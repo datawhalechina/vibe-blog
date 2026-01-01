@@ -123,11 +123,17 @@ class SharedState(TypedDict):
     target_length: Literal["short", "medium", "long"]
     source_material: Optional[str]
     
+    # 文档知识 (用户上传的文档)
+    document_ids: List[str]  # 用户上传的文档 ID 列表
+    document_knowledge: List[dict]  # 文档解析后的知识条目
+    
     # 素材收集 (Researcher 输出)
     search_results: List[dict]  # 搜索结果列表
     background_knowledge: Optional[str]  # 背景知识摘要
     key_concepts: List[str]  # 提取的核心概念
-    reference_links: List[str]  # 参考链接
+    reference_links: List[str]  # 参考链接 (网络来源)
+    document_references: List[dict]  # 文档来源引用
+    knowledge_source_stats: dict  # 知识来源统计
     
     # 多轮搜索相关
     search_count: int  # 当前搜索次数
@@ -191,6 +197,8 @@ def create_initial_state(
     target_audience: str = "intermediate",
     target_length: str = "medium",
     source_material: str = None,
+    document_ids: List[str] = None,
+    document_knowledge: List[dict] = None,
 ) -> SharedState:
     """创建初始状态"""
     return SharedState(
@@ -199,10 +207,16 @@ def create_initial_state(
         target_audience=target_audience,
         target_length=target_length,
         source_material=source_material,
+        # 文档知识
+        document_ids=document_ids or [],
+        document_knowledge=document_knowledge or [],
+        # 素材收集
         search_results=[],
         background_knowledge=None,
         key_concepts=[],
         reference_links=[],
+        document_references=[],
+        knowledge_source_stats={},
         # 多轮搜索相关
         search_count=0,
         max_search_count=get_max_search_count(target_length),

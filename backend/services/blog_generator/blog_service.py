@@ -29,17 +29,20 @@ class BlogService:
     博客生成服务 - 与 Banana Vibe Blog 任务管理系统集成
     """
     
-    def __init__(self, llm_client, search_service=None):
+    def __init__(self, llm_client, search_service=None, knowledge_service=None):
         """
         初始化博客生成服务
         
         Args:
             llm_client: LLM 客户端
             search_service: 搜索服务 (可选)
+            knowledge_service: 知识服务 (可选，用于文档知识融合)
         """
+        self.knowledge_service = knowledge_service
         self.generator = BlogGenerator(
             llm_client=llm_client,
-            search_service=search_service
+            search_service=search_service,
+            knowledge_service=knowledge_service
         )
         self.generator.compile()
     
@@ -80,6 +83,8 @@ class BlogService:
         target_audience: str = "intermediate",
         target_length: str = "medium",
         source_material: str = None,
+        document_ids: list = None,
+        document_knowledge: list = None,
         task_manager=None,
         app=None
     ):
@@ -93,6 +98,8 @@ class BlogService:
             target_audience: 目标受众
             target_length: 目标长度
             source_material: 参考资料
+            document_ids: 文档 ID 列表
+            document_knowledge: 文档知识列表
             task_manager: 任务管理器
             app: Flask 应用实例
         """
@@ -106,6 +113,8 @@ class BlogService:
                         target_audience=target_audience,
                         target_length=target_length,
                         source_material=source_material,
+                        document_ids=document_ids,
+                        document_knowledge=document_knowledge,
                         task_manager=task_manager
                     )
             else:
@@ -116,6 +125,8 @@ class BlogService:
                     target_audience=target_audience,
                     target_length=target_length,
                     source_material=source_material,
+                    document_ids=document_ids,
+                    document_knowledge=document_knowledge,
                     task_manager=task_manager
                 )
         
@@ -130,7 +141,9 @@ class BlogService:
         target_audience: str,
         target_length: str,
         source_material: str,
-        task_manager
+        document_ids: list = None,
+        document_knowledge: list = None,
+        task_manager=None
     ):
         """
         执行生成流程，发送 SSE 事件
@@ -190,13 +203,15 @@ class BlogService:
                     'message': f'开始生成博客: {topic}'
                 })
             
-            # 创建初始状态
+            # 创建初始状态（支持文档知识）
             initial_state = create_initial_state(
                 topic=topic,
                 article_type=article_type,
                 target_audience=target_audience,
                 target_length=target_length,
-                source_material=source_material
+                source_material=source_material,
+                document_ids=document_ids or [],
+                document_knowledge=document_knowledge or []
             )
             
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
@@ -662,13 +677,14 @@ class BlogService:
             return None
 
 
-def init_blog_service(llm_client, search_service=None) -> BlogService:
+def init_blog_service(llm_client, search_service=None, knowledge_service=None) -> BlogService:
     """
     初始化博客生成服务
     
     Args:
         llm_client: LLM 客户端 (banana-blog 的 LLMService)
         search_service: 搜索服务 (智谱搜索)
+        knowledge_service: 知识服务 (可选，用于文档知识融合)
         
     Returns:
         BlogService 实例
@@ -678,7 +694,7 @@ def init_blog_service(llm_client, search_service=None) -> BlogService:
     # 创建 LLM 客户端适配器
     llm_adapter = LLMClientAdapter(llm_client)
     
-    _blog_service = BlogService(llm_adapter, search_service)
+    _blog_service = BlogService(llm_adapter, search_service, knowledge_service)
     logger.info("博客生成服务已初始化")
     return _blog_service
 

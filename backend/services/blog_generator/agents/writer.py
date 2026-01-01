@@ -91,7 +91,9 @@ class WriterAgent:
         if not vague_points:
             return original_content
         
-        logger.info(f"正在深化章节 {progress_info}: {section_title}")
+        display_title = section_title if section_title else "(未知章节)"
+        display_progress = progress_info if progress_info else ""
+        logger.info(f"正在深化章节 {display_progress} {display_title}")
         
         pm = get_prompt_manager()
         prompt = pm.render_writer_enhance(

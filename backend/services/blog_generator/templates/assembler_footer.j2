@@ -13,6 +13,18 @@
 
 ## 参考资料
 
+{% if document_references %}
+### 📄 文档来源
+
+{% for ref in document_references %}
+- {{ ref.title }}{% if ref.file_name %} (`{{ ref.file_name }}`){% endif %}
+
+{% endfor %}
+{% endif %}
+{% if reference_links %}
+### 🌐 网络来源
+
 {% for link in reference_links %}
 {{ loop.index }}. {{ link }}
 {% endfor %}
+{% endif %}

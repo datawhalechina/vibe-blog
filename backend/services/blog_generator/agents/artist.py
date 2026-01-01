@@ -117,10 +117,12 @@ class ArtistAgent:
 图片说明：{caption}
 """
             
+            logger.info(f"开始生成【文章内容图】: {caption}")
             result = image_service.generate(
                 prompt=full_prompt,
                 aspect_ratio=AspectRatio.LANDSCAPE_16_9,
-                image_size=ImageSize.SIZE_1K
+                image_size=ImageSize.SIZE_1K,
+                max_wait_time=600
             )
             
             if result and result.local_path:
@@ -309,11 +311,15 @@ class ArtistAgent:
                     }
                     images.append(image_resource)
                     
-                    if 'image_ids' not in section:
-                        section['image_ids'] = []
-                    section['image_ids'].append(image_id)
+                    # 只有当图片成功生成时，才将其 image_id 添加到章节中
+                    if rendered_path:
+                        if 'image_ids' not in section:
+                            section['image_ids'] = []
+                        section['image_ids'].append(image_id)
+                        logger.info(f"配图生成完成 ({current_progress}/{total_image_count}): {image_id} ({placeholder['type']}) [来源:占位符:写作阶段]")
+                    else:
+                        logger.warning(f"配图生成失败 ({current_progress}/{total_image_count}): {image_id} ({placeholder['type']}) - rendered_path 为空")
                     
-                    logger.info(f"配图生成完成 ({current_progress}/{total_image_count}): {image_id} ({placeholder['type']}) [来源:占位符:写作阶段]")
                     image_id_counter += 1
                     
                 except Exception as e:

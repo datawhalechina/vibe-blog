@@ -30,7 +30,8 @@ class AssemblerAgent:
         outline: Dict[str, Any],
         sections: List[Dict[str, Any]],
         code_blocks: List[Dict[str, Any]],
-        images: List[Dict[str, Any]]
+        images: List[Dict[str, Any]],
+        document_references: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         组装最终文档
@@ -40,6 +41,7 @@ class AssemblerAgent:
             sections: 章节内容列表
             code_blocks: 代码块列表
             images: 图片资源列表
+            document_references: 文档来源引用列表
             
         Returns:
             组装结果
@@ -71,12 +73,13 @@ class AssemblerAgent:
         
         body = '\n\n---\n\n'.join(body_parts)
         
-        # 4. 生成文章尾部
+        # 4. 生成文章尾部（支持分类展示参考来源）
         conclusion = outline.get('conclusion', {})
         footer = pm.render_assembler_footer(
             summary_points=conclusion.get('summary_points', []),
             next_steps=conclusion.get('next_steps', ''),
-            reference_links=outline.get('reference_links', [])
+            reference_links=outline.get('reference_links', []),
+            document_references=document_references or []
         )
         
         # 5. 组装完整文档
@@ -120,6 +123,7 @@ class AssemblerAgent:
         
         code_blocks = state.get('code_blocks', [])
         images = state.get('images', [])
+        document_references = state.get('document_references', [])
         
         logger.info("开始组装文档")
         
@@ -127,7 +131,8 @@ class AssemblerAgent:
             outline=outline,
             sections=sections,
             code_blocks=code_blocks,
-            images=images
+            images=images,
+            document_references=document_references
         )
         
         state['final_markdown'] = result.get('markdown', '')

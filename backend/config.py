@@ -50,6 +50,14 @@ class Config:
     ZAI_SEARCH_MAX_RESULTS = int(os.getenv('ZAI_SEARCH_MAX_RESULTS', '5'))
     ZAI_SEARCH_CONTENT_SIZE = os.getenv('ZAI_SEARCH_CONTENT_SIZE', 'medium')
     ZAI_SEARCH_RECENCY_FILTER = os.getenv('ZAI_SEARCH_RECENCY_FILTER', 'noLimit')
+    
+    # MinerU PDF 解析 API
+    MINERU_TOKEN = os.getenv('MINERU_TOKEN', '')
+    MINERU_API_BASE = os.getenv('MINERU_API_BASE', 'https://mineru.net')
+    
+    # 知识融合配置
+    KNOWLEDGE_MAX_CONTENT_LENGTH = int(os.getenv('KNOWLEDGE_MAX_CONTENT_LENGTH', '8000'))
+    KNOWLEDGE_MAX_DOC_ITEMS = int(os.getenv('KNOWLEDGE_MAX_DOC_ITEMS', '10'))  # 文档知识最大条目数
 
 
 class DevelopmentConfig(Config):

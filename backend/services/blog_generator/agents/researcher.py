@@ -14,18 +14,21 @@ logger = logging.getLogger(__name__)
 class ResearcherAgent:
     """
     主题素材收集师 - 负责联网搜索收集背景资料
+    支持文档知识融合（一期）
     """
     
-    def __init__(self, llm_client, search_service=None):
+    def __init__(self, llm_client, search_service=None, knowledge_service=None):
         """
         初始化 Researcher Agent
         
         Args:
             llm_client: LLM 客户端
             search_service: 搜索服务 (可选，如果不提供则跳过搜索)
+            knowledge_service: 知识服务 (可选，用于文档知识融合)
         """
         self.llm = llm_client
         self.search_service = search_service
+        self.knowledge_service = knowledge_service
     
     def generate_search_queries(self, topic: str, target_audience: str) -> List[str]:
         """
@@ -199,6 +202,10 @@ class ResearcherAgent:
         """
         执行素材收集
         
+        支持两种模式：
+        1. 无文档上传 → 原有流程（仅网络搜索）
+        2. 有文档上传 → 知识融合流程（文档 + 网络搜索）
+        
         Args:
             state: 共享状态
             
@@ -208,17 +215,60 @@ class ResearcherAgent:
         topic = state.get('topic', '')
         target_audience = state.get('target_audience', 'intermediate')
         
-        logger.info(f"开始收集素材: {topic}")
+        # 获取文档知识（如果有上传文档）
+        document_knowledge = state.get('document_knowledge', [])
+        has_document = bool(document_knowledge)
         
-        # 1. 执行搜索
+        logger.info(f"开始收集素材: {topic}, 文档知识: {len(document_knowledge)} 条")
+        
+        # 1. 执行网络搜索（保持原有逻辑）
         search_results = self.search(topic, target_audience)
         
-        # 2. 整理结果
-        summary = self.summarize(
-            topic=topic,
-            search_results=search_results,
-            target_audience=target_audience
-        )
+        # 2. 知识融合分支
+        if self.knowledge_service and has_document:
+            # ✅ 有文档 → 走知识融合逻辑
+            logger.info("使用知识融合模式")
+            
+            # 将文档知识转换为 KnowledgeItem
+            doc_items = self.knowledge_service.prepare_document_knowledge(
+                [{'filename': d.get('file_name', ''), 'markdown_content': d.get('content', '')} 
+                 for d in document_knowledge]
+            )
+            
+            # 将搜索结果转换为 KnowledgeItem
+            web_items = self.knowledge_service.convert_search_results(search_results)
+            
+            # 融合知识
+            merged_knowledge = self.knowledge_service.get_merged_knowledge(
+                document_knowledge=doc_items,
+                web_knowledge=web_items
+            )
+            
+            # 整理为 Prompt 可用格式
+            summary = self.knowledge_service.summarize_for_prompt(merged_knowledge)
+            
+            # 记录知识来源统计
+            state['knowledge_source_stats'] = {
+                'document_count': len([k for k in merged_knowledge if k.source_type == 'document']),
+                'web_count': len([k for k in merged_knowledge if k.source_type == 'web_search']),
+                'total_items': len(merged_knowledge)
+            }
+            state['document_references'] = summary.get('document_references', [])
+            
+        else:
+            # ✅ 无文档 → 完全走原有逻辑，零改动
+            logger.info("使用原有搜索模式（无文档上传）")
+            summary = self.summarize(
+                topic=topic,
+                search_results=search_results,
+                target_audience=target_audience
+            )
+            state['knowledge_source_stats'] = {
+                'document_count': 0,
+                'web_count': len(search_results),
+                'total_items': len(search_results)
+            }
+            state['document_references'] = []
         
         # 3. 更新状态
         state['search_results'] = search_results
@@ -229,9 +279,11 @@ class ResearcherAgent:
         ]
         state['reference_links'] = [
             r.get('url', r) if isinstance(r, dict) else r
-            for r in summary.get('top_references', [])
+            for r in summary.get('top_references', summary.get('web_references', []))
         ]
         
-        logger.info(f"素材收集完成: {len(search_results)} 条结果, {len(state['key_concepts'])} 个核心概念")
+        stats = state['knowledge_source_stats']
+        logger.info(f"素材收集完成: 文档知识 {stats['document_count']} 条, "
+                    f"网络搜索 {stats['web_count']} 条, 核心概念 {len(state['key_concepts'])} 个")
         
         return state

@@ -249,14 +249,16 @@ class PromptManager:
         self,
         summary_points: list,
         next_steps: str,
-        reference_links: list
+        reference_links: list,
+        document_references: list = None
     ) -> str:
         """渲染文章尾部"""
         return self.render(
             'assembler_footer',
             summary_points=summary_points or [],
             next_steps=next_steps or '',
-            reference_links=reference_links or []
+            reference_links=reference_links or [],
+            document_references=document_references or []
         )
     
     def render_knowledge_gap_detector(

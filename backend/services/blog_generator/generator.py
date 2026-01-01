@@ -33,6 +33,7 @@ class BlogGenerator:
         self,
         llm_client,
         search_service=None,
+        knowledge_service=None,
         max_questioning_rounds: int = 2,
         max_revision_rounds: int = 3
     ):
@@ -42,16 +43,18 @@ class BlogGenerator:
         Args:
             llm_client: LLM 客户端
             search_service: 搜索服务 (可选)
+            knowledge_service: 知识服务 (可选，用于文档知识融合)
             max_questioning_rounds: 最大追问轮数
             max_revision_rounds: 最大修订轮数
         """
         self.llm = llm_client
         self.search_service = search_service
+        self.knowledge_service = knowledge_service
         self.max_questioning_rounds = max_questioning_rounds
         self.max_revision_rounds = max_revision_rounds
         
         # 初始化各 Agent
-        self.researcher = ResearcherAgent(llm_client, search_service)
+        self.researcher = ResearcherAgent(llm_client, search_service, knowledge_service)
         self.planner = PlannerAgent(llm_client)
         self.writer = WriterAgent(llm_client)
         self.coder = CoderAgent(llm_client)
@@ -297,7 +300,10 @@ class BlogGenerator:
         state['revision_count'] = state.get('revision_count', 0) + 1
         
         # 根据审核问题修订内容
-        for issue in state.get('review_issues', []):
+        review_issues = state.get('review_issues', [])
+        total_issues = len(review_issues)
+        
+        for idx, issue in enumerate(review_issues, 1):
             section_id = issue.get('section_id', '')
             issue_type = issue.get('issue_type', '')
             suggestion = issue.get('suggestion', '')
@@ -305,15 +311,18 @@ class BlogGenerator:
             # 找到对应章节并修订
             for section in state.get('sections', []):
                 if section.get('id') == section_id:
+                    section_title = section.get('title', section_id)
                     # 简单实现：将建议作为追问深化
                     enhanced_content = self.writer.enhance_section(
                         original_content=section.get('content', ''),
                         vague_points=[{
-                            'location': section.get('title', ''),
+                            'location': section_title,
                             'issue': issue.get('description', ''),
                             'question': suggestion,
                             'suggestion': '根据审核建议修改'
-                        }]
+                        }],
+                        section_title=section_title,
+                        progress_info=f"[{idx}/{total_issues}]"
                     )
                     section['content'] = enhanced_content
                     break

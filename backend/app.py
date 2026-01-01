@@ -515,7 +515,8 @@ def create_app(config_class=None):
             "topic": "LangGraph 入门教程",
             "article_type": "tutorial",  // tutorial | problem-solution | comparison
             "target_audience": "intermediate",  // beginner | intermediate | advanced
-            "target_length": "medium"  // short | medium | long
+            "target_length": "medium",  // short | medium | long
+            "document_ids": []  // 可选，上传文档的 ID 列表
         }
         
         返回:
@@ -540,11 +541,26 @@ def create_app(config_class=None):
             target_audience = data.get('target_audience', 'intermediate')
             target_length = data.get('target_length', 'medium')
             source_material = data.get('source_material', None)
+            document_ids = data.get('document_ids', [])  # 新增：文档 ID 列表
             
             # 检查博客生成服务
             blog_service = get_blog_service()
             if not blog_service:
                 return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
+            
+            # 准备文档知识（如果有上传文档）
+            document_knowledge = []
+            if document_ids:
+                db_service = get_db_service()
+                docs = db_service.get_documents_by_ids(document_ids)
+                for doc in docs:
+                    if doc.get('markdown_content'):
+                        document_knowledge.append({
+                            'file_name': doc.get('filename', ''),
+                            'content': doc.get('markdown_content', ''),
+                            'source_type': 'document'
+                        })
+                logger.info(f"加载文档知识: {len(document_knowledge)} 条")
             
             # 创建任务
             task_manager = get_task_manager()
@@ -559,6 +575,8 @@ def create_app(config_class=None):
                 target_audience=target_audience,
                 target_length=target_length,
                 source_material=source_material,
+                document_ids=document_ids,
+                document_knowledge=document_knowledge,
                 task_manager=task_manager,
                 app=current_app._get_current_object()
             )
@@ -566,7 +584,8 @@ def create_app(config_class=None):
             return jsonify({
                 'success': True,
                 'task_id': task_id,
-                'message': '博客生成任务已创建，请订阅 /api/tasks/{task_id}/stream 获取进度'
+                'message': '博客生成任务已创建，请订阅 /api/tasks/{task_id}/stream 获取进度',
+                'document_count': len(document_knowledge)
             }), 202
             
         except Exception as e:
