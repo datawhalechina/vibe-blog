@@ -378,7 +378,3 @@ banana-blog/
 
 本项目采用 [CC BY-NC-SA 4.0](https://creativecommons.org/licenses/by-nc-sa/4.0/) 许可证。
 
-- ✅ 允许修改和衍生
-- ✅ 需要署名
-- ✅ 必须以相同协议分发
-- ❌ 禁止商业使用
