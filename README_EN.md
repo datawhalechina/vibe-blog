@@ -8,7 +8,7 @@
 
 <p>
 
-[![Version](https://img.shields.io/badge/version-v0.1.0-4CAF50.svg)](https://github.com/Anionex/banana-vibe-blog)
+[![Version](https://img.shields.io/badge/version-v0.1.0-4CAF50.svg)](https://github.com/lailoo/Banana-Vibe-Blog)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
 
@@ -136,12 +136,29 @@ Banana Vibe Blog was born to solve these problems. Based on multi-Agent collabor
 ## 🎯 Feature Introduction
 
 ### 1. Multi-Agent Collaborative Architecture
-Based on LangGraph, multi-Agent workflow with clear division of labor and efficient collaboration.
-- **Researcher Agent**: Deep research, search the web for latest materials
-- **Planner Agent**: Smart planning, generate well-structured article outlines
-- **Writer Agent**: Content creation, write easy-to-understand chapter content
-- **Coder Agent**: Code generation, provide runnable example code
-- **Artist Agent**: Smart illustration, generate Mermaid diagrams and AI images
+
+<div align="center">
+
+<img width="800" src="./logo/multi-agent-architecture.png">
+
+</div>
+
+Based on LangGraph, multi-Agent workflow with clear division of labor and efficient collaboration:
+
+| Agent | Role | Core Capability |
+|-------|------|--------|
+| **Orchestrator** | Director | Coordinate entire workflow, manage Agent communication |
+| **Researcher** | Researcher | Web search, knowledge extraction, document fusion |
+| **SearchCoordinator** | Multi-round Search | Multi-round search based on Writer/Questioner feedback, detect knowledge gaps |
+| **Planner** | Planner | Generate structured outlines, design article framework |
+| **Writer** | Writer | Write each chapter content in loop, ensure logical coherence |
+| **Questioner** | Depth Checker | Core role for article length control, deep check Writer output, expand content based on depth type |
+| **Coder** | Coder | Generate example code, provide runnable code |
+| **Artist** | Illustrator | Generate Mermaid diagrams, AI cover images |
+| **Reviewer** | Quality Controller | Core quality control role, check and score Writer/Questioner output, regenerate if below threshold |
+| **Assembler** | Assembler | Final document assembly, multi-format export |
+
+All Agents share unified state management and Prompt template library, ensuring efficient collaboration and consistent output quality.
 
 ### 2. Deep Research Capability
 - **Zhipu Search Integration**: Automatically search the web for latest technical materials
@@ -159,33 +176,12 @@ Based on LangGraph, multi-Agent workflow with clear division of labor and effici
 - **Live Preview**: Real-time Markdown and Mermaid rendering in frontend
 
 
-## 🤖 Multi-Agent Collaborative Architecture
-
-<div align="center">
-
-<img width="800" src="./logo/multi-agent-architecture.png">
-
-</div>
-
-Banana Vibe Blog adopts a multi-Agent collaborative architecture where each Agent has clear responsibilities and works efficiently together:
-
-- **Orchestrator Agent** (Director): Coordinates the entire workflow
-- **Researcher Agent** (Researcher): Deep search and knowledge extraction
-- **Planner Agent** (Planner): Generate structured outlines
-- **Writer Agent** (Writer): Write section content
-- **Coder Agent** (Coder): Generate example code
-- **Artist Agent** (Illustrator): Generate Mermaid diagrams and AI images
-- **Reviewer Agent** (Reviewer): Quality check and optimization
-- **Assembler Agent** (Assembler): Final document assembly
-
-All Agents share unified state management and Prompt template library, ensuring efficient collaboration and consistent output quality.
-
 
 ## 🗺️ Development Roadmap
 
 | Status | Milestone |
 | --- | --- |
-| ✅ Completed | Multi-Agent architecture (Researcher/Planner/Writer/Coder/Artist) |
+| ✅ Completed | Multi-Agent architecture (10 Agents: Orchestrator/Researcher/SearchCoordinator/Planner/Writer/Questioner/Coder/Artist/Reviewer/Assembler) |
 | ✅ Completed | Zhipu search service integration |
 | ✅ Completed | Mermaid diagram auto-generation |
 | ✅ Completed | AI cover image generation (nano-banana-pro) |
@@ -207,8 +203,7 @@ All Agents share unified state management and Prompt template library, ensuring 
 
 1. **Clone the repository**
 ```bash
-git clone https://github.com/Anionex/banana-blog
-cd banana-blog
+git clone https://github.com/lailoo/Banana-Vibe-Blog
 ```
 
 2. **Install dependencies**
@@ -306,7 +301,7 @@ banana-blog/
 │       └── blog_generator/               # Blog generator core
 │           ├── blog_service.py           # Blog generation service entry
 │           ├── generator.py              # LangGraph workflow definition
-│           ├── agents/                   # 9 Agent implementations
+│           ├── agents/                   # 10 Agent implementations
 │           │   ├── researcher.py         # Research Agent - web search
 │           │   ├── search_coordinator.py # Search Coordinator Agent - multi-round search
 │           │   ├── planner.py            # Planning Agent - outline generation
@@ -362,9 +357,9 @@ banana-blog/
 ## 🤝 Contributing
 
 Welcome to contribute to this project through
-[Issue](https://github.com/Anionex/banana-blog/issues)
+[Issue](https://github.com/lailoo/Banana-Vibe-Blog/issues)
 and
-[Pull Request](https://github.com/Anionex/banana-blog/pulls)!
+[Pull Request](https://github.com/lailoo/Banana-Vibe-Blog/pulls)!
 
 
 ## 📄 License

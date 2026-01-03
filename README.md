@@ -12,7 +12,7 @@
 
 
 
-[![Version](https://img.shields.io/badge/version-v0.1.0-4CAF50.svg)](https://github.com/Anionex/banana-vibe-blog)
+[![Version](https://img.shields.io/badge/version-v0.1.0-4CAF50.svg)](https://github.com/lailoo/Banana-Vibe-Blog)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
 <h1>Banana-Vibe-Blog</h1>
@@ -186,12 +186,29 @@ Banana Vibe Blog 应运而生，基于多 Agent 协作架构，自动完成调�
 ## 🎯 功能介绍
 
 ### 1. 多 Agent 协作架构
-基于 LangGraph 构建的多 Agent 工作流，各司其职，高效协作。
-- **Researcher Agent**：深度调研，搜索网络获取最新资料
-- **Planner Agent**：智能规划，生成结构清晰的文章大纲
-- **Writer Agent**：内容创作，撰写通俗易懂的章节内容
-- **Coder Agent**：代码生成，提供可运行的示例代码
-- **Artist Agent**：智能配图，生成 Mermaid 图表和 AI 配图
+
+<div align="center">
+
+<img width="800" src="./logo/multi-agent-architecture.png">
+
+</div>
+
+基于 LangGraph 构建的多 Agent 工作流，各个 Agent 分工明确，协同高效：
+
+| Agent | 职责 | 核心能力 |
+|-------|------|--------|
+| **Orchestrator** | 总指挥 | 协调整个工作流程，管理 Agent 间通信 |
+| **Researcher** | 调研员 | 联网搜索、知识提取、文档融合 |
+| **SearchCoordinator** | 多轮搜索策略 | 根据 Writer 和 Questioner 反馈进行多轮搜索，检测知识空白，构造细化查询，填补内容缺陷 |
+| **Planner** | 规划师 | 生成结构化大纲，设计文章框架，生成若干个章节和内容块 |
+| **Writer** | 撰写师 | 循环撰写每一章节的内容，保证逻辑连贯、适配目标受众 |
+| **Questioner** | 问题追问官 | 核心控制文章长度的角色，对 Writer 输出进行深度检查，根据指定的深度类型持续深化内容，完成文章长度扩展 |
+| **Coder** | 代码员 | 生成示例代码、提供可运行代码、输出代码说明 |
+| **Artist** | 配图师 | 生成 Mermaid 图表、AI 封面图、上下文感知配图 |
+| **Reviewer** | 质量审核官 | 核心质量控制角色，对 Writer 和 Questioner 输出进行检查与评分，低于阈值或发现错误则重新生成，确保内容准确性和完整性 |
+| **Assembler** | 组装员 | 最终文档组装、多格式导出、排版优化 |
+
+所有 Agent 共享统一的状态管理和 Prompt 模板库，确保高效协作和一致的输出质量。
 
 ### 2. 深度调研能力
 - **智谱搜索集成**：自动搜索网络获取最新技术资料
@@ -209,27 +226,6 @@ Banana Vibe Blog 应运而生，基于多 Agent 协作架构，自动完成调�
 - **实时预览**：前端实时渲染 Markdown 和 Mermaid 图表
 
 
-## 🤖 Multi-Agent 协作架构
-
-<div align="center">
-
-<img width="800" src="./logo/multi-agent-architecture.png">
-
-</div>
-
-Banana Vibe Blog 采用多 Agent 协作架构，各个 Agent 分工明确，协同高效：
-
-- **Orchestrator Agent**（总指挥）：协调整个工作流程
-- **Researcher Agent**（调研员）：深度搜索和知识提取
-- **Planner Agent**（规划师）：生成结构化大纲
-- **Writer Agent**（写手）：撰写章节内容
-- **Coder Agent**（代码员）：生成示例代码
-- **Artist Agent**（配图师）：生成 Mermaid 图表和 AI 配图
-- **Reviewer Agent**（审核员）：质量检查和优化
-- **Assembler Agent**（组装员）：最终文档组装
-
-所有 Agent 共享统一的状态管理和 Prompt 模板库，确保高效协作和一致的输出质量。
-
 
 ## 🗺️ 开发计划
 
@@ -237,7 +233,7 @@ Banana Vibe Blog 采用多 Agent 协作架构，各个 Agent 分工明确，协�
 
 | # | 状态 | 功能 | 说明 |
 | --- | --- | --- | --- |
-| 1 | ✅ | 多 Agent 架构 | Researcher/Planner/Writer/Coder/Artist 协作 |
+| 1 | ✅ | 多 Agent 架构 | 10 个 Agent 协作：Orchestrator/Researcher/SearchCoordinator/Planner/Writer/Questioner/Coder/Artist/Reviewer/Assembler |
 | 2 | ✅ | 联网搜索 | 智谱搜索 API 集成 |
 | 3 | ✅ | 多轮搜索 | 迭代式深度调研 |
 | 4 | ✅ | Mermaid 图表 | 流程图/架构图自动生成 |
@@ -329,19 +325,20 @@ cp .env.example .env
 
 编辑 `.env` 文件，配置必要的环境变量：
 ```env
-# AI Provider 格式配置 (openai)
+# AI Provider 格式配置
 AI_PROVIDER_FORMAT=openai
 
-# OpenAI 格式配置
+# OpenAI 兼容 API 配置
 OPENAI_API_KEY=your-api-key-here
-OPENAI_API_BASE=https://api.openai.com/v1
-TEXT_MODEL=gpt-4o
+OPENAI_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
+TEXT_MODEL=qwen3-max-preview
 
 # 智谱搜索 API（可选，用于深度调研）
-ZHIPU_API_KEY=your-zhipu-api-key
+ZAI_SEARCH_API_KEY=your-zhipu-api-key
 
 # Nano Banana Pro API（可选，用于 AI 封面图）
 NANO_BANANA_API_KEY=your-nano-banana-api-key
+NANO_BANANA_API_BASE=https://api.grsai.com
 ```
 
 4. **启动服务**
@@ -404,7 +401,7 @@ banana-blog/
 │       └── blog_generator/               # 博客生成器核心
 │           ├── blog_service.py           # 博客生成服务入口
 │           ├── generator.py              # LangGraph 工作流定义
-│           ├── agents/                   # 9 个 Agent 实现
+│           ├── agents/                   # 10 个 Agent 实现
 │           │   ├── researcher.py         # 调研 Agent - 联网搜索
 │           │   ├── search_coordinator.py # 搜索协调 Agent - 多轮搜索
 │           │   ├── planner.py            # 规划 Agent - 大纲生成
@@ -447,25 +444,72 @@ banana-blog/
 
 ## 🔧 环境变量
 
+### Flask 配置
+
 | 变量名 | 说明 | 示例值 |
 |--------|------|--------|
 | `FLASK_ENV` | Flask 运行环境 | development |
 | `SECRET_KEY` | Flask 密钥 | banana-blog-secret-key |
-| `AI_PROVIDER_FORMAT` | AI Provider 格式 (openai/gemini) | openai |
-| `TEXT_MODEL` | 文本生成模型 | qwen3-max-preview |
-| `OPENAI_API_KEY` | OpenAI 兼容 API Key | - |
-| `OPENAI_API_BASE` | OpenAI 兼容 API 基础 URL | https://dashscope.aliyuncs.com/compatible-mode/v1 |
 | `LOG_LEVEL` | 日志级别 | INFO |
 | `CORS_ORIGINS` | CORS 允许的源 | * |
-| `NANO_BANANA_API_KEY` | Nano Banana 图片生成 API Key（可选） | - |
-| `NANO_BANANA_API_BASE` | Nano Banana API 基础 URL | https://api.grsai.com(国内我使用的是这个模型代理网站) |
+
+### AI 模型配置
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `AI_PROVIDER_FORMAT` | AI Provider 格式 | openai |
+| `TEXT_MODEL` | 文本生成模型 | qwen3-max-preview |
+| `IMAGE_CAPTION_MODEL` | 图片摘要模型 | qwen3-vl-plus-2025-12-19 |
+
+### OpenAI 兼容 API 配置
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `OPENAI_API_KEY` | OpenAI 兼容 API Key | sk-xxx |
+| `OPENAI_API_BASE` | OpenAI 兼容 API 基础 URL | https://dashscope.aliyuncs.com/compatible-mode/v1 |
+
+### 图片生成配置（Nano Banana）
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `NANO_BANANA_API_KEY` | Nano Banana API Key | sk-xxx |
+| `NANO_BANANA_API_BASE` | Nano Banana API 基础 URL | https://api.grsai.com |
 | `NANO_BANANA_MODEL` | Nano Banana 模型名称 | nano-banana-pro |
-| `ZAI_SEARCH_API_KEY` | 智谱 Web Search API Key（可选） | - |
+
+### 搜索配置（智谱 Web Search）
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `ZAI_SEARCH_API_KEY` | 智谱 Web Search API Key | xxx |
 | `ZAI_SEARCH_API_BASE` | 智谱搜索 API 基础 URL | https://open.bigmodel.cn/api/paas/v4/web_search |
-| `ZAI_SEARCH_ENGINE` | 智谱搜索引擎类型 | search_pro_quark |
+| `ZAI_SEARCH_ENGINE` | 搜索引擎类型 | search_pro_quark |
 | `ZAI_SEARCH_MAX_RESULTS` | 搜索最大结果数 | 5 |
 | `ZAI_SEARCH_CONTENT_SIZE` | 搜索内容大小 | medium |
 | `ZAI_SEARCH_RECENCY_FILTER` | 搜索时效过滤 | noLimit |
+
+### 多轮搜索配置
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `MULTI_SEARCH_MAX_SHORT` | 短文最大搜索次数 | 3 |
+| `MULTI_SEARCH_MAX_MEDIUM` | 中等文章最大搜索次数 | 5 |
+| `MULTI_SEARCH_MAX_LONG` | 长文最大搜索次数 | 8 |
+
+### 文件解析配置（MinerU）
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `MINERU_TOKEN` | MinerU 服务 Token | xxx |
+| `MINERU_API_BASE` | MinerU API 基础 URL | https://mineru.net |
+
+### 知识融合配置
+
+| 变量名 | 说明 | 示例值 |
+|--------|------|--------|
+| `KNOWLEDGE_MAX_CONTENT_LENGTH` | 最大内容长度 | 8000 |
+| `KNOWLEDGE_MAX_DOC_ITEMS` | 最大文档项数 | 10 |
+| `KNOWLEDGE_CHUNK_SIZE` | 知识分块大小 | 2000 |
+| `KNOWLEDGE_CHUNK_OVERLAP` | 知识分块重叠 | 200 |
 
 
 ## 🤝 贡献指南
