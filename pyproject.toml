@@ -1,0 +1,8 @@
+[tool.vercel]
+builders = [
+  { src = "backend/app.py", use = "@vercel/python" }
+]
+
+[[tool.vercel.routes]]
+src = "/(.*)"
+dest = "backend/app.py"

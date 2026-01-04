@@ -1,6 +1,5 @@
 {
-  "buildCommand": "cd backend && pip install -r requirements.txt",
-  "outputDirectory": "backend",
+  "buildCommand": "pip install -r backend/requirements.txt",
   "framework": "python",
   "python": {
     "version": "3.11"
