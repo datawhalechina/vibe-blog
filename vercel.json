@@ -1,6 +1,7 @@
 {
   "buildCommand": "pip install -r backend/requirements.txt",
   "framework": "python",
+  "regions": ["sfo1"],
   "rewrites": [
     {
       "source": "/(.*)",
