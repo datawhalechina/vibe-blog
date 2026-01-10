@@ -3,6 +3,7 @@ vibe-reviewer API 路由定义
 
 所有路由使用 /api/reviewer/ 前缀
 """
+import os
 import logging
 import json
 import time
@@ -21,6 +22,20 @@ _evaluation_lock = threading.Lock()
 
 # 创建 Blueprint
 reviewer_bp = Blueprint('reviewer', __name__, url_prefix='/api/reviewer')
+
+logger.info("vibe-reviewer API 路由已注册")
+
+
+@reviewer_bp.route('/config', methods=['GET'])
+def get_config():
+    """获取 vibe-reviewer 配置"""
+    max_chapters = int(os.environ.get('REVIEWER_MAX_CHAPTERS', 5))
+    return jsonify({
+        'success': True,
+        'config': {
+            'max_chapters': max_chapters
+        }
+    })
 
 
 def register_reviewer_routes(app):
@@ -177,7 +192,8 @@ def evaluate_tutorial(tutorial_id):
         
         # 获取参数
         data = request.get_json() or {}
-        max_chapters = data.get('max_chapters', 20)  # 默认最多评估20个章节
+        default_max = int(os.environ.get('REVIEWER_MAX_CHAPTERS', 5))
+        max_chapters = data.get('max_chapters', default_max)
         
         # 同步执行评估
         result = service.evaluate_tutorial_sync(
@@ -204,7 +220,8 @@ def evaluate_tutorial_stream(tutorial_id):
             return jsonify({'success': False, 'error': 'ReviewerService 未初始化'}), 500
         
         # 获取参数 (从 URL 查询参数)
-        max_chapters = request.args.get('max_chapters', 20, type=int)
+        default_max = int(os.environ.get('REVIEWER_MAX_CHAPTERS', 5))
+        max_chapters = request.args.get('max_chapters', default_max, type=int)
         # 0 表示全部评估
         if max_chapters == 0:
             max_chapters = 1000  # 实际上不限制

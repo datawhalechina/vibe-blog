@@ -64,9 +64,9 @@ class PromptManager:
         """渲染质量审核 Prompt"""
         return self.render("quality_review", content=content, references=references or [])
     
-    def render_readability_check(self, content: str) -> str:
+    def render_readability_check(self, content: str, metrics: Dict = None) -> str:
         """渲染可读性检测 Prompt"""
-        return self.render("readability_check", content=content)
+        return self.render("readability_check", content=content, metrics=metrics or {})
     
     def render_improvement(
         self, 

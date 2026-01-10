@@ -142,6 +142,11 @@ def create_app(config_class=None):
     def index():
         return send_from_directory(static_folder, 'index.html')
     
+    # vibe-reviewer 独立页面
+    @app.route('/reviewer')
+    def reviewer_page():
+        return send_from_directory(static_folder, 'reviewer.html')
+    
     # 提供 outputs 目录下的图片文件
     @app.route('/outputs/images/<path:filename>')
     def serve_output_image(filename):
@@ -156,7 +161,7 @@ def create_app(config_class=None):
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Banana Blog - 技术科普绘本生成器</title>
+    <title>Vibe Blog - 技术科普绘本生成器</title>
     <style>
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; max-width: 800px; margin: 50px auto; padding: 20px; }
         h1 { color: #FF6B35; }
@@ -955,7 +960,7 @@ def create_app(config_class=None):
     except Exception as e:
         logger.warning(f"vibe-reviewer 模块初始化失败 (可选模块): {e}")
     
-    logger.info("Banana Blog 后端应用已启动")
+    logger.info("Vibe Blog 后端应用已启动")
     return app
 
 

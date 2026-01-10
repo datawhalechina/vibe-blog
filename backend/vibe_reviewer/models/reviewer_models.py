@@ -419,15 +419,33 @@ class ChapterModel:
     def create(tutorial_id: int, file_path: str, file_name: str, 
                title: str = None, chapter_order: int = 0,
                raw_content: str = None, content_hash: str = None) -> int:
-        """创建章节"""
+        """创建或更新章节（按 tutorial_id + file_path 去重）"""
         word_count = len(raw_content) if raw_content else 0
         with get_connection() as conn:
-            cursor = conn.execute('''
-                INSERT INTO reviewer_chapters 
-                (tutorial_id, file_path, file_name, title, chapter_order, raw_content, content_hash, word_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            ''', (tutorial_id, file_path, file_name, title, chapter_order, raw_content, content_hash, word_count))
-            return cursor.lastrowid
+            # 先检查是否已存在
+            existing = conn.execute(
+                'SELECT id FROM reviewer_chapters WHERE tutorial_id = ? AND file_path = ?',
+                (tutorial_id, file_path)
+            ).fetchone()
+            
+            if existing:
+                # 更新已存在的章节
+                conn.execute('''
+                    UPDATE reviewer_chapters 
+                    SET file_name = ?, title = ?, chapter_order = ?, raw_content = ?, 
+                        content_hash = ?, word_count = ?, status = 'pending',
+                        updated_at = CURRENT_TIMESTAMP
+                    WHERE id = ?
+                ''', (file_name, title, chapter_order, raw_content, content_hash, word_count, existing['id']))
+                return existing['id']
+            else:
+                # 创建新章节
+                cursor = conn.execute('''
+                    INSERT INTO reviewer_chapters 
+                    (tutorial_id, file_path, file_name, title, chapter_order, raw_content, content_hash, word_count)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (tutorial_id, file_path, file_name, title, chapter_order, raw_content, content_hash, word_count))
+                return cursor.lastrowid
     
     @staticmethod
     def get_by_id(chapter_id: int) -> Optional[Dict]:

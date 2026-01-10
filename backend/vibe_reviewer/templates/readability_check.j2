@@ -4,6 +4,34 @@
 
 {{ content }}
 
+{% if metrics %}
+## 中文可读性指标（自动分析）
+
+以下是针对中文技术博客的可读性指标，请结合这些数据进行评估：
+
+| 指标 | 数值 | 说明 |
+|------|------|------|
+| **平均句长** | {{ metrics.avg_sentence_length }} 字 | 最佳 15-25 字，超过 35 字偏长 |
+| **长句比例** | {{ metrics.long_sentence_ratio }}% | 超过 40 字的句子占比，建议 < 20% |
+| **超长句比例** | {{ metrics.very_long_sentence_ratio }}% | 超过 60 字的句子占比 |
+| **段落数** | {{ metrics.paragraph_count }} | 是否有合理分段 |
+| **平均段落长度** | {{ metrics.avg_paragraph_length }} 字 | 建议 100-200 字 |
+
+**文档结构**:
+- 标题数: {{ metrics.heading_count }}
+- 列表项: {{ metrics.list_count }}
+- 代码块: {{ metrics.code_block_count }}
+- 结构良好: {{ "是" if metrics.has_structure else "否" }}
+
+**系统预估**:
+- 综合评分: {{ metrics.overall_score }}
+- 难度等级: {{ metrics.difficulty_level }}
+- 建议阅读年级: {{ metrics.suggested_grade }}
+- 评估摘要: {{ metrics.summary }}
+
+请参考以上客观指标，结合内容质量进行综合评估。重点关注句子长度和段落结构。
+{% endif %}
+
 ## 评估维度（每个维度25分，共100分）
 
 ### 1. 词汇层面 (vocabulary_score, 25分)
@@ -86,7 +114,8 @@
     {
       "issue_type": "jargon_unexplained",
       "severity": "medium",
-      "location": "第1节第3段 - 'Redis Cluster'",
+      "location": "第1节第3段",
+      "original_text": "Redis Cluster",
       "description": "首次出现 'Redis Cluster' 术语时没有解释，读者可能不理解",
       "suggestion": "在首次提及时添加简要解释：Redis Cluster 是 Redis 的分布式解决方案，用于数据分片和高可用",
       "question": "一个不了解 Redis 的读者能否理解这个术语？"
@@ -94,7 +123,8 @@
     {
       "issue_type": "sentence_too_long",
       "severity": "low",
-      "location": "第2节第1段第1句",
+      "location": "第2节第1段",
+      "original_text": "在实际开发中，我们需要考虑到各种边界情况和异常处理，同时还要兼顾代码的可维护性和扩展性，这就要求我们在设计阶段就做好充分的规划",
       "description": "该句话超过80字，阅读负担较重",
       "suggestion": "将长句拆分为2-3个短句，每句表达一个要点"
     }
@@ -121,6 +151,8 @@
 - low: 可选优化
 
 **重要提示**:
-- 每个 issue 必须包含具体的 location（精确到段落或引用原文）
+- 每个 issue 必须包含具体的 location（精确到段落）
+- 每个 issue 必须包含 original_text（从原文中精确复制的问题文本片段，用于定位）
 - suggestion 应该是可操作的改进建议
 - 站在目标读者的角度思考：他们能理解吗？
+- original_text 应该是原文中可以直接搜索到的文本，不要修改或缩写

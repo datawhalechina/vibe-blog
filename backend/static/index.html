@@ -56,6 +56,7 @@
         .nav-links { display: flex; gap: 30px; }
         .nav-links a { color: rgba(0,0,0,0.6); text-decoration: none; font-size: 14px; }
         .nav-links a:hover { color: #000; }
+        .nav-tabs { display: flex; gap: 10px; }
         .hero { text-align: center; padding: 50px 20px 30px; }
         .hero h1 {
             font-size: 42px; font-weight: 700; margin-bottom: 12px;
@@ -64,7 +65,7 @@
         }
         .hero p { font-size: 16px; color: rgba(0,0,0,0.6); }
         .main-card {
-            max-width: 1000px; margin: 30px auto; padding: 24px;
+            max-width: 75vw; margin: 30px auto; padding: 24px;
             background: rgba(255,255,255,0.8);
             backdrop-filter: blur(20px);
             border-radius: 20px;
@@ -162,7 +163,7 @@
         /* 进度面板 */
         .progress-panel {
             display: none;
-            max-width: 1000px;
+            max-width: 75vw;
             margin: 30px auto;
             background: linear-gradient(135deg, rgba(255,255,255,0.95), rgba(245,245,245,0.95));
             backdrop-filter: blur(20px);
@@ -273,7 +274,7 @@
         /* 结果区域 */
         .result-section {
             display: none;
-            max-width: 1000px;
+            max-width: 75vw;
             margin: 30px auto;
             padding: 0;
         }
@@ -449,7 +450,7 @@
         .markdown-body::-webkit-scrollbar-thumb:hover { background: rgba(0,0,0,0.3); }
 
         /* 示例卡片 */
-        .examples-section { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+        .examples-section { max-width: 75vw; margin: 40px auto; padding: 0 20px; }
         .section-title { font-size: 20px; font-weight: 600; margin-bottom: 20px; color: #333; }
         .examples-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
         .example-card {
@@ -477,7 +478,7 @@
         .example-desc { font-size: 12px; color: rgba(0,0,0,0.5); }
 
         /* 历史记录区域 */
-        .history-section { max-width: 1000px; margin: 40px auto; padding: 0 20px; }
+        .history-section { max-width: 75vw; margin: 40px auto; padding: 0 20px; }
         .history-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; }
         .history-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
         .history-card {
@@ -555,7 +556,9 @@
 
     <nav class="navbar">
         <div class="logo"><span>vibe-blog</span></div>
-        <div class="nav-links">
+        <div class="nav-tabs">
+            <div class="tab active">📝 长文博客</div>
+            <a href="/reviewer" class="tab" style="text-decoration: none;">🔍 教程评估</a>
         </div>
     </nav>
 
@@ -565,10 +568,6 @@
     </section>
 
     <div class="main-card">
-        <div class="tabs">
-            <div class="tab active" data-tab="blog">📝 长文博客</div>
-            <div class="tab" data-tab="reviewer">🔍 教程评估</div>
-        </div>
         <div class="input-wrapper">
             <textarea class="text-input" id="contentInput" placeholder="输入技术主题，如：LangGraph 入门教程、Redis 性能优化..."></textarea>
         </div>
@@ -1809,7 +1808,7 @@
                             flex: 1; background: linear-gradient(135deg, #4ECDC4, #45B7AA);
                             border-radius: 12px; padding: 16px; color: white; text-align: center;
                         ">
-                            <div style="font-size: 32px; font-weight: 700;">${tutorial.overall_score || '-'}</div>
+                            <div style="font-size: 32px; font-weight: 700;">${tutorial.overall_score ? tutorial.overall_score.toFixed(2) : '-'}</div>
                             <div style="font-size: 12px; opacity: 0.9;">综合评分</div>
                         </div>
                         <div style="flex: 1; background: #f5f5f5; border-radius: 12px; padding: 16px; text-align: center;">

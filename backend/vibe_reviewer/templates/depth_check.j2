@@ -71,6 +71,7 @@
   "vague_points": [
     {
       "location": "第2节 - Redis数据结构",
+      "original_text": "Redis支持String、Hash、List、Set、ZSet等数据结构",
       "issue": "只列举了数据结构类型，没有解释各自的使用场景",
       "question": "什么场景下应该使用 Hash 而不是 String？各有什么优缺点？",
       "suggestion": "建议添加每种数据结构的典型使用场景对比表格"
@@ -88,6 +89,9 @@
 - 0-59: 内容过于简略，需要重写
 
 **重要提示**:
+- 每个 vague_point 必须包含具体的 location（精确到段落）
+- 每个 vague_point 必须包含 original_text（从原文中精确复制的问题文本片段，用于定位）
 - 每个 vague_point 必须包含具体的 question（追问问题）
 - question 应该是读者真正会问的问题
 - suggestion 应该是可操作的改进建议
+- original_text 应该是原文中可以直接搜索到的文本，不要修改或缩写

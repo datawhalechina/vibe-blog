@@ -1,0 +1,1629 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🔍 vibe-reviewer - 教程质量评估</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- 代码高亮 -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/core.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/python.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/javascript.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/bash.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/languages/json.min.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+        .navbar {
+            display: flex; justify-content: space-between; align-items: center;
+            padding: 16px 40px;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            position: sticky; top: 0; z-index: 100;
+        }
+        .logo {
+            display: flex; align-items: center; gap: 12px;
+            text-decoration: none;
+        }
+        .logo span {
+            font-size: 22px; font-weight: 700;
+            background: linear-gradient(135deg, #4ECDC4, #45B7AA);
+            -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .logo small {
+            font-size: 12px; color: #666; font-weight: 400;
+        }
+        .nav-links {
+            display: flex; gap: 20px; align-items: center;
+        }
+        .nav-links a {
+            color: #666; text-decoration: none; font-size: 14px;
+            padding: 8px 16px; border-radius: 8px;
+            transition: all 0.2s;
+        }
+        .nav-links a:hover {
+            background: rgba(78, 205, 196, 0.1); color: #4ECDC4;
+        }
+        .nav-links a.back {
+            background: #f5f5f5;
+        }
+        
+        .container {
+            max-width: 75vw; margin: 0 auto; padding: 30px 40px;
+        }
+        
+        .page-header {
+            margin-bottom: 30px;
+        }
+        .page-header h1 {
+            font-size: 28px; font-weight: 700; color: #333; margin-bottom: 8px;
+        }
+        .page-header p {
+            font-size: 14px; color: #666;
+        }
+        
+        .add-section {
+            background: white; border-radius: 16px; padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            margin-bottom: 30px;
+        }
+        .add-section h3 {
+            font-size: 16px; font-weight: 600; color: #333; margin-bottom: 16px;
+        }
+        .input-row {
+            display: flex; gap: 12px;
+        }
+        .input-row input {
+            flex: 1; padding: 14px 18px; border: 1px solid #e0e0e0;
+            border-radius: 10px; font-size: 14px; outline: none;
+            transition: border-color 0.2s;
+        }
+        .input-row input:focus {
+            border-color: #4ECDC4;
+        }
+        .input-row button {
+            padding: 14px 28px; background: linear-gradient(135deg, #4ECDC4, #45B7AA);
+            border: none; border-radius: 10px; color: white;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        .input-row button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(78, 205, 196, 0.4);
+        }
+        
+        .tutorials-grid {
+            display: grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+            gap: 20px;
+        }
+        
+        .tutorial-card {
+            background: white; border-radius: 16px; padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            transition: transform 0.2s, box-shadow 0.2s;
+            cursor: pointer;
+        }
+        .tutorial-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+        }
+        .tutorial-header {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 16px;
+        }
+        .tutorial-name {
+            font-size: 18px; font-weight: 600; color: #333;
+            margin-bottom: 4px;
+        }
+        .tutorial-url {
+            font-size: 12px; color: #999;
+            word-break: break-all;
+        }
+        .tutorial-score {
+            width: 56px; height: 56px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 18px; font-weight: 700; color: white;
+            flex-shrink: 0;
+        }
+        .score-high { background: linear-gradient(135deg, #4ECDC4, #45B7AA); }
+        .score-medium { background: linear-gradient(135deg, #FFD166, #F0C040); }
+        .score-low { background: linear-gradient(135deg, #ff6b6b, #ee5a5a); }
+        
+        .tutorial-stats {
+            display: flex; gap: 16px; margin-bottom: 16px;
+        }
+        .stat-item {
+            display: flex; align-items: center; gap: 6px;
+            font-size: 13px; color: #666;
+        }
+        .stat-item strong {
+            color: #333;
+        }
+        
+        .tutorial-issues {
+            display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px;
+        }
+        .issue-badge {
+            padding: 4px 10px; border-radius: 12px; font-size: 12px;
+        }
+        .issue-high { background: rgba(255,107,107,0.15); color: #ff6b6b; }
+        .issue-medium { background: rgba(255,209,102,0.15); color: #e6a800; }
+        .issue-low { background: rgba(78,205,196,0.15); color: #3db8ad; }
+        
+        .tutorial-status {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 6px 12px; border-radius: 8px; font-size: 12px;
+        }
+        .status-completed { background: rgba(78,205,196,0.1); color: #4ECDC4; }
+        .status-pending { background: rgba(255,209,102,0.1); color: #e6a800; }
+        .status-evaluating { background: rgba(78,205,196,0.1); color: #4ECDC4; }
+        .status-failed { background: rgba(255,107,107,0.1); color: #ff6b6b; }
+        
+        .tutorial-actions {
+            display: flex; gap: 8px; margin-top: 16px; padding-top: 16px;
+            border-top: 1px solid #f0f0f0;
+        }
+        .action-btn {
+            flex: 1; padding: 10px; border: none; border-radius: 8px;
+            font-size: 13px; cursor: pointer; transition: all 0.2s;
+        }
+        .action-btn.primary {
+            background: linear-gradient(135deg, #4ECDC4, #45B7AA);
+            color: white;
+        }
+        .action-btn.secondary {
+            background: #f5f5f5; color: #666;
+        }
+        .action-btn.danger {
+            background: rgba(255,107,107,0.1); color: #ff6b6b;
+        }
+        .action-btn:hover {
+            transform: translateY(-1px);
+        }
+        
+        /* 详情页面 */
+        .detail-page {
+            display: none;
+        }
+        .detail-page.active {
+            display: block;
+        }
+        .list-page.hidden {
+            display: none;
+        }
+        
+        .detail-header {
+            background: white; border-radius: 16px; padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            margin-bottom: 24px;
+        }
+        .detail-title {
+            display: flex; justify-content: space-between; align-items: flex-start;
+            margin-bottom: 20px;
+        }
+        .detail-title h2 {
+            font-size: 24px; font-weight: 700; color: #333;
+        }
+        .detail-title .back-btn {
+            padding: 8px 16px; background: #f5f5f5; border: none;
+            border-radius: 8px; font-size: 13px; cursor: pointer;
+            color: #666;
+        }
+        
+        .detail-stats {
+            display: flex; gap: 20px; flex-wrap: wrap;
+        }
+        .detail-stat {
+            flex: 1; min-width: 120px; background: #f8f9fa;
+            border-radius: 12px; padding: 16px; text-align: center;
+        }
+        .detail-stat.score {
+            background: linear-gradient(135deg, #4ECDC4, #45B7AA);
+            color: white;
+        }
+        .detail-stat .value {
+            font-size: 28px; font-weight: 700;
+        }
+        .detail-stat .label {
+            font-size: 12px; opacity: 0.8; margin-top: 4px;
+        }
+        
+        .chapters-section {
+            background: white; border-radius: 16px; padding: 24px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+        }
+        .chapters-section h3 {
+            font-size: 18px; font-weight: 600; color: #333; margin-bottom: 20px;
+        }
+        
+        .chapter-item {
+            padding: 16px; background: #f8f9fa; border-radius: 12px;
+            margin-bottom: 12px; cursor: pointer;
+            transition: all 0.2s;
+        }
+        .chapter-item:hover {
+            background: #f0f0f0;
+        }
+        .chapter-header {
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .chapter-title {
+            font-size: 14px; font-weight: 500; color: #333;
+        }
+        .chapter-path {
+            font-size: 11px; color: #999; margin-top: 4px;
+        }
+        .chapter-score {
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 13px; font-weight: 600; color: white;
+        }
+        
+        .issues-list {
+            margin-top: 12px; padding-top: 12px; border-top: 1px solid #e0e0e0;
+        }
+        .issue-item {
+            padding: 12px; background: white; border-radius: 8px;
+            margin-bottom: 8px; border-left: 3px solid;
+        }
+        .issue-item.high { border-color: #ff6b6b; }
+        .issue-item.medium { border-color: #FFD166; }
+        .issue-item.low { border-color: #4ECDC4; }
+        .issue-type {
+            font-size: 11px; color: #999; margin-bottom: 4px;
+        }
+        .issue-desc {
+            font-size: 13px; color: #333; margin-bottom: 6px;
+        }
+        .issue-suggestion {
+            font-size: 12px; color: #666; background: #f5f5f5;
+            padding: 8px; border-radius: 6px;
+        }
+        
+        /* 进度面板 */
+        .progress-panel {
+            position: fixed; bottom: 20px; right: 20px;
+            width: 400px; max-height: 500px;
+            background: white; border-radius: 16px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+            display: none; flex-direction: column;
+            z-index: 1000;
+        }
+        .progress-panel.active {
+            display: flex;
+        }
+        .progress-header {
+            padding: 16px 20px; border-bottom: 1px solid #f0f0f0;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        .progress-title {
+            font-size: 14px; font-weight: 600; color: #333;
+        }
+        .progress-close {
+            background: none; border: none; font-size: 20px;
+            cursor: pointer; color: #999;
+        }
+        .progress-body {
+            flex: 1; overflow-y: auto; padding: 16px 20px;
+            max-height: 400px;
+        }
+        .progress-item {
+            padding: 8px 0; font-size: 13px; color: #666;
+            border-bottom: 1px solid #f5f5f5;
+        }
+        .progress-item:last-child {
+            border-bottom: none;
+        }
+        .progress-item.error {
+            color: #ff6b6b;
+        }
+        .progress-item.success {
+            color: #4ECDC4;
+        }
+        
+        .empty-state {
+            text-align: center; padding: 60px 20px; color: #999;
+        }
+        .empty-state .icon {
+            font-size: 48px; margin-bottom: 16px;
+        }
+        .empty-state p {
+            font-size: 14px;
+        }
+        
+        /* 章节详情页 - 三栏布局 (类似 GitHub) */
+        .chapter-detail-page {
+            display: none;
+        }
+        .chapter-detail-page.active {
+            display: block;
+        }
+        
+        .three-column-view {
+            display: grid;
+            grid-template-columns: 220px 1fr 320px;
+            gap: 0;
+            margin-top: 20px;
+            height: calc(100vh - 180px);
+            border: 1px solid #d0d7de;
+            border-radius: 8px;
+            overflow: hidden;
+            background: white;
+        }
+        
+        /* 左侧文件列表 */
+        .file-list-panel {
+            background: #f6f8fa;
+            border-right: 1px solid #d0d7de;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .file-list-header {
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
+            font-weight: 600;
+            font-size: 13px;
+            color: #1f2328;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .file-list-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 8px 0;
+        }
+        
+        .file-item {
+            padding: 6px 16px;
+            font-size: 13px;
+            color: #1f2328;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            border-left: 3px solid transparent;
+        }
+        .file-item:hover {
+            background: #e8ecf0;
+        }
+        .file-item.active {
+            background: #ddf4ff;
+            border-left-color: #0969da;
+        }
+        .file-item .file-icon {
+            font-size: 14px;
+        }
+        .file-item .file-name {
+            flex: 1;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .file-item .file-score {
+            font-size: 11px;
+            padding: 2px 6px;
+            border-radius: 10px;
+            font-weight: 500;
+        }
+        .file-item .file-score.high { background: #dafbe1; color: #1a7f37; }
+        .file-item .file-score.medium { background: #fff8c5; color: #9a6700; }
+        .file-item .file-score.low { background: #ffebe9; color: #cf222e; }
+        
+        /* 中间内容区 */
+        .content-panel {
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            background: white;
+        }
+        
+        .content-header {
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
+            font-size: 13px;
+            color: #1f2328;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        .content-header .file-path {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 12px;
+            color: #0969da;
+        }
+        .content-header .file-stats {
+            margin-left: auto;
+            font-size: 12px;
+            color: #656d76;
+        }
+        
+        .content-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px 24px;
+        }
+        
+        /* 右侧问题标注 */
+        .issues-panel {
+            background: #f6f8fa;
+            border-left: 1px solid #d0d7de;
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        
+        .issues-header {
+            padding: 12px 16px;
+            background: #f6f8fa;
+            border-bottom: 1px solid #d0d7de;
+            font-weight: 600;
+            font-size: 13px;
+            color: #1f2328;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .issues-header .issue-count {
+            margin-left: auto;
+            font-size: 11px;
+            padding: 2px 8px;
+            background: #ddf4ff;
+            color: #0969da;
+            border-radius: 10px;
+        }
+        
+        .issues-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+        }
+        
+        /* 兼容旧的双栏样式 */
+        .split-view {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin-top: 20px;
+        }
+        
+        .split-panel {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            max-height: calc(100vh - 200px);
+        }
+        
+        .panel-header {
+            padding: 16px 20px;
+            background: #f8f9fa;
+            border-bottom: 1px solid #e0e0e0;
+            font-weight: 600;
+            font-size: 14px;
+            color: #333;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .panel-body {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        /* 原文内容样式 - Markdown 渲染 */
+        .original-content {
+            font-size: 14px;
+            line-height: 1.8;
+            color: #333;
+        }
+        
+        .original-content h1 {
+            font-size: 24px; font-weight: 700; margin: 24px 0 12px;
+            padding-bottom: 8px; border-bottom: 2px solid #e0e0e0;
+        }
+        .original-content h2 {
+            font-size: 20px; font-weight: 600; margin: 20px 0 10px;
+            padding-bottom: 6px; border-bottom: 1px solid #e0e0e0;
+        }
+        .original-content h3 {
+            font-size: 16px; font-weight: 600; margin: 16px 0 8px;
+        }
+        .original-content p {
+            margin: 12px 0;
+        }
+        .original-content ul, .original-content ol {
+            margin: 12px 0; padding-left: 24px;
+        }
+        .original-content li {
+            margin: 6px 0;
+        }
+        .original-content code {
+            background: #f0f0f0; padding: 2px 6px; border-radius: 4px;
+            font-family: 'SF Mono', Monaco, 'Courier New', monospace;
+            font-size: 13px;
+        }
+        .original-content pre {
+            background: #f8f9fa; padding: 16px; border-radius: 8px;
+            overflow-x: auto; margin: 12px 0;
+        }
+        .original-content pre code {
+            background: none; padding: 0;
+        }
+        .original-content blockquote {
+            border-left: 4px solid #4ECDC4; padding-left: 16px;
+            margin: 12px 0; color: #666; font-style: italic;
+        }
+        .original-content table {
+            border-collapse: collapse; width: 100%; margin: 12px 0;
+        }
+        .original-content th, .original-content td {
+            border: 1px solid #e0e0e0; padding: 8px 12px; text-align: left;
+        }
+        .original-content th {
+            background: #f8f9fa; font-weight: 600;
+        }
+        .original-content a {
+            color: #4ECDC4; text-decoration: none;
+        }
+        .original-content a:hover {
+            text-decoration: underline;
+        }
+        .original-content img {
+            max-width: 100%; border-radius: 8px; margin: 12px 0;
+        }
+        
+        /* 问题高亮标记 - 可点击跳转 */
+        .issue-marker {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 12px;
+            margin: 0 2px;
+        }
+        .issue-marker.high {
+            background: rgba(255, 107, 107, 0.2);
+            border: 1px solid #ff6b6b;
+            color: #ff6b6b;
+        }
+        .issue-marker.medium {
+            background: rgba(255, 209, 102, 0.2);
+            border: 1px solid #FFD166;
+            color: #e6a800;
+        }
+        .issue-marker.low {
+            background: rgba(78, 205, 196, 0.2);
+            border: 1px solid #4ECDC4;
+            color: #3db8ad;
+        }
+        .issue-marker:hover {
+            transform: scale(1.05);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+        }
+        
+        /* 右侧问题卡片高亮状态 */
+        .issue-annotation.highlighted {
+            box-shadow: 0 0 0 3px rgba(78, 205, 196, 0.5);
+            transform: scale(1.02);
+        }
+        
+        /* 问题标记样式 */
+        .annotated-content {
+            font-size: 14px;
+            line-height: 1.8;
+        }
+        
+        .issue-highlight {
+            position: relative;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .issue-highlight.high {
+            background: rgba(255, 107, 107, 0.2);
+            border-bottom: 2px solid #ff6b6b;
+        }
+        
+        .issue-highlight.medium {
+            background: rgba(255, 209, 102, 0.2);
+            border-bottom: 2px solid #FFD166;
+        }
+        
+        .issue-highlight.low {
+            background: rgba(78, 205, 196, 0.2);
+            border-bottom: 2px solid #4ECDC4;
+        }
+        
+        .issue-highlight:hover {
+            filter: brightness(0.95);
+        }
+        
+        /* 问题批注气泡 */
+        .issue-annotation {
+            margin: 12px 0;
+            padding: 12px 16px;
+            border-radius: 8px;
+            border-left: 4px solid;
+            background: #f8f9fa;
+        }
+        
+        .issue-annotation.high {
+            border-color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.08);
+        }
+        
+        .issue-annotation.medium {
+            border-color: #FFD166;
+            background: rgba(255, 209, 102, 0.08);
+        }
+        
+        .issue-annotation.low {
+            border-color: #4ECDC4;
+            background: rgba(78, 205, 196, 0.08);
+        }
+        
+        .annotation-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+        
+        .annotation-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .annotation-badge.high {
+            background: #ff6b6b;
+            color: white;
+        }
+        
+        .annotation-badge.medium {
+            background: #FFD166;
+            color: #333;
+        }
+        
+        .annotation-badge.low {
+            background: #4ECDC4;
+            color: white;
+        }
+        
+        .annotation-location {
+            font-size: 12px;
+            color: #666;
+            font-family: monospace;
+        }
+        
+        .annotation-desc {
+            font-size: 13px;
+            color: #333;
+            margin-bottom: 8px;
+        }
+        
+        .annotation-suggestion {
+            font-size: 12px;
+            color: #666;
+            background: white;
+            padding: 8px 12px;
+            border-radius: 6px;
+            margin-top: 8px;
+        }
+        
+        .annotation-suggestion::before {
+            content: '💡 ';
+        }
+        
+        /* 无问题提示 */
+        .no-issues {
+            text-align: center;
+            padding: 40px;
+            color: #4ECDC4;
+        }
+        
+        .no-issues .icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+        
+        @media (max-width: 1400px) {
+            .three-column-view {
+                grid-template-columns: 180px 1fr 280px;
+            }
+        }
+        
+        @media (max-width: 1200px) {
+            .three-column-view {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            .file-list-panel {
+                display: none;
+            }
+            .issues-panel {
+                border-left: none;
+                border-top: 1px solid #d0d7de;
+                max-height: 400px;
+            }
+            .split-view {
+                grid-template-columns: 1fr;
+            }
+            .split-panel {
+                max-height: 50vh;
+            }
+        }
+        
+        @media (max-width: 768px) {
+            .container { padding: 20px; }
+            .tutorials-grid { grid-template-columns: 1fr; }
+            .input-row { flex-direction: column; }
+            .progress-panel { width: calc(100% - 40px); left: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <a href="/" class="logo">
+            <span>vibe-reviewer</span>
+            <small>教程质量评估</small>
+        </a>
+        <div class="nav-links">
+            <a href="/" class="back">← 返回 vibe-blog</a>
+        </div>
+    </nav>
+
+    <div class="container">
+        <!-- 列表页面 -->
+        <div class="list-page" id="listPage">
+            <div class="page-header">
+                <h1>📚 教程评估中心</h1>
+                <p>添加 Git 仓库，自动评估教程质量，发现问题并给出改进建议</p>
+            </div>
+            
+            <div class="add-section">
+                <h3>➕ 添加新教程</h3>
+                <div class="input-row">
+                    <input type="text" id="gitUrlInput" placeholder="输入 Git 仓库 URL，如：https://github.com/user/tutorial.git">
+                    <button onclick="addTutorial()">添加教程</button>
+                </div>
+            </div>
+            
+            <div class="tutorials-grid" id="tutorialsGrid">
+                <!-- 教程卡片将动态生成 -->
+            </div>
+            
+            <div class="empty-state" id="emptyState" style="display: none;">
+                <div class="icon">📭</div>
+                <p>还没有添加任何教程<br>输入 Git 仓库 URL 开始评估</p>
+            </div>
+        </div>
+        
+        <!-- 详情页面 -->
+        <div class="detail-page" id="detailPage">
+            <div class="detail-header">
+                <div class="detail-title">
+                    <div>
+                        <h2 id="detailName">教程名称</h2>
+                        <div style="font-size: 13px; color: #999; margin-top: 4px;" id="detailUrl"></div>
+                    </div>
+                    <button class="back-btn" onclick="showListPage()">← 返回列表</button>
+                </div>
+                <div class="detail-stats" id="detailStats">
+                    <!-- 统计数据将动态生成 -->
+                </div>
+                <div style="margin-top: 16px; display: flex; gap: 12px;">
+                    <button class="action-btn primary" id="evaluateBtn" onclick="startEvaluation()">🚀 开始评估</button>
+                    <button class="action-btn secondary" onclick="exportReport()">📄 导出报告</button>
+                    <button class="action-btn danger" onclick="deleteTutorial()">🗑️ 删除</button>
+                </div>
+            </div>
+            
+            <div class="chapters-section">
+                <h3>📖 章节列表</h3>
+                <div id="chaptersList">
+                    <!-- 章节列表将动态生成 -->
+                </div>
+            </div>
+        </div>
+        
+        <!-- 章节详情页 - 三栏布局 (类似 GitHub) -->
+        <div class="chapter-detail-page" id="chapterDetailPage">
+            <div class="detail-header" style="padding-bottom: 12px;">
+                <div class="detail-title">
+                    <div>
+                        <h2 id="chapterDetailName" style="font-size: 18px;">章节名称</h2>
+                    </div>
+                    <button class="back-btn" onclick="backToTutorialDetail()">← 返回章节列表</button>
+                </div>
+            </div>
+            
+            <div class="three-column-view">
+                <!-- 左栏: 文件列表 -->
+                <div class="file-list-panel">
+                    <div class="file-list-header">
+                        📁 章节文件
+                    </div>
+                    <div class="file-list-body" id="fileListBody">
+                        <!-- 文件列表将动态生成 -->
+                    </div>
+                </div>
+                
+                <!-- 中栏: Markdown 内容 -->
+                <div class="content-panel">
+                    <div class="content-header">
+                        <span class="file-path" id="chapterDetailPath">文件路径</span>
+                        <span class="file-stats">
+                            评分: <span id="chapterScoreBadge" style="padding: 2px 8px; border-radius: 4px; font-weight: 600;"></span>
+                            &nbsp;|&nbsp;
+                            问题: <span id="chapterIssueCount" style="font-weight: 600;"></span>
+                        </span>
+                    </div>
+                    <div class="content-body">
+                        <div class="original-content" id="originalContent">
+                            <!-- Markdown 内容将动态生成 -->
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 右栏: 问题标注 -->
+                <div class="issues-panel">
+                    <div class="issues-header">
+                        🔍 问题批注
+                        <span class="issue-count" id="issueCountBadge">0</span>
+                    </div>
+                    <div class="issues-body">
+                        <div class="annotated-content" id="annotatedContent">
+                            <!-- 问题标记将动态生成 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 进度面板 -->
+    <div class="progress-panel" id="progressPanel">
+        <div class="progress-header">
+            <div class="progress-title">⚙️ 评估进度</div>
+            <button class="progress-close" onclick="closeProgress()">×</button>
+        </div>
+        <div class="progress-body" id="progressBody">
+            <!-- 进度信息将动态生成 -->
+        </div>
+    </div>
+
+    <script>
+        let currentTutorialId = null;
+        let eventSource = null;
+        
+        // 页面加载时获取教程列表
+        document.addEventListener('DOMContentLoaded', loadTutorials);
+        
+        async function loadTutorials() {
+            try {
+                const response = await fetch('/api/reviewer/tutorials');
+                const data = await response.json();
+                if (data.success) {
+                    renderTutorials(data.tutorials);
+                }
+            } catch (error) {
+                console.error('加载教程列表失败:', error);
+            }
+        }
+        
+        function renderTutorials(tutorials) {
+            const grid = document.getElementById('tutorialsGrid');
+            const emptyState = document.getElementById('emptyState');
+            
+            if (tutorials.length === 0) {
+                grid.innerHTML = '';
+                emptyState.style.display = 'block';
+                return;
+            }
+            
+            emptyState.style.display = 'none';
+            grid.innerHTML = tutorials.map(t => {
+                const scoreClass = t.overall_score >= 80 ? 'score-high' : 
+                                   t.overall_score >= 60 ? 'score-medium' : 'score-low';
+                const statusClass = `status-${t.status}`;
+                const statusText = {
+                    'pending': '⏳ 待评估',
+                    'cloning': '📥 克隆中',
+                    'scanning': '🔍 扫描中',
+                    'evaluating': '⚙️ 评估中',
+                    'completed': '✅ 已完成',
+                    'failed': '❌ 失败'
+                }[t.status] || t.status;
+                
+                return `
+                    <div class="tutorial-card" onclick="showDetailPage(${t.id})">
+                        <div class="tutorial-header">
+                            <div>
+                                <div class="tutorial-name">${t.name}</div>
+                                <div class="tutorial-url">${t.git_url}</div>
+                            </div>
+                            ${t.overall_score > 0 ? `
+                                <div class="tutorial-score ${scoreClass}">${t.overall_score.toFixed(0)}</div>
+                            ` : ''}
+                        </div>
+                        <div class="tutorial-stats">
+                            <div class="stat-item">📖 <strong>${t.total_chapters || 0}</strong> 章节</div>
+                            <div class="stat-item">⚠️ <strong>${t.total_issues || 0}</strong> 问题</div>
+                        </div>
+                        <div class="tutorial-issues">
+                            ${t.high_issues > 0 ? `<span class="issue-badge issue-high">🔴 ${t.high_issues} 高</span>` : ''}
+                            ${t.medium_issues > 0 ? `<span class="issue-badge issue-medium">🟡 ${t.medium_issues} 中</span>` : ''}
+                            ${t.low_issues > 0 ? `<span class="issue-badge issue-low">🟢 ${t.low_issues} 低</span>` : ''}
+                        </div>
+                        <div class="tutorial-status ${statusClass}">${statusText}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function addTutorial() {
+            const input = document.getElementById('gitUrlInput');
+            const gitUrl = input.value.trim();
+            if (!gitUrl) {
+                alert('请输入 Git 仓库 URL');
+                return;
+            }
+            
+            try {
+                const response = await fetch('/api/reviewer/tutorials', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ git_url: gitUrl })
+                });
+                const data = await response.json();
+                if (data.success) {
+                    input.value = '';
+                    loadTutorials();
+                } else {
+                    alert(data.error || '添加失败');
+                }
+            } catch (error) {
+                alert('添加失败: ' + error.message);
+            }
+        }
+        
+        function showListPage() {
+            document.getElementById('listPage').classList.remove('hidden');
+            document.getElementById('detailPage').classList.remove('active');
+            currentTutorialId = null;
+            loadTutorials();
+        }
+        
+        async function showDetailPage(tutorialId) {
+            currentTutorialId = tutorialId;
+            document.getElementById('listPage').classList.add('hidden');
+            document.getElementById('detailPage').classList.add('active');
+            
+            try {
+                // 获取教程详情
+                const response = await fetch(`/api/reviewer/tutorials/${tutorialId}`);
+                const data = await response.json();
+                if (data.success) {
+                    renderDetail(data.tutorial);
+                }
+                
+                // 获取章节列表
+                const chaptersResponse = await fetch(`/api/reviewer/tutorials/${tutorialId}/chapters`);
+                const chaptersData = await chaptersResponse.json();
+                if (chaptersData.success) {
+                    renderChapters(chaptersData.chapters);
+                }
+            } catch (error) {
+                console.error('加载详情失败:', error);
+            }
+        }
+        
+        function renderDetail(tutorial) {
+            document.getElementById('detailName').textContent = tutorial.name;
+            document.getElementById('detailUrl').textContent = tutorial.git_url;
+            
+            const scoreClass = tutorial.overall_score >= 80 ? 'score-high' : 
+                               tutorial.overall_score >= 60 ? 'score-medium' : 'score-low';
+            
+            document.getElementById('detailStats').innerHTML = `
+                <div class="detail-stat score">
+                    <div class="value">${tutorial.overall_score ? tutorial.overall_score.toFixed(2) : '-'}</div>
+                    <div class="label">综合评分</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="value">${tutorial.total_chapters || 0}</div>
+                    <div class="label">章节数</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="value">${tutorial.total_issues || 0}</div>
+                    <div class="label">问题数</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="value" style="color: #ff6b6b;">${tutorial.high_issues || 0}</div>
+                    <div class="label">高优先级</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="value" style="color: #e6a800;">${tutorial.medium_issues || 0}</div>
+                    <div class="label">中优先级</div>
+                </div>
+                <div class="detail-stat">
+                    <div class="value" style="color: #4ECDC4;">${tutorial.low_issues || 0}</div>
+                    <div class="label">低优先级</div>
+                </div>
+            `;
+            
+            // 更新评估按钮文字
+            const evaluateBtn = document.getElementById('evaluateBtn');
+            evaluateBtn.textContent = tutorial.status === 'completed' ? '🔄 重新评估' : '🚀 开始评估';
+        }
+        
+        function renderChapters(chapters) {
+            const container = document.getElementById('chaptersList');
+            
+            // 保存章节列表用于三栏布局的文件列表
+            allChapters = chapters;
+            
+            if (chapters.length === 0) {
+                container.innerHTML = '<div class="empty-state"><p>暂无章节数据，请先进行评估</p></div>';
+                return;
+            }
+            
+            container.innerHTML = chapters.map(c => {
+                const scoreClass = c.overall_score >= 80 ? 'score-high' : 
+                                   c.overall_score >= 60 ? 'score-medium' : 'score-low';
+                return `
+                    <div class="chapter-item" onclick="showChapterDetail(${c.id})">
+                        <div class="chapter-header">
+                            <div>
+                                <div class="chapter-title">${c.title || c.file_name}</div>
+                                <div class="chapter-path">${c.file_path}</div>
+                            </div>
+                            <div style="display: flex; align-items: center; gap: 12px;">
+                                ${c.total_issues > 0 ? `<span style="font-size: 12px; color: #ff6b6b;">${c.total_issues} 问题</span>` : ''}
+                                ${c.overall_score > 0 ? `<div class="chapter-score ${scoreClass}">${c.overall_score}</div>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function toggleChapterIssues(element, chapterId) {
+            const issuesList = document.getElementById(`issues-${chapterId}`);
+            
+            if (issuesList.style.display === 'none') {
+                // 加载问题列表
+                try {
+                    const response = await fetch(`/api/reviewer/chapters/${chapterId}/issues`);
+                    const data = await response.json();
+                    if (data.success && data.issues.length > 0) {
+                        issuesList.innerHTML = data.issues.map(issue => `
+                            <div class="issue-item ${issue.severity}">
+                                <div class="issue-type">[${issue.category}/${issue.issue_type}] ${issue.location || ''}</div>
+                                <div class="issue-desc">${issue.description}</div>
+                                ${issue.suggestion ? `<div class="issue-suggestion">💡 ${issue.suggestion}</div>` : ''}
+                            </div>
+                        `).join('');
+                    } else {
+                        issuesList.innerHTML = '<div style="padding: 12px; color: #999; font-size: 13px;">暂无问题</div>';
+                    }
+                } catch (error) {
+                    issuesList.innerHTML = '<div style="padding: 12px; color: #ff6b6b; font-size: 13px;">加载失败</div>';
+                }
+                issuesList.style.display = 'block';
+            } else {
+                issuesList.style.display = 'none';
+            }
+        }
+        
+        // 系统配置（从后端获取）
+        let systemConfig = { max_chapters: 5 };
+        
+        // 页面加载时获取配置
+        async function loadSystemConfig() {
+            try {
+                const response = await fetch('/api/reviewer/config');
+                const data = await response.json();
+                if (data.success && data.config) {
+                    systemConfig = data.config;
+                }
+            } catch (e) {
+                console.warn('获取系统配置失败，使用默认值');
+            }
+        }
+        loadSystemConfig();
+        
+        function startEvaluation() {
+            if (!currentTutorialId) return;
+            
+            const maxAllowed = systemConfig.max_chapters || 5;
+            const inputValue = prompt(`请输入要评估的章节数 (最大 ${maxAllowed}):`, String(maxAllowed));
+            if (inputValue === null) return;
+            
+            let maxChapters = parseInt(inputValue) || maxAllowed;
+            
+            // 检查是否超过限制
+            if (maxChapters > maxAllowed) {
+                alert(`⚠️ 章节数不能超过 ${maxAllowed}！\n\n已自动调整为最大值 ${maxAllowed}。\n\n如需评估更多章节，请联系管理员修改 REVIEWER_MAX_CHAPTERS 配置。`);
+                maxChapters = maxAllowed;
+            }
+            
+            // 显示进度面板
+            const progressPanel = document.getElementById('progressPanel');
+            const progressBody = document.getElementById('progressBody');
+            progressPanel.classList.add('active');
+            progressBody.innerHTML = '<div class="progress-item">🚀 开始评估...</div>';
+            
+            // 关闭之前的连接
+            if (eventSource) {
+                eventSource.close();
+            }
+            
+            // 建立 SSE 连接
+            const url = `/api/reviewer/tutorials/${currentTutorialId}/evaluate-stream?max_chapters=${maxChapters}`;
+            eventSource = new EventSource(url);
+            
+            eventSource.onmessage = (event) => {
+                const data = JSON.parse(event.data);
+                addProgressItem(data.message || JSON.stringify(data));
+            };
+            
+            eventSource.addEventListener('progress', (event) => {
+                const data = JSON.parse(event.data);
+                addProgressItem(data.message || '处理中...');
+            });
+            
+            eventSource.addEventListener('log', (event) => {
+                const data = JSON.parse(event.data);
+                addProgressItem(data.message || data.log);
+            });
+            
+            eventSource.addEventListener('chapter_complete', (event) => {
+                const data = JSON.parse(event.data);
+                addProgressItem(`✅ ${data.chapter_title || '章节'} 评估完成 (${data.score || '-'}分)`, 'success');
+            });
+            
+            eventSource.addEventListener('complete', (event) => {
+                addProgressItem('🎉 评估完成！', 'success');
+                eventSource.close();
+                eventSource = null;
+                // 刷新详情页
+                showDetailPage(currentTutorialId);
+            });
+            
+            eventSource.addEventListener('error', (event) => {
+                if (event.data) {
+                    const data = JSON.parse(event.data);
+                    addProgressItem(`❌ ${data.message || '评估失败'}`, 'error');
+                }
+                eventSource.close();
+                eventSource = null;
+            });
+            
+            eventSource.onerror = () => {
+                if (eventSource.readyState === EventSource.CLOSED) return;
+                addProgressItem('❌ 连接断开', 'error');
+                eventSource.close();
+                eventSource = null;
+            };
+        }
+        
+        function addProgressItem(message, type = '') {
+            const progressBody = document.getElementById('progressBody');
+            const item = document.createElement('div');
+            item.className = `progress-item ${type}`;
+            item.textContent = message;
+            progressBody.appendChild(item);
+            progressBody.scrollTop = progressBody.scrollHeight;
+        }
+        
+        function closeProgress() {
+            document.getElementById('progressPanel').classList.remove('active');
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+        }
+        
+        function exportReport() {
+            if (!currentTutorialId) return;
+            window.open(`/api/reviewer/tutorials/${currentTutorialId}/export`, '_blank');
+        }
+        
+        async function deleteTutorial() {
+            if (!currentTutorialId) return;
+            if (!confirm('确定要删除这个教程吗？')) return;
+            
+            try {
+                const response = await fetch(`/api/reviewer/tutorials/${currentTutorialId}`, {
+                    method: 'DELETE'
+                });
+                const data = await response.json();
+                if (data.success) {
+                    showListPage();
+                } else {
+                    alert(data.error || '删除失败');
+                }
+            } catch (error) {
+                alert('删除失败: ' + error.message);
+            }
+        }
+        
+        // Enter 键添加教程
+        document.getElementById('gitUrlInput').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') addTutorial();
+        });
+        
+        // ========== 章节详情页 - 三栏布局 ==========
+        let currentChapterId = null;
+        let allChapters = [];  // 存储所有章节用于左侧文件列表
+        
+        async function showChapterDetail(chapterId) {
+            currentChapterId = chapterId;
+            
+            // 隐藏教程详情页，显示章节详情页
+            document.getElementById('detailPage').classList.remove('active');
+            document.getElementById('chapterDetailPage').classList.add('active');
+            
+            // 渲染左侧文件列表
+            renderFileList(chapterId);
+            
+            // 加载章节详情
+            await loadChapterContent(chapterId);
+        }
+        
+        async function loadChapterContent(chapterId) {
+            try {
+                const response = await fetch(`/api/reviewer/chapters/${chapterId}/issues`);
+                const data = await response.json();
+                
+                if (data.success) {
+                    renderChapterDetail(data.chapter, data.issues || []);
+                }
+            } catch (error) {
+                console.error('加载章节详情失败:', error);
+            }
+        }
+        
+        function renderFileList(activeChapterId) {
+            const container = document.getElementById('fileListBody');
+            
+            if (!allChapters || allChapters.length === 0) {
+                container.innerHTML = '<div style="padding: 16px; color: #666; font-size: 12px;">暂无章节</div>';
+                return;
+            }
+            
+            container.innerHTML = allChapters.map(chapter => {
+                const isActive = chapter.id === activeChapterId;
+                const score = chapter.overall_score || 0;
+                const scoreClass = score >= 80 ? 'high' : score >= 60 ? 'medium' : 'low';
+                const fileName = chapter.file_name || chapter.file_path.split('/').pop();
+                
+                return `
+                    <div class="file-item ${isActive ? 'active' : ''}" onclick="switchChapter(${chapter.id})">
+                        <span class="file-icon">📄</span>
+                        <span class="file-name" title="${chapter.file_path}">${fileName}</span>
+                        <span class="file-score ${scoreClass}">${score}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        async function switchChapter(chapterId) {
+            if (chapterId === currentChapterId) return;
+            currentChapterId = chapterId;
+            renderFileList(chapterId);
+            await loadChapterContent(chapterId);
+        }
+        
+        function backToTutorialDetail() {
+            document.getElementById('chapterDetailPage').classList.remove('active');
+            document.getElementById('detailPage').classList.add('active');
+            currentChapterId = null;
+        }
+        
+        function renderChapterDetail(chapter, issues) {
+            // 设置标题
+            document.getElementById('chapterDetailName').textContent = chapter.title || chapter.file_name;
+            document.getElementById('chapterDetailPath').textContent = chapter.file_path;
+            
+            // 设置评分徽章
+            const scoreBadge = document.getElementById('chapterScoreBadge');
+            const score = chapter.overall_score || 0;
+            scoreBadge.textContent = score;
+            if (score >= 80) {
+                scoreBadge.style.background = '#dafbe1';
+                scoreBadge.style.color = '#1a7f37';
+            } else if (score >= 60) {
+                scoreBadge.style.background = '#fff8c5';
+                scoreBadge.style.color = '#9a6700';
+            } else {
+                scoreBadge.style.background = '#ffebe9';
+                scoreBadge.style.color = '#cf222e';
+            }
+            
+            // 设置问题数
+            const issueText = `${issues.length} (🔴${chapter.high_issues || 0} 🟡${chapter.medium_issues || 0} 🟢${chapter.low_issues || 0})`;
+            document.getElementById('chapterIssueCount').textContent = issueText;
+            document.getElementById('issueCountBadge').textContent = issues.length;
+            
+            // 按严重程度排序
+            const severityOrder = { high: 0, medium: 1, low: 2 };
+            const sortedIssues = [...issues].sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+            
+            // 渲染 Markdown 内容
+            try {
+                renderMarkdownContent(chapter.raw_content || '暂无内容', sortedIssues);
+            } catch (e) {
+                console.error('renderMarkdownContent error:', e);
+            }
+            
+            // 渲染问题批注
+            try {
+                renderAnnotations(sortedIssues);
+            } catch (e) {
+                console.error('renderAnnotations error:', e);
+            }
+        }
+        
+        function renderMarkdownContent(rawContent, issues) {
+            const container = document.getElementById('originalContent');
+            
+            // 直接使用 marked.parse (v15.x API)
+            let html = '';
+            try {
+                html = marked.parse(rawContent);
+            } catch (e) {
+                console.error('Markdown 解析失败:', e);
+                html = '<pre style="white-space: pre-wrap;">' + escapeHtml(rawContent) + '</pre>';
+            }
+            
+            // 在内容末尾添加问题标记索引
+            if (issues && issues.length > 0) {
+                html += '<div style="margin-top: 24px; padding-top: 16px; border-top: 2px dashed #e0e0e0;">';
+                html += '<div style="font-size: 13px; color: #666; margin-bottom: 12px;">📌 本章节发现的问题 (点击跳转到右侧详情):</div>';
+                html += '<div style="display: flex; flex-wrap: wrap; gap: 8px;">';
+                
+                issues.forEach((issue, index) => {
+                    const emoji = issue.severity === 'high' ? '🔴' : issue.severity === 'medium' ? '🟡' : '🟢';
+                    html += '<span class="issue-marker ' + issue.severity + '" onclick="scrollToIssue(' + index + ')" title="' + escapeHtml(issue.description) + '">';
+                    html += emoji + ' #' + (index + 1) + ' ' + issue.issue_type;
+                    html += '</span>';
+                });
+                
+                html += '</div></div>';
+            }
+            
+            container.innerHTML = html;
+            
+            // 代码高亮
+            container.querySelectorAll('pre code').forEach(function(block) {
+                hljs.highlightElement(block);
+            });
+        }
+        
+        function scrollToIssue(index) {
+            const issueCard = document.getElementById('issue-' + index);
+            if (issueCard) {
+                // 移除之前的高亮
+                document.querySelectorAll('.issue-annotation').forEach(a => a.classList.remove('highlighted'));
+                
+                // 滚动右侧面板到目标问题卡片
+                const issuesBody = document.querySelector('.issues-body');
+                if (issuesBody) {
+                    issuesBody.scrollTop = issueCard.offsetTop - issuesBody.offsetTop - 20;
+                }
+                
+                // 高亮问题卡片
+                issueCard.classList.add('highlighted');
+                
+                // 3秒后移除高亮
+                setTimeout(() => {
+                    issueCard.classList.remove('highlighted');
+                }, 3000);
+            }
+        }
+        
+        function renderAnnotations(issues) {
+            // 尝试多个可能的容器 ID
+            let container = document.getElementById('annotatedContent');
+            
+            if (!container) {
+                console.error('annotatedContent not found, trying issues-body');
+                container = document.querySelector('.issues-body');
+            }
+            
+            if (!container) {
+                console.error('No container found for annotations!');
+                return;
+            }
+            
+            if (!issues || issues.length === 0) {
+                container.innerHTML = '<div class="no-issues"><div class="icon">✅</div><div>本章节未发现问题</div></div>';
+                return;
+            }
+            
+            // 直接构建 HTML 字符串，添加点击事件实现联动
+            let html = '';
+            for (let i = 0; i < issues.length; i++) {
+                const issue = issues[i];
+                const severityLabel = issue.severity === 'high' ? '🔴 高' : issue.severity === 'medium' ? '🟡 中' : '🟢 低';
+                
+                // 添加 onclick 实现点击问题卡片时在左侧内容中搜索并高亮
+                html += '<div class="issue-annotation ' + issue.severity + '" id="issue-' + i + '" onclick="highlightInContent(' + i + ')" style="cursor: pointer;">';
+                html += '<div class="annotation-header">';
+                html += '<span class="annotation-badge ' + issue.severity + '">' + severityLabel + '</span>';
+                html += '<span style="font-size: 12px; color: #999; margin-left: auto;">#' + (i + 1) + '</span>';
+                html += '</div>';
+                html += '<div style="font-size: 12px; color: #666; margin-bottom: 4px;">[' + (issue.category || 'unknown') + '/' + (issue.issue_type || 'unknown') + ']</div>';
+                if (issue.location) {
+                    html += '<div class="annotation-location">📍 ' + escapeHtml(issue.location) + '</div>';
+                }
+                if (issue.original_text) {
+                    html += '<div class="annotation-original" style="background: #fff3cd; padding: 6px 10px; border-radius: 4px; margin: 6px 0; font-size: 12px; border-left: 3px solid #ffc107;">📝 ' + escapeHtml(issue.original_text) + '</div>';
+                }
+                html += '<div class="annotation-desc">' + escapeHtml(issue.description) + '</div>';
+                if (issue.suggestion) {
+                    html += '<div class="annotation-suggestion">' + escapeHtml(issue.suggestion) + '</div>';
+                }
+                html += '</div>';
+            }
+            
+            container.innerHTML = html;
+            
+            // 保存 issues 供联动使用
+            window.currentIssues = issues;
+        }
+        
+        // 点击右侧问题卡片时，在左侧内容中高亮相关位置
+        function highlightInContent(issueIndex) {
+            const issue = window.currentIssues && window.currentIssues[issueIndex];
+            if (!issue) return;
+            
+            // 高亮当前问题卡片
+            document.querySelectorAll('.issue-annotation').forEach(el => el.classList.remove('highlighted'));
+            const issueCard = document.getElementById('issue-' + issueIndex);
+            if (issueCard) issueCard.classList.add('highlighted');
+            
+            // 尝试在左侧内容中找到相关文本并滚动
+            const contentBody = document.querySelector('.content-body');
+            if (!contentBody) return;
+            
+            // 先清除之前的高亮
+            clearHighlights(contentBody);
+            
+            // 从问题中提取多个可能的关键词
+            const searchTexts = extractKeywordsFromIssue(issue);
+            
+            // 尝试高亮找到的关键词
+            let foundMatch = false;
+            for (const text of searchTexts) {
+                if (text && text.length >= 2) {
+                    const highlighted = highlightTextInElement(contentBody, text);
+                    if (highlighted) {
+                        foundMatch = true;
+                        break;
+                    }
+                }
+            }
+            
+            // 如果找到匹配，滚动到高亮位置
+            if (foundMatch) {
+                const firstHighlight = contentBody.querySelector('.text-highlight');
+                if (firstHighlight) {
+                    firstHighlight.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                }
+            } else {
+                // 没找到匹配，按比例滚动
+                contentBody.scrollTop = Math.max(0, (issueIndex / window.currentIssues.length) * contentBody.scrollHeight - 100);
+            }
+        }
+        
+        // 从问题中提取关键词
+        function extractKeywordsFromIssue(issue) {
+            const keywords = [];
+            
+            // 0. 优先使用 original_text 字段（最精确）
+            if (issue.original_text && issue.original_text.length >= 2) {
+                keywords.push(issue.original_text);
+            }
+            
+            // 1. 从 location 中提取（通常包含具体位置信息）
+            if (issue.location) {
+                // 提取引号中的内容
+                const quoteMatches = issue.location.match(/['""'']([^'""'']+)['""'']/g);
+                if (quoteMatches) {
+                    quoteMatches.forEach(m => {
+                        const text = m.replace(/['""'']/g, '').trim();
+                        if (text.length >= 2) keywords.push(text);
+                    });
+                }
+                // 提取 "第X节" 后面的标题
+                const sectionMatch = issue.location.match(/第\d+[节章段]\s*[-–—]\s*(.+)/);
+                if (sectionMatch) keywords.push(sectionMatch[1].trim());
+            }
+            
+            // 2. 从 description 中提取引号内容
+            if (issue.description) {
+                const quoteMatches = issue.description.match(/['""'']([^'""'']+)['""'']/g);
+                if (quoteMatches) {
+                    quoteMatches.forEach(m => {
+                        const text = m.replace(/['""'']/g, '').trim();
+                        if (text.length >= 2 && text.length <= 30) keywords.push(text);
+                    });
+                }
+            }
+            
+            return keywords;
+        }
+        
+        // 清除之前的高亮
+        function clearHighlights(container) {
+            container.querySelectorAll('.text-highlight').forEach(el => {
+                const text = document.createTextNode(el.textContent);
+                el.parentNode.replaceChild(text, el);
+            });
+            // 合并相邻文本节点
+            container.normalize();
+        }
+        
+        // 在元素中高亮指定文本，返回是否找到匹配
+        function highlightTextInElement(container, text) {
+            if (!text || text.length < 2) return false;
+            
+            const walker = document.createTreeWalker(container, NodeFilter.SHOW_TEXT, null, false);
+            const textNodes = [];
+            
+            while (walker.nextNode()) {
+                if (walker.currentNode.textContent.includes(text)) {
+                    textNodes.push(walker.currentNode);
+                }
+            }
+            
+            if (textNodes.length === 0) return false;
+            
+            // 只高亮第一个匹配
+            const node = textNodes[0];
+            const escapedText = text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const span = document.createElement('span');
+            span.innerHTML = node.textContent.replace(
+                new RegExp('(' + escapedText + ')', 'gi'),
+                '<mark class="text-highlight" style="background: #ffeb3b; padding: 2px 4px; border-radius: 3px; box-shadow: 0 0 0 2px rgba(255,235,59,0.5);">$1</mark>'
+            );
+            node.parentNode.replaceChild(span, node);
+            
+            return true;
+        }
+        
+        function escapeHtml(text) {
+            if (!text) return '';
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+    </script>
+</body>
+</html>

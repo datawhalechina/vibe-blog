@@ -72,7 +72,8 @@
     {
       "issue_type": "fact_error",
       "severity": "high",
-      "location": "第3节第2段 - 'Redis默认端口是6380'",
+      "location": "第3节第2段",
+      "original_text": "Redis默认端口是6380",
       "description": "Redis默认端口号错误，实际应为6379",
       "suggestion": "将端口号修正为6379",
       "question": "这个错误可能导致读者配置失败，是否还有其他端口相关的配置需要检查？",
@@ -81,7 +82,8 @@
     {
       "issue_type": "logic_gap",
       "severity": "medium",
-      "location": "第4节 - 从配置直接跳到高级用法",
+      "location": "第4节",
+      "original_text": "高级用法",
       "description": "缺少基础使用示例，读者可能无法理解高级用法",
       "suggestion": "在配置和高级用法之间添加基础使用示例（CRUD操作）",
       "question": "一个新手读者能否仅凭本文完成基础操作？"
@@ -113,6 +115,8 @@
 - 0-59: 不合格，建议重写
 
 **重要提示**:
-- 每个 issue 必须包含具体的 location（精确到段落或引用原文）
+- 每个 issue 必须包含具体的 location（精确到段落）
+- 每个 issue 必须包含 original_text（从原文中精确复制的问题文本片段，用于定位）
 - 每个 issue 必须包含 question（读者可能会问的问题）
 - suggestion 应该是可操作的改进建议
+- original_text 应该是原文中可以直接搜索到的文本，不要修改或缩写
