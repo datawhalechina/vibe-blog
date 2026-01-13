@@ -574,7 +574,7 @@
         <div class="logo"><span>vibe-blog</span></div>
         <div class="nav-tabs">
             <div class="tab active">📝 长文博客</div>
-            <a href="/reviewer" class="tab" style="text-decoration: none;">🔍 教程评估</a>
+            <a href="/reviewer" class="tab" id="reviewerTab" style="text-decoration: none; display: none;">🔍 教程评估</a>
         </div>
     </nav>
 
@@ -749,6 +749,23 @@
         
         // 已上传的知识文档
         let uploadedDocuments = [];
+        
+        // ========== 加载前端配置 ==========
+        (async function loadFrontendConfig() {
+            try {
+                const response = await fetch('/api/config');
+                const data = await response.json();
+                if (data.success && data.config) {
+                    // 根据配置显示/隐藏 reviewer 入口
+                    if (data.config.reviewer_enabled) {
+                        const reviewerTab = document.getElementById('reviewerTab');
+                        if (reviewerTab) reviewerTab.style.display = 'block';
+                    }
+                }
+            } catch (e) {
+                console.warn('加载前端配置失败:', e);
+            }
+        })();
         
         // ========== 知识文档上传功能 ==========
         

@@ -146,6 +146,9 @@ def create_app(config_class=None):
     # vibe-reviewer 独立页面
     @app.route('/reviewer')
     def reviewer_page():
+        # 检查开关
+        if os.environ.get('REVIEWER_ENABLED', 'false').lower() != 'true':
+            return jsonify({'error': 'vibe-reviewer 功能未启用'}), 403
         return send_from_directory(static_folder, 'reviewer.html')
     
     # 提供 outputs 目录下的图片文件
@@ -256,6 +259,17 @@ def create_app(config_class=None):
         except Exception as e:
             logger.error(f"转化失败: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # 获取前端配置
+    @app.route('/api/config', methods=['GET'])
+    def get_frontend_config():
+        """获取前端配置"""
+        return jsonify({
+            'success': True,
+            'config': {
+                'reviewer_enabled': os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true'
+            }
+        })
     
     # 获取比喻库
     @app.route('/api/metaphors', methods=['GET'])
@@ -972,7 +986,11 @@ def create_app(config_class=None):
             return jsonify({'success': False, 'error': str(e)}), 500
     
     # ========== vibe-reviewer 初始化 (新增) ==========
-    try:
+    # 检查开关
+    if os.environ.get('REVIEWER_ENABLED', 'false').lower() != 'true':
+        logger.info("vibe-reviewer 功能未启用 (REVIEWER_ENABLED != true)")
+    else:
+      try:
         from vibe_reviewer import init_reviewer_service, get_reviewer_service
         from vibe_reviewer.api import register_reviewer_routes
         
@@ -998,7 +1016,7 @@ def create_app(config_class=None):
         register_reviewer_routes(app)
         
         logger.info("vibe-reviewer 模块已初始化")
-    except Exception as e:
+      except Exception as e:
         logger.warning(f"vibe-reviewer 模块初始化失败 (可选模块): {e}")
     
     logger.info("Vibe Blog 后端应用已启动")
