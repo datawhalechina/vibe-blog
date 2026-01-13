@@ -4,9 +4,14 @@ Writer Agent - 内容撰写
 
 import json
 import logging
+import os
 from typing import Dict, Any, List
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..prompts.prompt_manager import get_prompt_manager
+
+# 从环境变量读取并行配置，默认为 3
+MAX_WORKERS = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
 
 logger = logging.getLogger(__name__)
 
@@ -111,12 +116,13 @@ class WriterAgent:
             logger.error(f"章节深化失败: {e}")
             return original_content
     
-    def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
+    def run(self, state: Dict[str, Any], max_workers: int = None) -> Dict[str, Any]:
         """
-        执行内容撰写
+        执行内容撰写（并行）
         
         Args:
             state: 共享状态
+            max_workers: 最大并行数
             
         Returns:
             更新后的状态
@@ -135,11 +141,14 @@ class WriterAgent:
         sections_outline = outline.get('sections', [])
         background_knowledge = state.get('background_knowledge', '')
         
-        logger.info(f"开始撰写内容: {len(sections_outline)} 个章节")
+        if not sections_outline:
+            logger.warning("没有章节大纲，跳过内容撰写")
+            state['sections'] = []
+            return state
         
-        sections = []
+        # 第一步：收集所有章节撰写任务，预先分配顺序索引
+        tasks = []
         for i, section_outline in enumerate(sections_outline):
-            # 获取上下文
             prev_summary = ""
             next_preview = ""
             
@@ -151,20 +160,62 @@ class WriterAgent:
                 next_section = sections_outline[i + 1]
                 next_preview = f"下一章节《{next_section.get('title', '')}》将介绍 {next_section.get('key_concept', '')}"
             
+            tasks.append({
+                'order_idx': i,
+                'section_outline': section_outline,
+                'prev_summary': prev_summary,
+                'next_preview': next_preview,
+                'background_knowledge': background_knowledge
+            })
+        
+        # 使用环境变量配置或传入的参数
+        if max_workers is None:
+            max_workers = MAX_WORKERS
+        
+        logger.info(f"开始撰写内容: {len(tasks)} 个章节，使用 {min(max_workers, len(tasks))} 个并行线程")
+        
+        # 第二步：并行撰写章节
+        results = [None] * len(tasks)
+        
+        def write_task(task):
+            """单个章节撰写任务"""
             try:
                 section = self.write_section(
-                    section_outline=section_outline,
-                    previous_section_summary=prev_summary,
-                    next_section_preview=next_preview,
-                    background_knowledge=background_knowledge
+                    section_outline=task['section_outline'],
+                    previous_section_summary=task['prev_summary'],
+                    next_section_preview=task['next_preview'],
+                    background_knowledge=task['background_knowledge']
                 )
-                sections.append(section)
-                logger.info(f"章节撰写完成: {section.get('title', '')}")
-                
+                return {
+                    'success': True,
+                    'order_idx': task['order_idx'],
+                    'section': section
+                }
             except Exception as e:
-                logger.error(f"章节撰写失败: {e}")
-                state['error'] = f"章节撰写失败: {str(e)}"
-                break
+                logger.error(f"章节撰写失败 [{task['section_outline'].get('title', '')}]: {e}")
+                return {
+                    'success': False,
+                    'order_idx': task['order_idx'],
+                    'title': task['section_outline'].get('title', ''),
+                    'error': str(e)
+                }
+        
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(write_task, task): task for task in tasks}
+            
+            for future in as_completed(futures):
+                result = future.result()
+                order_idx = result['order_idx']
+                results[order_idx] = result
+                
+                if result['success']:
+                    logger.info(f"章节撰写完成: {result['section'].get('title', '')}")
+        
+        # 第三步：按原始顺序组装结果
+        sections = []
+        for result in results:
+            if result and result['success']:
+                sections.append(result['section'])
         
         state['sections'] = sections
         logger.info(f"内容撰写完成: {len(sections)} 个章节")

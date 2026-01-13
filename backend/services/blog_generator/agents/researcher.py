@@ -4,9 +4,11 @@ Researcher Agent - 素材收集
 
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional
 
 from ..prompts.prompt_manager import get_prompt_manager
+from ..services.smart_search_service import get_smart_search_service, init_smart_search_service
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +31,15 @@ class ResearcherAgent:
         self.llm = llm_client
         self.search_service = search_service
         self.knowledge_service = knowledge_service
+        
+        # 检查是否启用智能搜索
+        self.smart_search_enabled = os.environ.get('SMART_SEARCH_ENABLED', 'false').lower() == 'true'
+        if self.smart_search_enabled:
+            # 初始化智能搜索服务
+            smart_service = get_smart_search_service()
+            if not smart_service:
+                init_smart_search_service(llm_client)
+            logger.info("🧠 智能知识源搜索已启用")
     
     def generate_search_queries(self, topic: str, target_audience: str) -> List[str]:
         """
@@ -109,6 +120,42 @@ class ResearcherAgent:
                 unique_results.append(item)
         
         return unique_results[:max_results]
+    
+    def _smart_search(self, topic: str, target_audience: str, max_results: int = 15) -> List[Dict]:
+        """
+        使用智能搜索服务（LLM 路由 + 多源并行）
+        
+        Args:
+            topic: 技术主题
+            target_audience: 目标受众
+            max_results: 最大结果数
+            
+        Returns:
+            搜索结果列表
+        """
+        smart_service = get_smart_search_service()
+        if not smart_service:
+            logger.warning("智能搜索服务未初始化，回退到普通搜索")
+            return self.search(topic, target_audience, max_results)
+        
+        try:
+            result = smart_service.search(
+                topic=topic,
+                article_type=target_audience,
+                max_results_per_source=5
+            )
+            
+            if result.get('success'):
+                sources_used = result.get('sources_used', [])
+                logger.info(f"🧠 智能搜索完成，使用搜索源: {sources_used}")
+                return result.get('results', [])[:max_results]
+            else:
+                logger.warning(f"智能搜索失败: {result.get('error')}，回退到普通搜索")
+                return self.search(topic, target_audience, max_results)
+                
+        except Exception as e:
+            logger.error(f"智能搜索异常: {e}，回退到普通搜索")
+            return self.search(topic, target_audience, max_results)
     
     def summarize(
         self,
@@ -231,9 +278,15 @@ class ResearcherAgent:
             preview = content[:1000] + '...' if len(content) > 1000 else content
             logger.info(f"__DOC_PREVIEW__{preview}__END_PREVIEW__")
         
-        # 1. 执行网络搜索（保持原有逻辑）
-        logger.info(f"🌐 启动网络搜索...")
-        search_results = self.search(topic, target_audience)
+        # 1. 执行网络搜索
+        if self.smart_search_enabled:
+            # 使用智能搜索（LLM 路由 + 多源并行）
+            logger.info(f"🧠 启动智能知识源搜索...")
+            search_results = self._smart_search(topic, target_audience)
+        else:
+            # 使用普通搜索
+            logger.info(f"🌐 启动网络搜索...")
+            search_results = self.search(topic, target_audience)
         
         # 2. 知识融合分支
         if self.knowledge_service and has_document:

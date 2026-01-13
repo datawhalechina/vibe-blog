@@ -88,8 +88,7 @@ class BlogGenerator:
         # 追问和审核节点
         workflow.add_node("questioner", self._questioner_node)
         workflow.add_node("deepen_content", self._deepen_content_node)
-        workflow.add_node("coder", self._coder_node)
-        workflow.add_node("artist", self._artist_node)
+        workflow.add_node("coder_and_artist", self._coder_and_artist_node)  # 并行节点
         workflow.add_node("reviewer", self._reviewer_node)
         workflow.add_node("revision", self._revision_node)
         workflow.add_node("assembler", self._assembler_node)
@@ -122,14 +121,13 @@ class BlogGenerator:
             self._should_deepen,
             {
                 "deepen": "deepen_content",
-                "continue": "coder"
+                "continue": "coder_and_artist"  # 进入并行节点
             }
         )
         workflow.add_edge("deepen_content", "questioner")  # 深化后重新追问
         
-        # Coder 和 Artist 顺序执行 (简化版，实际可并行)
-        workflow.add_edge("coder", "artist")
-        workflow.add_edge("artist", "reviewer")
+        # Coder 和 Artist 并行执行（通过单个节点内部并行实现）
+        workflow.add_edge("coder_and_artist", "reviewer")
         
         # 条件边：审核后决定是修订还是组装
         workflow.add_conditional_edges(
@@ -190,7 +188,10 @@ class BlogGenerator:
         return state
     
     def _enhance_with_knowledge_node(self, state: SharedState) -> SharedState:
-        """基于新知识增强内容节点"""
+        """基于新知识增强内容节点（并行）"""
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import os
+        
         logger.info("=== Step 3.7: 知识增强 ===")
         
         sections = state.get('sections', [])
@@ -204,31 +205,63 @@ class BlogGenerator:
         from .prompts.prompt_manager import get_prompt_manager
         pm = get_prompt_manager()
         
-        # 找出需要增强的章节（根据 gaps 中的 section_id 或全部增强）
-        enhanced_count = 0
+        # 第一步：收集需要增强的任务
+        tasks = []
         for section in sections:
-            # 检查该章节是否有相关的知识空白
             section_gaps = [g for g in gaps if not g.get('section_id') or g.get('section_id') == section.get('id')]
             
             if section_gaps:
-                original_content = section.get('content', '')
-                
+                tasks.append({
+                    'section': section,
+                    'section_gaps': section_gaps,
+                    'new_knowledge': new_knowledge
+                })
+        
+        if not tasks:
+            logger.info("没有需要增强的章节")
+            state['knowledge_gaps'] = []
+            return state
+        
+        max_workers = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
+        logger.info(f"开始知识增强: {len(tasks)} 个章节，使用 {min(max_workers, len(tasks))} 个并行线程")
+        
+        # 第二步：并行增强
+        def enhance_task(task):
+            """单个章节增强任务"""
+            section = task['section']
+            try:
                 prompt = pm.render_writer_enhance_with_knowledge(
-                    original_content=original_content,
-                    new_knowledge=new_knowledge,
-                    knowledge_gaps=section_gaps
+                    original_content=section.get('content', ''),
+                    new_knowledge=task['new_knowledge'],
+                    knowledge_gaps=task['section_gaps']
                 )
                 
-                try:
-                    enhanced_content = self.writer.llm.chat(
-                        messages=[{"role": "user", "content": prompt}]
-                    )
-                    section['content'] = enhanced_content
-                    enhanced_count += 1
-                    logger.info(f"章节增强完成: {section.get('title', '')}")
-                except Exception as e:
-                    logger.error(f"章节增强失败: {e}")
+                enhanced_content = self.writer.llm.chat(
+                    messages=[{"role": "user", "content": prompt}]
+                )
+                return {
+                    'success': True,
+                    'section': section,
+                    'enhanced_content': enhanced_content
+                }
+            except Exception as e:
+                logger.error(f"章节增强失败 [{section.get('title', '')}]: {e}")
+                return {
+                    'success': False,
+                    'section': section,
+                    'error': str(e)
+                }
         
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {executor.submit(enhance_task, task): task for task in tasks}
+            
+            for future in as_completed(futures):
+                result = future.result()
+                if result['success']:
+                    result['section']['content'] = result['enhanced_content']
+                    logger.info(f"章节增强完成: {result['section'].get('title', '')}")
+        
+        enhanced_count = sum(1 for t in tasks if t['section'].get('content'))
         logger.info(f"知识增强完成: {enhanced_count} 个章节")
         
         # 清空已处理的知识空白
@@ -281,15 +314,37 @@ class BlogGenerator:
         
         return state
     
-    def _coder_node(self, state: SharedState) -> SharedState:
-        """代码生成节点"""
-        logger.info("=== Step 5: 代码生成 ===")
-        return self.coder.run(state)
-    
-    def _artist_node(self, state: SharedState) -> SharedState:
-        """配图生成节点"""
-        logger.info("=== Step 6: 配图生成 ===")
-        return self.artist.run(state)
+    def _coder_and_artist_node(self, state: SharedState) -> SharedState:
+        """代码和配图并行生成节点"""
+        from concurrent.futures import ThreadPoolExecutor
+        import copy
+        
+        logger.info("=== Step 5: 代码和配图并行生成 ===")
+        
+        # 使用线程池并行执行 coder 和 artist
+        # 注意：state 是共享的，但 coder 和 artist 修改的是不同的字段
+        # coder 修改: code_blocks, sections[x].code_ids
+        # artist 修改: images, sections[x].image_ids
+        # 两者不冲突，可以安全并行
+        
+        def run_coder():
+            logger.info("→ 开始代码生成")
+            return self.coder.run(state)
+        
+        def run_artist():
+            logger.info("→ 开始配图生成")
+            return self.artist.run(state)
+        
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            coder_future = executor.submit(run_coder)
+            artist_future = executor.submit(run_artist)
+            
+            # 等待两者完成
+            coder_future.result()
+            artist_future.result()
+        
+        logger.info("=== 代码和配图并行生成完成 ===")
+        return state
     
     def _reviewer_node(self, state: SharedState) -> SharedState:
         """质量审核节点"""
