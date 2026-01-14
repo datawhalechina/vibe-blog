@@ -1655,12 +1655,10 @@
             let processedMarkdown = markdown.replace(/\]\(\.\/images\//g, '](/outputs/images/');
             
             // 预处理：确保分割线 --- 前后有空行（避免被解析为标题）
+            // 只处理独立的分割线（行首的 ---），不处理表格分隔符（包含 | 的行）
+            processedMarkdown = processedMarkdown.replace(/^(-{3,})$/gm, '\n$1\n');
             // 处理 ---# 紧跟的情况（没有换行）
-            processedMarkdown = processedMarkdown.replace(/(-{3,})([#])/g, '$1\n\n$2');
-            // 处理 X--- 前面紧跟字符的情况
-            processedMarkdown = processedMarkdown.replace(/([^\n])(-{3,})/g, '$1\n\n$2');
-            // 处理 ---\nX 后面只有一个换行的情况
-            processedMarkdown = processedMarkdown.replace(/(-{3,})\n([^\n])/g, '$1\n\n$2');
+            processedMarkdown = processedMarkdown.replace(/^(-{3,})([#])/gm, '$1\n\n$2');
             
             // 配置 marked
             marked.setOptions({
