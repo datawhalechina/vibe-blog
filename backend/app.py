@@ -4,8 +4,14 @@ vibe-blog 后端应用入口
 """
 import os
 import logging
+import re
+import io
+import zipfile
+import requests
 from contextvars import ContextVar
 from dotenv import load_dotenv
+from pathlib import Path
+from urllib.parse import urlparse, quote
 
 # 加载 .env 文件
 load_dotenv()
@@ -1014,6 +1020,128 @@ def create_app(config_class=None):
                 return jsonify({'success': False, 'error': '记录不存在'}), 404
         except Exception as e:
             logger.error(f"删除历史记录失败: {e}", exc_info=True)
+            return jsonify({'success': False, 'error': str(e)}), 500
+    
+    # ========== Markdown 导出 API ==========
+    
+    def extract_image_urls(markdown_content):
+        """从 Markdown 中提取所有图片 URL"""
+        pattern = r'!\[([^\]]*)\]\(([^\)]+)\)'
+        matches = re.findall(pattern, markdown_content)
+        return matches
+    
+    def download_image(url, timeout=10):
+        """下载图片，返回二进制内容"""
+        try:
+            original_url = url
+            
+            # 处理各种相对路径格式
+            if url.startswith('./images/'):
+                # ./images/xxx.png -> /outputs/images/xxx.png
+                url = '/outputs/images/' + url[9:]
+            elif url.startswith('/outputs/images/'):
+                # 已经是正确格式
+                pass
+            
+            if url.startswith('/'):
+                # 相对路径，需要拼接完整 URL
+                base_url = request.host_url.rstrip('/')
+                url = base_url + url
+            
+            logger.info(f"下载图片: {original_url} -> {url}")
+            response = requests.get(url, timeout=timeout)
+            response.raise_for_status()
+            return response.content
+        except Exception as e:
+            logger.warning(f"下载图片失败 {url}: {e}")
+            return None
+    
+    def get_image_filename(url):
+        """从 URL 中提取文件名"""
+        parsed = urlparse(url)
+        filename = os.path.basename(parsed.path)
+        if not filename or '.' not in filename:
+            filename = 'image.png'
+        return filename
+    
+    @app.route('/api/export/markdown', methods=['POST'])
+    def export_markdown_with_images():
+        """
+        导出 Markdown 文件，包含所有本地图片
+        
+        请求体:
+        {
+            "markdown": "# 标题\n![图片](url)...",
+            "title": "文档标题"
+        }
+        
+        返回: ZIP 文件，包含 markdown 文件和 images 目录
+        """
+        try:
+            data = request.get_json()
+            if not data or 'markdown' not in data:
+                return jsonify({'success': False, 'error': '缺少 markdown 参数'}), 400
+            
+            markdown_content = data.get('markdown', '')
+            title = data.get('title', 'blog')
+            
+            # 清理标题中的特殊字符，保留中文
+            safe_title = re.sub(r'[^\w\u4e00-\u9fa5_-]', '_', title)[:50]
+            
+            # 提取所有图片 URL
+            image_matches = extract_image_urls(markdown_content)
+            
+            # 创建 ZIP 文件（使用 UTF-8 编码文件名）
+            zip_buffer = io.BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+                # 设置 UTF-8 编码标志
+                zip_file.comment = b''
+                # 处理 Markdown 内容，替换图片路径
+                modified_markdown = markdown_content
+                image_mapping = {}  # 原始 URL -> 新文件名的映射
+                
+                for alt_text, img_url in image_matches:
+                    # 下载图片
+                    img_content = download_image(img_url)
+                    if img_content:
+                        # 生成新的文件名
+                        original_filename = get_image_filename(img_url)
+                        # 确保文件名唯一
+                        base_name, ext = os.path.splitext(original_filename)
+                        counter = 1
+                        new_filename = original_filename
+                        while new_filename in image_mapping.values():
+                            new_filename = f"{base_name}_{counter}{ext}"
+                            counter += 1
+                        
+                        # 保存到 ZIP 的 images 目录
+                        zip_file.writestr(f'images/{new_filename}', img_content)
+                        image_mapping[img_url] = new_filename
+                        
+                        # 更新 Markdown 中的图片路径为相对路径
+                        old_ref = f'![{alt_text}]({img_url})'
+                        new_ref = f'![{alt_text}](./images/{new_filename})'
+                        modified_markdown = modified_markdown.replace(old_ref, new_ref)
+                
+                # 将修改后的 Markdown 写入 ZIP
+                zip_file.writestr(f'{safe_title}.md', modified_markdown.encode('utf-8'))
+            
+            # 返回 ZIP 文件
+            zip_buffer.seek(0)
+            timestamp = __import__('datetime').datetime.now().strftime('%Y%m%d')
+            # 使用纯英文文件名避免编码问题
+            filename = f'export_{timestamp}.zip'
+            
+            return Response(
+                zip_buffer.getvalue(),
+                mimetype='application/zip',
+                headers={
+                    'Content-Disposition': f'attachment; filename="{filename}"'
+                }
+            )
+            
+        except Exception as e:
+            logger.error(f"导出 Markdown 失败: {e}", exc_info=True)
             return jsonify({'success': False, 'error': str(e)}), 500
     
     # ========== vibe-reviewer 初始化 (新增) ==========

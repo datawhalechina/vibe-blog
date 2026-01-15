@@ -1667,10 +1667,10 @@
                         <div class="page-number">📄</div>
                         <div class="page-title">完整博客内容</div>
                         <div style="margin-left: auto; display: flex; gap: 10px;">
-                            <button class="download-btn" onclick="exportMarkdownAsImage()" style="padding: 8px 16px; background: linear-gradient(135deg, #FF6B35, #FF8E53); border: none; border-radius: 8px; color: #fff; font-size: 13px; cursor: pointer;">
+                            <button class="export-image-btn" style="padding: 8px 16px; background: linear-gradient(135deg, #FF6B35, #FF8E53); border: none; border-radius: 8px; color: #fff; font-size: 13px; cursor: pointer;">
                                 📷 导出图片
                             </button>
-                            <button class="download-btn" onclick="downloadMarkdown()" style="padding: 8px 16px; background: linear-gradient(135deg, #4ECDC4, #44A08D); border: none; border-radius: 8px; color: #fff; font-size: 13px; cursor: pointer;">
+                            <button class="download-markdown-btn" style="padding: 8px 16px; background: linear-gradient(135deg, #4ECDC4, #44A08D); border: none; border-radius: 8px; color: #fff; font-size: 13px; cursor: pointer;">
                                 📥 下载 Markdown
                             </button>
                         </div>
@@ -1678,6 +1678,21 @@
                     <div class="markdown-body" id="markdownContent"></div>
                 `;
                 pagesContainer.appendChild(markdownEl);
+                
+                // 为按钮添加事件监听器
+                const downloadBtn = markdownEl.querySelector('.download-markdown-btn');
+                const exportBtn = markdownEl.querySelector('.export-image-btn');
+                
+                console.log('[displayBlogResult] 查找按钮:', { downloadBtn, exportBtn });
+                
+                if (downloadBtn) {
+                    downloadBtn.addEventListener('click', downloadMarkdown);
+                    console.log('[displayBlogResult] 下载按钮事件监听器已添加');
+                }
+                if (exportBtn) {
+                    exportBtn.addEventListener('click', exportMarkdownAsImage);
+                    console.log('[displayBlogResult] 导出按钮事件监听器已添加');
+                }
                 
                 // 使用 marked.js 渲染 Markdown
                 renderMarkdown(result.markdown);
@@ -1767,27 +1782,80 @@
             }, 200);
         }
 
-        // 下载 Markdown
-        function downloadMarkdown() {
+        // 下载 Markdown (包含本地图片)
+        async function downloadMarkdown() {
+            console.log('[downloadMarkdown] 开始下载，currentBlogResult:', currentBlogResult);
+            
             if (!currentBlogResult || !currentBlogResult.markdown) {
+                console.error('[downloadMarkdown] 没有可下载的内容');
                 alert('没有可下载的内容');
                 return;
             }
             
             const title = currentBlogResult.outline?.title || 'blog';
             const safeTitle = title.replace(/[^a-zA-Z0-9\u4e00-\u9fa5_-]/g, '_').substring(0, 50);
-            const filename = `${safeTitle}_${new Date().toISOString().slice(0, 10)}.md`;
+            console.log('[downloadMarkdown] 标题:', title, '安全标题:', safeTitle);
             
-            const blob = new Blob([currentBlogResult.markdown], { type: 'text/markdown;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
+            // 找到按钮并显示加载状态
+            const btns = document.querySelectorAll('.download-btn');
+            let btn = null;
+            btns.forEach(b => { if (b.textContent.includes('下载 Markdown')) btn = b; });
+            const originalText = btn ? btn.innerHTML : '';
+            if (btn) {
+                btn.innerHTML = '⏳ 下载中...';
+                btn.disabled = true;
+                console.log('[downloadMarkdown] 按钮状态已更新');
+            }
             
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
+            try {
+                console.log('[downloadMarkdown] 调用 API: /api/export/markdown');
+                // 调用后端 API 导出包含图片的 Markdown
+                const response = await fetch('/api/export/markdown', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        markdown: currentBlogResult.markdown,
+                        title: title
+                    })
+                });
+                
+                console.log('[downloadMarkdown] API 响应状态:', response.status);
+                
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || '导出失败');
+                }
+                
+                // 获取 ZIP 文件
+                const blob = await response.blob();
+                console.log('[downloadMarkdown] 获得 ZIP 文件，大小:', blob.size);
+                
+                const url = URL.createObjectURL(blob);
+                
+                // 下载 ZIP 文件
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${safeTitle}_${new Date().toISOString().slice(0, 10)}.zip`;
+                document.body.appendChild(a);
+                console.log('[downloadMarkdown] 触发下载:', a.download);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                
+                if (btn) {
+                    btn.innerHTML = '✅ 已下载';
+                    setTimeout(() => { btn.innerHTML = originalText; }, 1500);
+                }
+                console.log('[downloadMarkdown] 下载完成');
+            } catch (error) {
+                console.error('[downloadMarkdown] 下载失败:', error);
+                alert('下载失败: ' + error.message);
+                if (btn) btn.innerHTML = originalText;
+            } finally {
+                if (btn) btn.disabled = false;
+            }
         }
         
         // 导出 Markdown 预览为图片
