@@ -1,5 +1,7 @@
 <div align="center">
 
+> ⚠️ **Alpha 内测版本警告**：此为早期内部构建版本，尚不完整且可能存在错误。欢迎大家提 [Issue](https://github.com/datawhalechina/vibe-blog/issues) 反馈问题或建议。
+
 <img width="256" src="./logo/vibe-blog.png">
 
 *Turn complex tech into stories everyone can understand.*
@@ -11,11 +13,10 @@
 
 
 
-
 [![Version](https://img.shields.io/badge/version-v0.1.0-4CAF50.svg)](https://github.com/datawhalechina/vibe-blog)
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Flask](https://img.shields.io/badge/Flask-3.0-000000?logo=flask&logoColor=white)
-<h1>vibe-blog</h1>
+<h1>vibe-blog 【!Alpha内测版】</h1>
 </p>
 
 <b>一个基于多 Agent 架构的 AI 长文博客生成Agent，支持深度调研、智能配图、Mermaid 图表、代码集成，<br></b>
