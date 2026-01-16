@@ -1775,9 +1775,21 @@
                     code = code.replace(/：/g, ':');  // 中文冒号转英文
                     code = code.replace(/；/g, ';');  // 中文分号转英文
                     code = code.replace(/，/g, ',');  // 中文逗号转英文
-                    // 处理节点文本中的特殊字符：将 \n 替换为 <br>，用引号包裹含特殊字符的文本
-                    code = code.replace(/\[([^\]]*?)\\n([^\]]*?)\]/g, '["$1<br/>$2"]');  // \n 换行
-                    code = code.replace(/\[([^\]"]*?\/[^\]"]*?)\]/g, '["$1"]');  // 包含 / 的文本用引号包裹
+                    
+                    // 处理节点文本中的特殊字符
+                    // 匹配 [...] 节点，处理其中的特殊字符
+                    code = code.replace(/\[([^\]]+)\]/g, (match, content) => {
+                        // 如果已经用引号包裹，跳过
+                        if (content.startsWith('"') && content.endsWith('"')) return match;
+                        // 检查是否包含需要转义的特殊字符
+                        if (/[\\\/\n·•–—]/.test(content) || content.includes('\\n')) {
+                            // 替换 \n 为 <br/>
+                            let fixed = content.replace(/\\n/g, '<br/>');
+                            // 用引号包裹
+                            return '["' + fixed + '"]';
+                        }
+                        return match;
+                    });
                     
                     const div = document.createElement('div');
                     div.className = 'mermaid';
