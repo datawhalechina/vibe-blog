@@ -442,6 +442,12 @@
             padding: 20px;
             margin: 16px 0;
             text-align: center;
+            overflow: visible;
+        }
+        .markdown-body .mermaid svg {
+            max-width: 100%;
+            height: auto;
+            overflow: visible;
         }
         /* 滚动条样式 */
         .markdown-body::-webkit-scrollbar { width: 6px; }
@@ -1890,8 +1896,31 @@
                 // 临时移除滚动限制以捕获完整内容
                 const originalMaxHeight = markdownContent.style.maxHeight;
                 const originalOverflow = markdownContent.style.overflow;
+                const originalWidth = markdownContent.style.width;
                 markdownContent.style.maxHeight = 'none';
                 markdownContent.style.overflow = 'visible';
+                markdownContent.style.width = 'auto';
+                
+                // 确保所有 SVG 和 Mermaid 图表不被裁剪
+                const svgs = markdownContent.querySelectorAll('svg');
+                const originalSvgStyles = [];
+                svgs.forEach((svg, i) => {
+                    originalSvgStyles[i] = {
+                        overflow: svg.style.overflow,
+                        maxWidth: svg.style.maxWidth
+                    };
+                    svg.style.overflow = 'visible';
+                    svg.style.maxWidth = 'none';
+                });
+                
+                const mermaidDivs = markdownContent.querySelectorAll('.mermaid');
+                const originalMermaidStyles = [];
+                mermaidDivs.forEach((div, i) => {
+                    originalMermaidStyles[i] = {
+                        overflow: div.style.overflow
+                    };
+                    div.style.overflow = 'visible';
+                });
                 
                 // 将所有图片转换为 base64（解决跨域问题）
                 const images = markdownContent.querySelectorAll('img');
@@ -1959,6 +1988,22 @@
                 // 恢复样式
                 markdownContent.style.maxHeight = originalMaxHeight;
                 markdownContent.style.overflow = originalOverflow;
+                markdownContent.style.width = originalWidth;
+                
+                // 恢复 SVG 样式
+                svgs.forEach((svg, i) => {
+                    if (originalSvgStyles[i]) {
+                        svg.style.overflow = originalSvgStyles[i].overflow;
+                        svg.style.maxWidth = originalSvgStyles[i].maxWidth;
+                    }
+                });
+                
+                // 恢复 Mermaid 样式
+                mermaidDivs.forEach((div, i) => {
+                    if (originalMermaidStyles[i]) {
+                        div.style.overflow = originalMermaidStyles[i].overflow;
+                    }
+                });
                 
                 // 检查 canvas 是否有效
                 if (canvas.width === 0 || canvas.height === 0) {
