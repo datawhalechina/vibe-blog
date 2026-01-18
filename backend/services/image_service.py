@@ -105,7 +105,8 @@ class NanoBananaService:
         model: Optional[str] = None,
         style_prefix: str = "",
         download: bool = True,
-        max_wait_time: int = 300
+        max_wait_time: int = 300,
+        max_retries: int = 1
     ) -> Optional[ImageResult]:
         """
         生成图片
@@ -118,65 +119,77 @@ class NanoBananaService:
             style_prefix: 风格前缀（会添加到 prompt 前面）
             download: 是否下载到本地
             max_wait_time: 最大等待时间（秒）
+            max_retries: 最大重试次数（默认1次）
 
         Returns:
             ImageResult 或 None
         """
-        try:
-            use_model = model or self.model
-            
-            # 添加风格前缀
-            full_prompt = f"{style_prefix}\n\n{prompt}" if style_prefix else prompt
-            
-            logger.info(f"开始生成图片: {prompt[:50]}...")
-            
-            # 提交任务
-            result = self._draw(
-                model=use_model,
-                prompt=full_prompt,
-                aspect_ratio=aspect_ratio,
-                image_size=image_size
-            )
-            
-            # 检查 API 返回的错误码
-            if result.get('code') != 0:
-                logger.error(f"API 返回错误: {result}")
-                return None
-            
-            data = result.get('data') or {}
-            task_id = data.get('id')
-            if not task_id:
-                logger.error(f"未获取到任务ID: {result}")
-                return None
-            
-            logger.info(f"任务已提交: {task_id}")
-            
-            # 等待完成
-            final_result = self._wait_for_completion(task_id, max_wait_time)
-            
-            # 获取图片 URL
-            results = final_result.get('data', {}).get('results', [])
-            if not results:
-                logger.error("未获取到生成结果")
-                return None
-            
-            image_url = results[0].get('url')
-            if not image_url:
-                logger.error("未获取到图片 URL")
-                return None
-            
-            logger.info(f"图片生成成功: {image_url}")
-            
-            # 下载图片
-            local_path = None
-            if download:
-                local_path = self._download_image(image_url)
-            
-            return ImageResult(url=image_url, local_path=local_path)
-            
-        except Exception as e:
-            logger.error(f"图片生成失败: {e}", exc_info=True)
-            return None
+        use_model = model or self.model
+        full_prompt = f"{style_prefix}\n\n{prompt}" if style_prefix else prompt
+        
+        last_error = None
+        for attempt in range(max_retries + 1):
+            try:
+                if attempt > 0:
+                    logger.info(f"图片生成重试 ({attempt}/{max_retries}): {prompt[:50]}...")
+                else:
+                    logger.info(f"开始生成图片: {prompt[:50]}...")
+                
+                # 提交任务
+                result = self._draw(
+                    model=use_model,
+                    prompt=full_prompt,
+                    aspect_ratio=aspect_ratio,
+                    image_size=image_size
+                )
+                
+                # 检查 API 返回的错误码
+                if result.get('code') != 0:
+                    logger.error(f"API 返回错误: {result}")
+                    last_error = f"API 返回错误: {result}"
+                    continue
+                
+                data = result.get('data') or {}
+                task_id = data.get('id')
+                if not task_id:
+                    logger.error(f"未获取到任务ID: {result}")
+                    last_error = f"未获取到任务ID: {result}"
+                    continue
+                
+                logger.info(f"任务已提交: {task_id}")
+                
+                # 等待完成
+                final_result = self._wait_for_completion(task_id, max_wait_time)
+                
+                # 获取图片 URL
+                results = final_result.get('data', {}).get('results', [])
+                if not results:
+                    logger.error("未获取到生成结果")
+                    last_error = "未获取到生成结果"
+                    continue
+                
+                image_url = results[0].get('url')
+                if not image_url:
+                    logger.error("未获取到图片 URL")
+                    last_error = "未获取到图片 URL"
+                    continue
+                
+                logger.info(f"图片生成成功: {image_url}")
+                
+                # 下载图片
+                local_path = None
+                if download:
+                    local_path = self._download_image(image_url)
+                
+                return ImageResult(url=image_url, local_path=local_path)
+                
+            except Exception as e:
+                last_error = str(e)
+                logger.error(f"图片生成失败 (尝试 {attempt + 1}/{max_retries + 1}): {e}", exc_info=True)
+                continue
+        
+        logger.error(f"图片生成最终失败，已重试 {max_retries} 次: {last_error}")
+        return None
 
     def generate_batch(
         self,
