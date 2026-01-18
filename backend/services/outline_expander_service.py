@@ -66,7 +66,9 @@ class OutlineExpanderService:
         # 5. 保存到数据库
         self.db.update_book_full_outline(book_id, marked_outline)
         
-        logger.info(f"大纲扩展完成: {book['title']}")
+        # 统计扩展后的章节数
+        expanded_count = len(marked_outline.get('chapters', []))
+        logger.info(f"大纲扩展完成: {book['title']}, 扩展后共 {expanded_count} 个章节")
         return marked_outline
     
     def _search_related_content(self, title: str, theme: str) -> List[Dict[str, Any]]:

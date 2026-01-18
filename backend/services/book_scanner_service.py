@@ -133,22 +133,25 @@ class BookScannerService:
                    f"分配 {classification_result['blogs_assigned']} 篇博客")
         
         # ========== 第二步：生成大纲（参考旧书籍大纲）==========
-        logger.info("【第二步】开始生成书籍大纲...")
-        
         books_to_update = classification_result.get('books_to_update', [])
+        total_books = len(books_to_update)
+        logger.info(f"【第二步】开始生成书籍大纲，共 {total_books} 本书籍待处理...")
+        
         outlines_generated = 0
         
-        for book_id in books_to_update:
+        for idx, book_id in enumerate(books_to_update, 1):
             try:
                 # 查找是否有相似的旧书籍大纲可参考
                 book = self.db.get_book(book_id)
+                book_title = book.get('title', book_id) if book else book_id
                 old_outline_ref = self._find_similar_old_outline(book, old_books_info) if book else None
                 
+                logger.info(f"📚 开始生成书籍大纲: [{idx}/{total_books}]: {book_title}")
                 self._generate_book_outline(book_id, old_outline_ref)
                 outlines_generated += 1
-                logger.info(f"生成书籍大纲: {book_id}")
+                logger.info(f"📚 生成书籍大纲完成: [{idx}/{total_books}]: {book_title}")
             except Exception as e:
-                logger.warning(f"生成书籍大纲失败: {book_id}, {e}")
+                logger.warning(f"📚 生成书籍大纲失败: {book_id}, {e}")
         
         result = {
             "status": "success",
