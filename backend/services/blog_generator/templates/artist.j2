@@ -3,8 +3,35 @@
 ## 输入信息
 - 图片类型: {{ image_type }}
 - 图片描述: {{ description }}
+{% if audience_adaptation %}
+- 受众适配: {{ audience_adaptation }}
+{% endif %}
 - 所在章节上下文: 
 {{ context }}
+
+## 受众适配要求
+{% if audience_adaptation == "high-school" %}
+### 🎓 高中生版本配图要求
+- 使用清晰、简洁的视觉元素
+- 配图要有教学性，突出知识架构
+- 多使用流程图和架构图帮助理解逻辑关系
+- 颜色搭配要清新，有学习氛围感
+- 图表要便于学习笔记记录
+{% elif audience_adaptation == "children" %}
+### 👶 儿童版本配图要求
+- 使用可爱、有趣的视觉元素
+- 多采用卡通化、拟人化的设计
+- 颜色要鲜艳活泼，充满童趣
+- 图表要简单直观，避免复杂的技术细节
+- 多使用比喻和故事化的视觉表达
+{% elif audience_adaptation == "professional" %}
+### 💼 职场版本配图要求
+- 使用专业、简洁的商务风格
+- 突出实际应用场景和业务价值
+- 多采用架构图和时序图展示技术实现
+- 配图要体现效率和专业性
+- 颜色搭配要商务化，蓝色、灰色为主
+{% endif %}
 
 ## 核心要求（极其重要！）
 **你必须生成与当前章节内容完全匹配的独特图表！**
@@ -13,12 +40,14 @@
 ❌ 不要生成通用的"前端-应用-缓存-数据库"架构图
 ❌ 不要复制示例代码
 ❌ 不要忽略章节上下文
+❌ 不要忽略受众适配要求
 
 ### 必须做到
 ✅ 仔细阅读【所在章节上下文】的具体内容
 ✅ 提取该章节特有的概念、术语、流程步骤
 ✅ 图表中的节点名称必须来自章节实际讨论的内容
 ✅ 每个图表都必须是独一无二的，反映该章节的核心知识点
+✅ 根据受众适配要求调整图表的复杂度和视觉风格
 
 ## 图片类型处理
 
@@ -69,10 +98,22 @@ sequenceDiagram
 ```
 
 ### comparison (对比图)
+{% if audience_adaptation == "children" %}
+输出 AI 图片生成 Prompt，使用可爱卡通风格:
+"Cute cartoon-style comparison diagram showing [A] vs [B], split screen layout with colorful and playful elements, 
+left side shows [A features] with fun icons, right side shows [B features] with bright colors, 
+child-friendly design with simple shapes and happy characters"
+{% elif audience_adaptation == "professional" %}
+输出 AI 图片生成 Prompt，使用商务专业风格:
+"Professional business-style comparison chart showing [A] vs [B], clean corporate layout,
+left side shows [A features] with efficiency metrics, right side shows [B features] with performance data,
+blue and gray color scheme, modern minimalist design, suitable for boardroom presentation"
+{% else %}
 输出 AI 图片生成 Prompt，示例:
 "Technical comparison diagram showing [A] vs [B], split screen layout, 
 left side shows [A features], right side shows [B features], 
 clean minimalist style, blue and orange color scheme"
+{% endif %}
 
 ### chart (数据图表)
 输出 Python matplotlib 代码
@@ -91,3 +132,4 @@ JSON 格式:
 3. 节点文字要简洁，避免过长
 4. **节点文本中不要使用 \n 换行符**，如需多行请拆分为多个节点
 5. 使用中文标签
+6. 根据受众适配调整图表复杂度和视觉风格

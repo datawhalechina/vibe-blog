@@ -30,7 +30,8 @@ class PlannerAgent:
         topic: str,
         article_type: str,
         target_audience: str,
-        target_length: str,
+        audience_adaptation: str = "technical-beginner",
+        target_length: str = "medium",
         background_knowledge: str = "",
         key_concepts: list = None,
         on_stream: callable = None,
@@ -46,6 +47,7 @@ class PlannerAgent:
             topic: 技术主题
             article_type: 文章类型
             target_audience: 目标受众
+            audience_adaptation: 受众适配类型
             target_length: 目标长度 (mini/short/medium/long/custom)
             background_knowledge: 背景知识
             key_concepts: 核心概念列表
@@ -65,6 +67,7 @@ class PlannerAgent:
             topic=topic,
             article_type=article_type,
             target_audience=target_audience,
+            audience_adaptation=audience_adaptation,
             target_length=target_length,
             background_knowledge=background_knowledge,
             key_concepts=key_concepts,
@@ -147,6 +150,7 @@ class PlannerAgent:
                 topic=state.get('topic', ''),
                 article_type=state.get('article_type', 'tutorial'),
                 target_audience=state.get('target_audience', 'intermediate'),
+                audience_adaptation=state.get('audience_adaptation', 'technical-beginner'),
                 target_length=state.get('target_length', 'medium'),
                 background_knowledge=state.get('background_knowledge', ''),
                 key_concepts=state.get('key_concepts', []),

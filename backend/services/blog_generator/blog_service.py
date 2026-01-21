@@ -82,6 +82,7 @@ class BlogService:
         topic: str,
         article_type: str = "tutorial",
         target_audience: str = "intermediate",
+        audience_adaptation: str = "default",
         target_length: str = "medium",
         source_material: str = None,
         document_ids: list = None,
@@ -100,6 +101,7 @@ class BlogService:
             topic: 技术主题
             article_type: 文章类型
             target_audience: 目标受众
+            audience_adaptation: 受众适配类型 (default/high-school/children/professional)
             target_length: 目标长度 (mini/short/medium/long/custom)
             source_material: 参考资料
             document_ids: 文档 ID 列表
@@ -125,6 +127,7 @@ class BlogService:
                             topic=topic,
                             article_type=article_type,
                             target_audience=target_audience,
+                            audience_adaptation=audience_adaptation,
                             target_length=target_length,
                             source_material=source_material,
                             document_ids=document_ids,
@@ -140,6 +143,7 @@ class BlogService:
                         topic=topic,
                         article_type=article_type,
                         target_audience=target_audience,
+                        audience_adaptation=audience_adaptation,
                         target_length=target_length,
                         source_material=source_material,
                         document_ids=document_ids,
@@ -164,6 +168,7 @@ class BlogService:
         topic: str,
         article_type: str,
         target_audience: str,
+        audience_adaptation: str,
         target_length: str,
         source_material: str,
         document_ids: list = None,
@@ -244,6 +249,7 @@ class BlogService:
                 topic=topic,
                 article_type=article_type,
                 target_audience=target_audience,
+                audience_adaptation=audience_adaptation,
                 target_length=target_length,
                 source_material=source_material,
                 document_ids=document_ids or [],

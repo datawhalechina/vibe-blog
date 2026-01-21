@@ -199,7 +199,8 @@ class ArtistAgent:
         self,
         image_type: str,
         description: str,
-        context: str
+        context: str,
+        audience_adaptation: str = "technical-beginner"
     ) -> Dict[str, Any]:
         """
         生成配图
@@ -208,6 +209,7 @@ class ArtistAgent:
             image_type: 图片类型
             description: 图片描述
             context: 所在章节上下文
+            audience_adaptation: 受众适配类型
             
         Returns:
             图片资源字典
@@ -216,7 +218,8 @@ class ArtistAgent:
         prompt = pm.render_artist(
             image_type=image_type,
             description=description,
-            context=context
+            context=context,
+            audience_adaptation=audience_adaptation
         )
         
         # 调试日志：记录传入的上下文摘要
@@ -380,7 +383,8 @@ class ArtistAgent:
                 'source': 'outline',
                 'image_type': image_type,
                 'description': image_description,
-                'context': f"章节标题: {section_title}\n\n章节内容摘要:\n{section_content}"
+                'context': f"章节标题: {section_title}\n\n章节内容摘要:\n{section_content}",
+                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
             })
             image_id_counter += 1
         
@@ -408,7 +412,8 @@ class ArtistAgent:
                     'source': 'placeholder',
                     'image_type': placeholder['type'],
                     'description': placeholder['description'],
-                    'context': f"章节标题: {section_title}\n\n相关内容:\n{surrounding_context}"
+                    'context': f"章节标题: {section_title}\n\n相关内容:\n{surrounding_context}",
+                    'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
                 })
                 image_id_counter += 1
         
@@ -434,7 +439,8 @@ class ArtistAgent:
                 image = self.generate_image(
                     image_type=task['image_type'],
                     description=task['description'],
-                    context=task['context']
+                    context=task['context'],
+                    audience_adaptation=task.get('audience_adaptation', 'technical-beginner')
                 )
                 
                 render_method = image.get('render_method', 'mermaid')

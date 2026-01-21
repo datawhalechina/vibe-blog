@@ -35,7 +35,8 @@ class WriterAgent:
         section_outline: Dict[str, Any],
         previous_section_summary: str = "",
         next_section_preview: str = "",
-        background_knowledge: str = ""
+        background_knowledge: str = "",
+        audience_adaptation: str = "technical-beginner"
     ) -> Dict[str, Any]:
         """
         撰写单个章节
@@ -45,6 +46,7 @@ class WriterAgent:
             previous_section_summary: 前一章节摘要
             next_section_preview: 后续章节预告
             background_knowledge: 背景知识
+            audience_adaptation: 受众适配类型
             
         Returns:
             章节内容
@@ -54,7 +56,8 @@ class WriterAgent:
             section_outline=section_outline,
             previous_section_summary=previous_section_summary,
             next_section_preview=next_section_preview,
-            background_knowledge=background_knowledge
+            background_knowledge=background_knowledge,
+            audience_adaptation=audience_adaptation
         )
         
         try:
@@ -165,7 +168,8 @@ class WriterAgent:
                 'section_outline': section_outline,
                 'prev_summary': prev_summary,
                 'next_preview': next_preview,
-                'background_knowledge': background_knowledge
+                'background_knowledge': background_knowledge,
+                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
             })
         
         # 使用环境变量配置或传入的参数
@@ -184,7 +188,8 @@ class WriterAgent:
                     section_outline=task['section_outline'],
                     previous_section_summary=task['prev_summary'],
                     next_section_preview=task['next_preview'],
-                    background_knowledge=task['background_knowledge']
+                    background_knowledge=task['background_knowledge'],
+                    audience_adaptation=task.get('audience_adaptation', 'technical-beginner')
                 )
                 return {
                     'success': True,

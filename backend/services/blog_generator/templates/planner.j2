@@ -4,12 +4,42 @@
 - 技术主题: {{ topic }}
 - 文章类型: {{ article_type }}
 - 目标受众: {{ target_audience }}
+{% if audience_adaptation %}
+- 受众适配: {{ audience_adaptation }}
+{% endif %}
 - 目标长度: {{ target_length }}
 {% if background_knowledge %}
 - 背景知识: {{ background_knowledge }}
 {% endif %}
 {% if key_concepts %}
 - 核心概念: {{ key_concepts | join(', ') }}
+{% endif %}
+
+## 受众适配要求
+{% if audience_adaptation == "high-school" %}
+### 🎓 高中生版本规划要求
+- 标题要青春有活力，贴近学生语境
+- 多设计基础概念解释的章节
+- 重视循序渐进的知识架构设计
+- 加强对学习方法和思维过程的引导
+- 章节内容要有明确的学习目标
+- 多采用flowchart类型的图表帮助理解
+{% elif audience_adaptation == "children" %}
+### 👶 儿童版本规划要求
+- 标题要有趣可爱，充满想象力
+- 多采用故事化的章节结构
+- 大量使用图片配图，减少文字密度
+- 内容要简单直观，避免抽象概念
+- 每个章节都要有互动性的思考环节
+- 优先选择chart和flowchart类型的图表
+{% elif audience_adaptation == "professional" %}
+### 💼 职场版本规划要求
+- 标题要突出实用价值和商业收益
+- 重点设计实践应用和案例分析章节
+- 多采用architecture和sequence类型的技术图表
+- 包含最佳实践和问题解决的章节设计
+- 注重效率提升和成本效益的内容规划
+- 章节要有明确的可行动指导
 {% endif %}
 
 ## 文章类型结构模板

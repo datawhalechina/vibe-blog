@@ -840,6 +840,26 @@
                     </select>
                 </div>
                 
+                <!-- 受众适配下拉框 -->
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <span style="font-size: 13px; color: #666;">👥 受众适配:</span>
+                    <select id="audienceAdaptationSelect" style="
+                        padding: 6px 12px;
+                        border: 1px solid rgba(0,0,0,0.15);
+                        border-radius: 8px;
+                        font-size: 13px;
+                        background: #fff;
+                        cursor: pointer;
+                        outline: none;
+                        min-width: 120px;
+                    ">
+                        <option value="default">🎯 默认风格</option>
+                        <option value="high-school">📚 高中生版</option>
+                        <option value="children">🧒 儿童版</option>
+                        <option value="professional">💼 职场版</option>
+                    </select>
+                </div>
+                
                 <!-- 配图风格下拉框 -->
                 <div style="display: flex; align-items: center; gap: 8px;">
                     <span style="font-size: 13px; color: #666;">🎨 配图风格:</span>
@@ -1732,12 +1752,14 @@
                     ? {
                         topic: topic,
                         article_type: articleType,
+                        audience_adaptation: getAudienceAdaptation(),
                         generate_cover_video: getGenerateCoverVideo()
                     }
                     : {
                         topic: topic,
                         article_type: articleType,
                         target_audience: 'intermediate',
+                        audience_adaptation: getAudienceAdaptation(),
                         target_length: targetLength,
                         document_ids: getReadyDocumentIds(),
                         image_style: getSelectedImageStyle(),
@@ -2856,6 +2878,12 @@
                     advancedBtn.classList.toggle('active', !isVisible);
                 });
             }
+        }
+        
+        // 获取受众适配
+        function getAudienceAdaptation() {
+            const select = document.getElementById('audienceAdaptationSelect');
+            return select ? select.value : 'default';
         }
         
         // 获取选中的图片风格

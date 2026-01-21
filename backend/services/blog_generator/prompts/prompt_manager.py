@@ -126,6 +126,7 @@ class PromptManager:
         topic: str,
         article_type: str = "tutorial",
         target_audience: str = "intermediate",
+        audience_adaptation: str = "technical-beginner",
         target_length: str = "medium",
         background_knowledge: str = None,
         key_concepts: list = None,
@@ -140,6 +141,7 @@ class PromptManager:
             topic=topic,
             article_type=article_type,
             target_audience=target_audience,
+            audience_adaptation=audience_adaptation,
             target_length=target_length,
             background_knowledge=background_knowledge,
             key_concepts=key_concepts or [],
@@ -154,7 +156,8 @@ class PromptManager:
         section_outline: dict,
         previous_section_summary: str = None,
         next_section_preview: str = None,
-        background_knowledge: str = None
+        background_knowledge: str = None,
+        audience_adaptation: str = "technical-beginner"
     ) -> str:
         """渲染 Writer Prompt"""
         return self.render(
@@ -162,7 +165,8 @@ class PromptManager:
             section_outline=section_outline,
             previous_section_summary=previous_section_summary,
             next_section_preview=next_section_preview,
-            background_knowledge=background_knowledge
+            background_knowledge=background_knowledge,
+            audience_adaptation=audience_adaptation
         )
     
     def render_writer_enhance(
@@ -197,14 +201,16 @@ class PromptManager:
         self,
         image_type: str,
         description: str,
-        context: str
+        context: str,
+        audience_adaptation: str = "technical-beginner"
     ) -> str:
         """渲染 Artist Prompt"""
         return self.render(
             'artist',
             image_type=image_type,
             description=description,
-            context=context
+            context=context,
+            audience_adaptation=audience_adaptation
         )
     
     def render_questioner(
