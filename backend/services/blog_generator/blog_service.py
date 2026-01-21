@@ -270,6 +270,18 @@ class BlogService:
             
             self.generator._outline_stream_callback = on_outline_stream
             
+            # 设置章节内容流式回调
+            def on_section_stream(delta, accumulated, section_index):
+                if task_manager:
+                    task_manager.send_event(task_id, 'stream', {
+                        'stage': 'section',
+                        'section_index': section_index,
+                        'delta': delta,
+                        'accumulated': accumulated
+                    })
+            
+            self.generator._section_stream_callback = on_section_stream
+            
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
             
             # 阶段进度映射
@@ -374,6 +386,7 @@ class BlogService:
                                         'data': {
                                             'section_index': i + 1,
                                             'title': section.get('title', ''),
+                                            'content': section.get('content', ''),  # 发送完整内容
                                             'content_length': len(section.get('content', '')),
                                             'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
                                         }

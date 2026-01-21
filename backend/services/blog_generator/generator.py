@@ -158,7 +158,9 @@ class BlogGenerator:
     def _writer_node(self, state: SharedState) -> SharedState:
         """内容撰写节点"""
         logger.info("=== Step 3: 内容撰写 ===")
-        result = self.writer.run(state)
+        # 使用实例变量中的流式回调
+        on_stream = getattr(self, '_section_stream_callback', None)
+        result = self.writer.run(state, on_stream=on_stream)
         # 初始化累积知识（首次写作后）
         if not result.get('accumulated_knowledge'):
             result['accumulated_knowledge'] = result.get('background_knowledge', '')

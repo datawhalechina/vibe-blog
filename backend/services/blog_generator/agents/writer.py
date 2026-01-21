@@ -35,7 +35,9 @@ class WriterAgent:
         section_outline: Dict[str, Any],
         previous_section_summary: str = "",
         next_section_preview: str = "",
-        background_knowledge: str = ""
+        background_knowledge: str = "",
+        on_stream: callable = None,
+        section_index: int = None
     ) -> Dict[str, Any]:
         """
         撰写单个章节
@@ -45,6 +47,8 @@ class WriterAgent:
             previous_section_summary: 前一章节摘要
             next_section_preview: 后续章节预告
             background_knowledge: 背景知识
+            on_stream: 流式回调函数 (delta, accumulated, section_index) -> None
+            section_index: 章节索引（1-indexed）
             
         Returns:
             章节内容
@@ -58,9 +62,23 @@ class WriterAgent:
         )
         
         try:
-            response = self.llm.chat(
-                messages=[{"role": "user", "content": prompt}]
-            )
+            # 如果有流式回调且 LLM 支持流式输出
+            if on_stream and hasattr(self.llm, 'chat_stream'):
+                accumulated = ""
+                def on_chunk(delta, acc):
+                    nonlocal accumulated
+                    accumulated = acc
+                    if on_stream:
+                        on_stream(delta, acc, section_index)
+                
+                response = self.llm.chat_stream(
+                    messages=[{"role": "user", "content": prompt}],
+                    on_chunk=on_chunk
+                )
+            else:
+                response = self.llm.chat(
+                    messages=[{"role": "user", "content": prompt}]
+                )
             
             return {
                 "id": section_outline.get('id', ''),
@@ -116,13 +134,14 @@ class WriterAgent:
             logger.error(f"章节深化失败: {e}")
             return original_content
     
-    def run(self, state: Dict[str, Any], max_workers: int = None) -> Dict[str, Any]:
+    def run(self, state: Dict[str, Any], max_workers: int = None, on_stream: callable = None) -> Dict[str, Any]:
         """
         执行内容撰写（并行）
         
         Args:
             state: 共享状态
             max_workers: 最大并行数
+            on_stream: 流式回调函数 (delta, accumulated, section_index) -> None
             
         Returns:
             更新后的状态
@@ -180,11 +199,14 @@ class WriterAgent:
         def write_task(task):
             """单个章节撰写任务"""
             try:
+                section_index = task['order_idx'] + 1  # 1-indexed for frontend
                 section = self.write_section(
                     section_outline=task['section_outline'],
                     previous_section_summary=task['prev_summary'],
                     next_section_preview=task['next_preview'],
-                    background_knowledge=task['background_knowledge']
+                    background_knowledge=task['background_knowledge'],
+                    on_stream=on_stream,
+                    section_index=section_index
                 )
                 return {
                     'success': True,
