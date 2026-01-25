@@ -54,16 +54,22 @@ class TaskManager:
         self.task_lock = Lock()
         logger.info("TaskManager 初始化完成")
     
-    def create_task(self) -> str:
-        """创建新任务"""
-        task_id = f"task_{uuid.uuid4().hex[:12]}"
+    def create_task(self, task_id: str = None, task_type: str = None) -> str:
+        """创建新任务
+        
+        Args:
+            task_id: 可选，自定义任务 ID，不传则自动生成
+            task_type: 可选，任务类型标识
+        """
+        if not task_id:
+            task_id = f"task_{uuid.uuid4().hex[:12]}"
         with self.task_lock:
             self.tasks[task_id] = TaskProgress(
                 task_id=task_id,
                 status="pending"
             )
             self.queues[task_id] = Queue()
-        logger.info(f"创建任务: {task_id}")
+        logger.info(f"创建任务: {task_id}" + (f" (类型: {task_type})" if task_type else ""))
         return task_id
     
     def get_task(self, task_id: str) -> Optional[TaskProgress]:

@@ -9,52 +9,52 @@
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
             font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: linear-gradient(135deg, #FFF8F0 0%, #FFE4D6 50%, #FFAB76 100%);
+            background: linear-gradient(135deg, #E8F4F8 0%, #FFF8E7 50%, #FFE4CC 100%);
             min-height: 100vh;
-            color: #333;
+            color: #4a4a4a;
         }
         .navbar {
             display: flex; justify-content: space-between; align-items: center;
             padding: 20px 40px;
-            background: rgba(255, 255, 255, 0.8);
+            background: rgba(255, 255, 255, 0.85);
             backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            border-bottom: 1px solid rgba(255, 165, 0, 0.1);
         }
         .logo span {
             font-size: 24px; font-weight: 700;
-            background: linear-gradient(135deg, #FF6B35, #FFD166);
+            background: linear-gradient(135deg, #FFA500, #FFD700);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .nav-tabs { display: flex; gap: 10px; }
         .tab {
             padding: 10px 20px;
-            background: rgba(0,0,0,0.05);
-            border: 1px solid rgba(0,0,0,0.1);
+            background: rgba(255, 200, 124, 0.08);
+            border: 1px solid rgba(255, 165, 0, 0.2);
             border-radius: 10px;
-            color: rgba(0,0,0,0.6);
+            color: #8B7355;
             font-size: 14px; cursor: pointer;
             text-decoration: none;
         }
-        .tab:hover { background: rgba(0,0,0,0.08); }
+        .tab:hover { background: rgba(255, 200, 124, 0.15); }
         .tab.active {
-            background: linear-gradient(135deg, rgba(255,107,53,0.15), rgba(255,209,102,0.15));
-            border-color: rgba(255,107,53,0.8);
-            color: #FF6B35;
+            background: linear-gradient(135deg, rgba(255, 200, 124, 0.25), rgba(255, 215, 0, 0.15));
+            border-color: rgba(255, 165, 0, 0.6);
+            color: #FFA500;
         }
         .hero { text-align: center; padding: 40px 20px 20px; }
         .hero h1 {
             font-size: 36px; font-weight: 700; margin-bottom: 12px;
-            background: linear-gradient(135deg, #FF6B35, #D4A574);
+            background: linear-gradient(135deg, #FFA500, #FFD700);
             -webkit-background-clip: text; -webkit-text-fill-color: transparent;
         }
         .hero p { font-size: 16px; color: rgba(0,0,0,0.6); }
         .main-card {
             max-width: 900px; margin: 30px auto; padding: 24px;
-            background: rgba(255,255,255,0.9);
+            background: rgba(255, 255, 255, 0.92);
             backdrop-filter: blur(20px);
             border-radius: 20px;
-            border: 1px solid rgba(0,0,0,0.1);
-            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            border: 1px solid rgba(255, 200, 124, 0.3);
+            box-shadow: 0 8px 32px rgba(255, 165, 0, 0.08);
         }
         .form-group { margin-bottom: 20px; }
         .form-group label {
@@ -71,8 +71,8 @@
         }
         .text-input:focus {
             outline: none;
-            border-color: #FF6B35;
-            box-shadow: 0 0 0 3px rgba(255,107,53,0.1);
+            border-color: #FFA500;
+            box-shadow: 0 0 0 3px rgba(255, 165, 0, 0.1);
         }
         .options-row {
             display: flex; gap: 20px; flex-wrap: wrap;
@@ -93,7 +93,7 @@
         }
         .generate-btn {
             width: 100%; padding: 16px;
-            background: linear-gradient(135deg, #FF6B35, #FFD166);
+            background: linear-gradient(135deg, #FFA500, #FFD700);
             border: none; border-radius: 12px;
             color: #fff; font-size: 16px; font-weight: 600;
             cursor: pointer;
@@ -201,6 +201,223 @@
             display: none;
         }
         .error-msg.show { display: block; }
+        
+        /* ========== SSE 进度条样式 ========== */
+        .progress-container {
+            display: none;
+            background: linear-gradient(135deg, #fff 0%, #f8f9fa 100%);
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+            border: 1px solid rgba(0, 0, 0, 0.05);
+        }
+        .progress-container.show { display: block; }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        .progress-title {
+            font-size: 18px;
+            font-weight: 600;
+            color: #333;
+        }
+        .cancel-btn {
+            padding: 8px 16px;
+            background: #ff4d4f;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+        .cancel-btn:hover {
+            background: #ff7875;
+            transform: translateY(-1px);
+        }
+        
+        .main-progress {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 25px;
+        }
+        .progress-bar {
+            flex: 1;
+            height: 12px;
+            background: #e8e8e8;
+            border-radius: 6px;
+            overflow: hidden;
+            position: relative;
+        }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #FFA500, #FFD700, #4ECDC4);
+            background-size: 200% 100%;
+            border-radius: 6px;
+            width: 0%;
+            transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            animation: gradientMove 2s ease infinite;
+        }
+        @keyframes gradientMove {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        .progress-glow {
+            position: absolute;
+            right: 0;
+            top: 0;
+            width: 30px;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.6));
+            animation: glowPulse 1.5s ease-in-out infinite;
+        }
+        @keyframes glowPulse {
+            0%, 100% { opacity: 0.5; }
+            50% { opacity: 1; }
+        }
+        .progress-percent {
+            font-size: 16px;
+            font-weight: 700;
+            color: #FFA500;
+            min-width: 50px;
+            text-align: right;
+        }
+        
+        .stage-indicators {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .stage-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f5f5f5;
+            border-radius: 12px;
+            min-width: 70px;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+        .stage-item.waiting { background: #f5f5f5; color: #999; }
+        .stage-item.active {
+            background: linear-gradient(135deg, rgba(255, 165, 0, 0.15), rgba(255, 215, 0, 0.15));
+            border: 2px solid #FFA500;
+            transform: scale(1.05);
+            box-shadow: 0 4px 15px rgba(255, 165, 0, 0.2);
+        }
+        .stage-item.active .stage-icon { animation: bounce 1s ease infinite; }
+        @keyframes bounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+        .stage-item.completed {
+            background: linear-gradient(135deg, rgba(78, 205, 196, 0.15), rgba(78, 205, 196, 0.25));
+            border: 2px solid #4ECDC4;
+        }
+        .stage-item.completed::after {
+            content: '✓';
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            width: 20px;
+            height: 20px;
+            background: #4ECDC4;
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .stage-icon { font-size: 20px; margin-bottom: 4px; }
+        .stage-name { font-size: 11px; font-weight: 600; color: #333; }
+        .stage-status { font-size: 9px; color: #999; margin-top: 2px; }
+        .stage-item.active .stage-status { color: #FFA500; font-weight: 500; }
+        .stage-item.completed .stage-status { color: #4ECDC4; }
+        .stage-sub-progress { font-size: 9px; color: #FFA500; font-weight: 600; margin-top: 2px; }
+        .stage-arrow { color: #ccc; font-size: 14px; font-weight: bold; }
+        
+        /* 悬浮详情样式 */
+        .stage-item { position: relative; cursor: pointer; }
+        .stage-detail {
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #333;
+            color: #fff;
+            padding: 10px 14px;
+            border-radius: 8px;
+            font-size: 11px;
+            white-space: pre-line;
+            min-width: 180px;
+            max-width: 280px;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+            margin-bottom: 8px;
+            line-height: 1.5;
+        }
+        .stage-detail::after {
+            content: '';
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            border: 6px solid transparent;
+            border-top-color: #333;
+        }
+        .stage-item:hover .stage-detail { display: block !important; }
+        .stage-item.waiting:hover .stage-detail { display: none !important; }
+        
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 15px;
+            border-top: 1px solid #eee;
+        }
+        .current-stage { font-size: 14px; color: #666; }
+        .time-estimate { font-size: 13px; color: #999; }
+        
+        /* 图片占位符 */
+        .image-card.loading {
+            background: #f5f5f5;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            aspect-ratio: 3/4;
+        }
+        .image-card.loading .placeholder {
+            text-align: center;
+            color: #999;
+        }
+        .image-card.loading .mini-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid #e0e0e0;
+            border-top-color: #FFA500;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 8px;
+        }
+        .image-card img {
+            animation: fadeIn 0.5s ease;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.95); }
+            to { opacity: 1; transform: scale(1); }
+        }
     </style>
 </head>
 <body>
@@ -244,8 +461,8 @@
             <div class="option-group">
                 <label>🎬 动画封面</label>
                 <select id="videoSelect">
-                    <option value="true">生成动画</option>
                     <option value="false">仅静态图</option>
+                    <option value="true">生成动画</option>
                 </select>
             </div>
         </div>
@@ -256,9 +473,71 @@
 
         <div class="error-msg" id="errorMsg"></div>
 
-        <div class="loading" id="loading">
-            <div class="spinner"></div>
-            <div class="loading-text" id="loadingText">正在生成大纲...</div>
+        <!-- SSE 进度条组件 -->
+        <div class="progress-container" id="progressContainer">
+            <div class="progress-header">
+                <span class="progress-title" id="progressTitle">🚀 小红书内容生成中...</span>
+                <button class="cancel-btn" id="cancelBtn" onclick="cancelGeneration()">取消生成</button>
+            </div>
+            
+            <div class="main-progress">
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progressFill">
+                        <div class="progress-glow"></div>
+                    </div>
+                </div>
+                <span class="progress-percent" id="progressPercent">0%</span>
+            </div>
+            
+            <div class="stage-indicators">
+                <div class="stage-item waiting" data-stage="search" title="点击查看详情">
+                    <div class="stage-icon">🔍</div>
+                    <div class="stage-name">搜索</div>
+                    <div class="stage-status">等待中</div>
+                    <div class="stage-detail" style="display:none;"></div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="stage-item waiting" data-stage="outline" title="点击查看详情">
+                    <div class="stage-icon">📋</div>
+                    <div class="stage-name">大纲</div>
+                    <div class="stage-status">等待中</div>
+                    <div class="stage-detail" style="display:none;"></div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="stage-item waiting" data-stage="content" title="点击查看详情">
+                    <div class="stage-icon">📝</div>
+                    <div class="stage-name">文案</div>
+                    <div class="stage-status">等待中</div>
+                    <div class="stage-detail" style="display:none;"></div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="stage-item waiting" data-stage="storyboard" title="点击查看详情">
+                    <div class="stage-icon">🎨</div>
+                    <div class="stage-name">分镜</div>
+                    <div class="stage-status">等待中</div>
+                    <div class="stage-detail" style="display:none;"></div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="stage-item waiting" data-stage="images" title="点击查看详情">
+                    <div class="stage-icon">🖼️</div>
+                    <div class="stage-name">图片</div>
+                    <div class="stage-status">等待中</div>
+                    <div class="stage-sub-progress" style="display:none;">(0/4)</div>
+                    <div class="stage-detail" style="display:none;"></div>
+                </div>
+                <div class="stage-arrow">→</div>
+                <div class="stage-item waiting" data-stage="video" title="点击查看详情">
+                    <div class="stage-icon">🎬</div>
+                    <div class="stage-name">视频</div>
+                    <div class="stage-status">等待中</div>
+                    <div class="stage-detail" style="display:none;"></div>
+                </div>
+            </div>
+            
+            <div class="progress-info">
+                <span class="current-stage" id="currentStage">准备中...</span>
+                <span class="time-estimate" id="timeEstimate">预计剩余: --</span>
+            </div>
         </div>
 
         <div class="result-section" id="resultSection">
@@ -347,7 +626,7 @@
             <p style="color: #666; font-size: 13px; margin-bottom: 12px;">
                 在浏览器开发者工具 → Network → 任意请求 → Headers → Cookie，复制粘贴即可：
             </p>
-            <textarea id="cookieInput" placeholder='直接粘贴 Cookie 字符串，如: a]1=xxx; webId=yyy; web_session=zzz' style="
+            <textarea id="cookieInput" placeholder='直接粘贴 Cookie 字符串，如: a1=xxx; webId=yyy; web_session=zzz' style="
                 width: 100%;
                 height: 150px;
                 padding: 12px;
@@ -378,7 +657,95 @@
         </div>
     </div>
 
+    <!-- 分镜详情面板 -->
+    <div id="storyboardPanel" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 450px;
+        height: 100vh;
+        background: #fff;
+        box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+        z-index: 1000;
+        overflow-y: auto;
+    ">
+        <div style="
+            position: sticky;
+            top: 0;
+            background: linear-gradient(135deg, #FF6B35, #FFD166);
+            color: #fff;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <h3 style="margin: 0; font-size: 16px;">🎨 分镜视觉指令</h3>
+            <button onclick="closeStoryboardPanel()" style="
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: #fff;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 18px;
+            ">×</button>
+        </div>
+        <div id="storyboardContent" style="padding: 16px;"></div>
+    </div>
+
+    <!-- 大纲详情面板 -->
+    <div id="outlinePanel" style="
+        display: none;
+        position: fixed;
+        top: 0;
+        right: 0;
+        width: 450px;
+        height: 100vh;
+        background: #fff;
+        box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+        z-index: 1000;
+        overflow-y: auto;
+    ">
+        <div style="
+            position: sticky;
+            top: 0;
+            background: linear-gradient(135deg, #4ECDC4, #44A08D);
+            color: #fff;
+            padding: 16px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        ">
+            <h3 style="margin: 0; font-size: 16px;">📋 完整大纲</h3>
+            <button onclick="closeOutlinePanel()" style="
+                background: rgba(255,255,255,0.2);
+                border: none;
+                color: #fff;
+                width: 32px;
+                height: 32px;
+                border-radius: 50%;
+                cursor: pointer;
+                font-size: 18px;
+            ">×</button>
+        </div>
+        <div id="outlineContent" style="padding: 16px;"></div>
+    </div>
+
     <script>
+        // ========== 全局状态 ==========
+        let currentResult = null;
+        let currentTaskId = null;
+        let eventSource = null;
+        let startTime = null;
+        let pageCount = 4;
+        // 新流程：搜索 → 大纲 → 文案 → 分镜 → 图片 → 视频
+        const stages = ['search', 'outline', 'content', 'storyboard', 'images', 'video'];
+        // 存储各阶段详情数据
+        const stageDetails = {};
+        
+        // ========== SSE 生成函数 ==========
         async function generateXHS() {
             const topic = document.getElementById('topicInput').value.trim();
             if (!topic) {
@@ -386,25 +753,26 @@
                 return;
             }
 
-            const count = parseInt(document.getElementById('countSelect').value);
+            pageCount = parseInt(document.getElementById('countSelect').value);
             const style = document.getElementById('styleSelect').value;
             const generateVideo = document.getElementById('videoSelect').value === 'true';
 
-            // 显示加载状态
+            // 重置 UI 状态
             document.getElementById('generateBtn').disabled = true;
-            document.getElementById('loading').classList.add('show');
             document.getElementById('resultSection').classList.remove('show');
             document.getElementById('errorMsg').classList.remove('show');
+            resetProgress();
+            showProgress();
+            initImagePlaceholders(pageCount);
 
             try {
-                updateLoadingText('正在生成大纲...');
-                
+                // 1. 创建任务
                 const response = await fetch('/api/xhs/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         topic,
-                        count,
+                        count: pageCount,
                         style,
                         generate_video: generateVideo
                     })
@@ -413,42 +781,572 @@
                 const result = await response.json();
 
                 if (!result.success) {
-                    throw new Error(result.error || '生成失败');
+                    throw new Error(result.error || '任务创建失败');
                 }
 
-                // 显示结果
-                displayResult(result.data);
+                currentTaskId = result.task_id;
+                startTime = Date.now();
+                
+                // 2. 建立 SSE 连接
+                connectSSE(currentTaskId);
 
             } catch (error) {
                 showError(error.message);
-            } finally {
+                hideProgress();
                 document.getElementById('generateBtn').disabled = false;
-                document.getElementById('loading').classList.remove('show');
             }
         }
-
-        function displayResult(data) {
-            // 保存结果供发布使用
-            currentResult = data;
+        
+        // ========== SSE 连接 ==========
+        function connectSSE(taskId) {
+            if (eventSource) {
+                eventSource.close();
+            }
             
-            // 显示图片
+            eventSource = new EventSource(`/api/xhs/stream/${taskId}`);
+            
+            // 进度事件
+            eventSource.addEventListener('progress', (e) => {
+                const data = JSON.parse(e.data);
+                updateProgress(data);
+            });
+            
+            // 搜索完成事件
+            eventSource.addEventListener('search', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('🔍 搜索完成:', data.results_count, '条结果');
+                stageDetails.search = data;
+                updateStageDetail('search', `${data.results_count} 条结果\n来源: ${data.sources?.join(', ') || '通用'}`);
+            });
+            
+            // 大纲事件
+            eventSource.addEventListener('outline', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('📋 大纲生成完成:', data.pages?.length, '页');
+                stageDetails.outline = data;
+                updateStageDetail('outline', `${data.summary || ''}\n点击查看完整大纲`);
+                // 显示大纲详情面板
+                showOutlinePanel(data);
+            });
+            
+            // 文案事件
+            eventSource.addEventListener('content', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('📝 文案生成完成');
+                stageDetails.content = data;
+                renderContent(data);
+                updateStageDetail('content', `标题: ${data.titles?.[0] || ''}\n标签: ${data.tags?.slice(0, 3).join(', ') || ''}`);
+            });
+            
+            // 分镜事件
+            eventSource.addEventListener('storyboard', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('🎨 分镜设计完成:', data.total, '个画面');
+                stageDetails.storyboard = data;
+                updateStageDetail('storyboard', `共 ${data.total} 个分镜\n悬浮图片查看视觉指令`);
+                // 不再自动弹出侧边面板，改为在图片上悬浮显示
+            });
+            
+            // 图片进度事件
+            eventSource.addEventListener('image_progress', (e) => {
+                const data = JSON.parse(e.data);
+                console.log(`🖼️ 图片 ${data.index} 状态: ${data.status}`);
+                updateImageSlotStatus(data.index, data.status, data.progress);
+            });
+            
+            // 图片完成事件
+            eventSource.addEventListener('image', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('🖼️ 图片生成完成:', data.index);
+                renderSingleImage(data.index, data.url, data.page_type);
+            });
+            
+            // 视频事件
+            eventSource.addEventListener('video', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('🎬 视频生成完成:', data.url);
+                stageDetails.video = data;
+                updateStageDetail('video', '动画封面已生成');
+            });
+            
+            // 完成事件
+            eventSource.addEventListener('complete', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('🎉 生成完成');
+                eventSource.close();
+                eventSource = null;
+                onGenerationComplete(data);
+            });
+            
+            // 错误事件
+            eventSource.addEventListener('error', (e) => {
+                if (e.data) {
+                    const data = JSON.parse(e.data);
+                    console.error('❌ 生成错误:', data.message);
+                    eventSource.close();
+                    eventSource = null;
+                    onGenerationError(data.message);
+                }
+            });
+            
+            // 取消事件
+            eventSource.addEventListener('cancelled', (e) => {
+                const data = JSON.parse(e.data);
+                console.log('⚠️ 任务已取消');
+                eventSource.close();
+                eventSource = null;
+                onGenerationCancelled();
+            });
+            
+            // 连接错误
+            eventSource.onerror = (e) => {
+                if (eventSource.readyState === EventSource.CLOSED) {
+                    console.log('SSE 连接已关闭');
+                }
+            };
+        }
+        
+        // ========== 阶段详情更新 ==========
+        function updateStageDetail(stage, detail) {
+            const item = document.querySelector(`[data-stage="${stage}"]`);
+            if (item) {
+                const detailEl = item.querySelector('.stage-detail');
+                if (detailEl) {
+                    detailEl.textContent = detail;
+                }
+            }
+        }
+        
+        // ========== 分镜面板 ==========
+        function showStoryboardPanel(prompts) {
+            const panel = document.getElementById('storyboardPanel');
+            const content = document.getElementById('storyboardContent');
+            
+            let html = '';
+            prompts.forEach((p, i) => {
+                html += `
+                    <div style="
+                        background: #f9f9f9;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 16px;
+                        border-left: 4px solid ${p.page_type === 'cover' ? '#FF6B35' : p.page_type === 'summary' ? '#4ECDC4' : '#FFD166'};
+                    ">
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 12px;
+                        ">
+                            <span style="
+                                font-weight: 600;
+                                color: #333;
+                            ">第 ${p.index + 1} 页 (${p.page_type})</span>
+                            <button onclick="copyPrompt(${i})" style="
+                                background: #fff;
+                                border: 1px solid #ddd;
+                                padding: 4px 12px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">复制</button>
+                        </div>
+                        <pre id="prompt-${i}" style="
+                            background: #fff;
+                            padding: 12px;
+                            border-radius: 8px;
+                            font-size: 12px;
+                            line-height: 1.6;
+                            white-space: pre-wrap;
+                            word-break: break-word;
+                            margin: 0;
+                            max-height: 300px;
+                            overflow-y: auto;
+                            border: 1px solid #eee;
+                        ">${escapeHtml(p.prompt || '')}</pre>
+                    </div>
+                `;
+            });
+            
+            content.innerHTML = html;
+            panel.style.display = 'block';
+        }
+        
+        function closeStoryboardPanel() {
+            document.getElementById('storyboardPanel').style.display = 'none';
+        }
+        
+        function copyPrompt(index) {
+            const pre = document.getElementById(`prompt-${index}`);
+            if (pre) {
+                navigator.clipboard.writeText(pre.textContent).then(() => {
+                    alert('已复制到剪贴板');
+                });
+            }
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // ========== 大纲面板 ==========
+        function showOutlinePanel(data) {
+            const panel = document.getElementById('outlinePanel');
+            const content = document.getElementById('outlineContent');
+            
+            let html = '';
+            
+            // 显示完整大纲文本
+            if (data.outline) {
+                html += `
+                    <div style="
+                        background: #f0f9f7;
+                        border-radius: 12px;
+                        padding: 16px;
+                        margin-bottom: 16px;
+                        border-left: 4px solid #4ECDC4;
+                    ">
+                        <div style="
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                            margin-bottom: 12px;
+                        ">
+                            <span style="font-weight: 600; color: #333;">📝 完整大纲</span>
+                            <button onclick="copyOutline()" style="
+                                background: #fff;
+                                border: 1px solid #ddd;
+                                padding: 4px 12px;
+                                border-radius: 6px;
+                                cursor: pointer;
+                                font-size: 12px;
+                            ">复制</button>
+                        </div>
+                        <pre id="outline-text" style="
+                            background: #fff;
+                            padding: 12px;
+                            border-radius: 8px;
+                            font-size: 12px;
+                            line-height: 1.6;
+                            white-space: pre-wrap;
+                            word-break: break-word;
+                            margin: 0;
+                            max-height: 300px;
+                            overflow-y: auto;
+                            border: 1px solid #eee;
+                        ">${escapeHtml(data.outline)}</pre>
+                    </div>
+                `;
+            }
+            
+            // 显示每页内容
+            if (data.pages && data.pages.length > 0) {
+                html += `<h4 style="margin: 16px 0 12px; color: #333;">📄 各页内容</h4>`;
+                data.pages.forEach((p, i) => {
+                    const typeColor = p.page_type === 'cover' ? '#FF6B35' : p.page_type === 'summary' ? '#4ECDC4' : '#FFD166';
+                    html += `
+                        <div style="
+                            background: #f9f9f9;
+                            border-radius: 12px;
+                            padding: 16px;
+                            margin-bottom: 12px;
+                            border-left: 4px solid ${typeColor};
+                        ">
+                            <div style="
+                                display: flex;
+                                justify-content: space-between;
+                                align-items: center;
+                                margin-bottom: 8px;
+                            ">
+                                <span style="font-weight: 600; color: #333;">
+                                    第 ${p.index + 1} 页 
+                                    <span style="
+                                        background: ${typeColor};
+                                        color: #fff;
+                                        padding: 2px 8px;
+                                        border-radius: 4px;
+                                        font-size: 11px;
+                                        margin-left: 8px;
+                                    ">${p.page_type}</span>
+                                </span>
+                            </div>
+                            <div style="
+                                background: #fff;
+                                padding: 12px;
+                                border-radius: 8px;
+                                font-size: 13px;
+                                line-height: 1.6;
+                                border: 1px solid #eee;
+                            ">${escapeHtml(p.content || '暂无内容')}</div>
+                        </div>
+                    `;
+                });
+            }
+            
+            content.innerHTML = html;
+            panel.style.display = 'block';
+        }
+        
+        function closeOutlinePanel() {
+            document.getElementById('outlinePanel').style.display = 'none';
+        }
+        
+        function copyOutline() {
+            const pre = document.getElementById('outline-text');
+            if (pre) {
+                navigator.clipboard.writeText(pre.textContent).then(() => {
+                    alert('已复制到剪贴板');
+                });
+            }
+        }
+        
+        // ========== 图片槽位状态更新 ==========
+        function updateImageSlotStatus(index, status, progress) {
+            const slot = document.getElementById(`image-slot-${index}`);
+            if (slot && slot.classList.contains('loading')) {
+                const placeholder = slot.querySelector('.placeholder span');
+                if (placeholder) {
+                    if (status === 'generating') {
+                        placeholder.textContent = `第 ${index + 1} 页 生成中...`;
+                    } else if (status === 'failed') {
+                        placeholder.textContent = `第 ${index + 1} 页 失败`;
+                        slot.style.opacity = '0.5';
+                    }
+                }
+            }
+        }
+        
+        // ========== 取消生成 ==========
+        async function cancelGeneration() {
+            if (!currentTaskId) return;
+            
+            try {
+                await fetch(`/api/xhs/tasks/${currentTaskId}/cancel`, { method: 'POST' });
+            } catch (e) {
+                console.error('取消请求失败:', e);
+            }
+            
+            if (eventSource) {
+                eventSource.close();
+                eventSource = null;
+            }
+            
+            onGenerationCancelled();
+        }
+        
+        // ========== 进度条控制 ==========
+        function showProgress() {
+            document.getElementById('progressContainer').classList.add('show');
+        }
+        
+        function hideProgress() {
+            document.getElementById('progressContainer').classList.remove('show');
+        }
+        
+        function resetProgress() {
+            document.getElementById('progressFill').style.width = '0%';
+            document.getElementById('progressPercent').textContent = '0%';
+            document.getElementById('currentStage').textContent = '准备中...';
+            document.getElementById('timeEstimate').textContent = '预计剩余: --';
+            document.getElementById('progressTitle').textContent = '🚀 小红书内容生成中...';
+            document.getElementById('cancelBtn').style.display = 'block';
+            
+            // 清空详情数据
+            Object.keys(stageDetails).forEach(k => delete stageDetails[k]);
+            
+            // 重置所有阶段状态
+            stages.forEach(stage => {
+                const item = document.querySelector(`[data-stage="${stage}"]`);
+                if (item) {
+                    item.classList.remove('waiting', 'active', 'completed');
+                    item.classList.add('waiting');
+                    item.querySelector('.stage-status').textContent = '等待中';
+                    const subProgress = item.querySelector('.stage-sub-progress');
+                    if (subProgress) subProgress.style.display = 'none';
+                    const detailEl = item.querySelector('.stage-detail');
+                    if (detailEl) detailEl.textContent = '';
+                }
+            });
+        }
+        
+        function updateProgress(data) {
+            const { stage, progress, message, sub_progress } = data;
+            
+            // 更新主进度条
+            document.getElementById('progressFill').style.width = `${progress}%`;
+            document.getElementById('progressPercent').textContent = `${progress}%`;
+            document.getElementById('currentStage').textContent = message;
+            
+            // 更新阶段指示器
+            updateStageIndicators(stage, sub_progress);
+            
+            // 更新预估时间
+            updateTimeEstimate(progress);
+        }
+        
+        function updateStageIndicators(currentStage, subProgress) {
+            let stageIndex = stages.indexOf(currentStage);
+            
+            // 如果是 complete 阶段，所有阶段都标记为完成
+            const isComplete = currentStage === 'complete';
+            if (isComplete) {
+                stageIndex = stages.length;
+            }
+            
+            stages.forEach((stage, index) => {
+                const item = document.querySelector(`[data-stage="${stage}"]`);
+                if (!item) return;
+                
+                const statusEl = item.querySelector('.stage-status');
+                const subEl = item.querySelector('.stage-sub-progress');
+                
+                item.classList.remove('waiting', 'active', 'completed');
+                
+                if (index < stageIndex || isComplete) {
+                    item.classList.add('completed');
+                    statusEl.textContent = '已完成';
+                    if (subEl) subEl.style.display = 'none';
+                } else if (index === stageIndex) {
+                    item.classList.add('active');
+                    statusEl.textContent = '进行中';
+                    
+                    if (subProgress && subEl) {
+                        subEl.textContent = `(${subProgress.current}/${subProgress.total})`;
+                        subEl.style.display = 'block';
+                    }
+                } else {
+                    item.classList.add('waiting');
+                    statusEl.textContent = '等待中';
+                }
+            });
+        }
+        
+        function updateTimeEstimate(progress) {
+            if (!startTime || progress <= 0) return;
+            
+            const elapsed = (Date.now() - startTime) / 1000;
+            const estimated = (elapsed / progress) * (100 - progress);
+            
+            const timeEl = document.getElementById('timeEstimate');
+            if (estimated > 60) {
+                timeEl.textContent = `预计剩余: ${Math.ceil(estimated / 60)} 分钟`;
+            } else {
+                timeEl.textContent = `预计剩余: ${Math.ceil(estimated)} 秒`;
+            }
+        }
+        
+        // ========== 图片实时渲染 ==========
+        function initImagePlaceholders(count) {
             const imagesGrid = document.getElementById('imagesGrid');
             imagesGrid.innerHTML = '';
             
-            if (data.image_urls && data.image_urls.length > 0) {
-                data.image_urls.forEach((url, index) => {
-                    const card = document.createElement('div');
-                    card.className = 'image-card';
-                    card.innerHTML = `
-                        <img src="${url}" alt="第${index + 1}张" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22267%22><rect fill=%22%23f0f0f0%22 width=%22200%22 height=%22267%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>图片加载中</text></svg>'">
-                        <div class="caption">第 ${index + 1} 页${index === 0 ? ' (封面)' : ''}</div>
-                    `;
-                    imagesGrid.appendChild(card);
-                });
-            } else {
-                imagesGrid.innerHTML = '<p style="color: #999; text-align: center; grid-column: 1/-1;">暂无图片（图片服务未配置）</p>';
+            for (let i = 0; i < count; i++) {
+                const card = document.createElement('div');
+                card.className = 'image-card loading';
+                card.id = `image-slot-${i}`;
+                card.innerHTML = `
+                    <div class="placeholder">
+                        <div class="mini-spinner"></div>
+                        <span>第 ${i + 1} 页</span>
+                    </div>
+                `;
+                imagesGrid.appendChild(card);
             }
-
+            
+            // 显示结果区域（图片占位符）
+            document.getElementById('resultSection').classList.add('show');
+        }
+        
+        function renderSingleImage(index, url, pageType) {
+            const slot = document.getElementById(`image-slot-${index}`);
+            if (slot) {
+                slot.className = 'image-card';
+                
+                // 获取对应的分镜视觉指令
+                const promptData = stageDetails.storyboard?.prompts?.[index];
+                const hasPrompt = promptData && promptData.prompt;
+                
+                slot.innerHTML = `
+                    <img src="${url}" alt="第${index + 1}张" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 width=%22200%22 height=%22267%22><rect fill=%22%23f0f0f0%22 width=%22200%22 height=%22267%22/><text x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22 fill=%22%23999%22>加载失败</text></svg>'">
+                    <div class="caption">第 ${index + 1} 页${index === 0 ? ' (封面)' : ''}</div>
+                    ${hasPrompt ? `
+                    <div class="prompt-tooltip" style="
+                        display: none;
+                        position: absolute;
+                        top: 0;
+                        left: 105%;
+                        width: 350px;
+                        max-height: 400px;
+                        background: #fff;
+                        border-radius: 12px;
+                        box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+                        z-index: 100;
+                        overflow: hidden;
+                    ">
+                        <div style="
+                            background: linear-gradient(135deg, #FF6B35, #FFD166);
+                            color: #fff;
+                            padding: 10px 14px;
+                            font-weight: 600;
+                            font-size: 13px;
+                            display: flex;
+                            justify-content: space-between;
+                            align-items: center;
+                        ">
+                            <span>🎨 第 ${index + 1} 页视觉指令</span>
+                            <button onclick="event.stopPropagation(); copyImagePrompt(${index})" style="
+                                background: rgba(255,255,255,0.2);
+                                border: none;
+                                color: #fff;
+                                padding: 4px 10px;
+                                border-radius: 4px;
+                                cursor: pointer;
+                                font-size: 11px;
+                            ">复制</button>
+                        </div>
+                        <pre id="img-prompt-${index}" style="
+                            padding: 12px 14px;
+                            font-size: 11px;
+                            line-height: 1.5;
+                            white-space: pre-wrap;
+                            word-break: break-word;
+                            margin: 0;
+                            max-height: 320px;
+                            overflow-y: auto;
+                            background: #fafafa;
+                        ">${escapeHtml(promptData.prompt)}</pre>
+                    </div>
+                    ` : ''}
+                `;
+                
+                // 添加悬浮事件
+                if (hasPrompt) {
+                    slot.style.position = 'relative';
+                    slot.onmouseenter = () => {
+                        const tooltip = slot.querySelector('.prompt-tooltip');
+                        if (tooltip) tooltip.style.display = 'block';
+                    };
+                    slot.onmouseleave = () => {
+                        const tooltip = slot.querySelector('.prompt-tooltip');
+                        if (tooltip) tooltip.style.display = 'none';
+                    };
+                }
+            }
+        }
+        
+        function copyImagePrompt(index) {
+            const pre = document.getElementById(`img-prompt-${index}`);
+            if (pre) {
+                navigator.clipboard.writeText(pre.textContent).then(() => {
+                    alert('已复制到剪贴板');
+                });
+            }
+        }
+        
+        // ========== 文案实时渲染 ==========
+        function renderContent(data) {
             // 显示标题
             const titlesList = document.getElementById('titlesList');
             if (data.titles && data.titles.length > 0) {
@@ -457,12 +1355,10 @@
                         ${i === 0 ? '⭐ ' : ''}${title}
                     </div>`
                 ).join('');
-            } else {
-                titlesList.innerHTML = '<p style="color: #999;">暂无标题</p>';
             }
 
             // 显示文案
-            document.getElementById('copyContent').textContent = data.copywriting || '暂无文案';
+            document.getElementById('copyContent').textContent = data.copywriting || '';
 
             // 显示标签
             const tagsList = document.getElementById('tagsList');
@@ -470,30 +1366,93 @@
                 tagsList.innerHTML = data.tags.map(tag => 
                     `<span class="tag">#${tag}</span>`
                 ).join('');
-            } else {
-                tagsList.innerHTML = '<p style="color: #999;">暂无标签</p>';
             }
-
-            // 显示结果区域
-            document.getElementById('resultSection').classList.add('show');
         }
-
-        function updateLoadingText(text) {
-            document.getElementById('loadingText').textContent = text;
+        
+        // ========== 完成/错误/取消处理 ==========
+        function onGenerationComplete(data) {
+            currentResult = data;
+            
+            // 更新进度条为完成状态
+            document.getElementById('progressFill').style.width = '100%';
+            document.getElementById('progressPercent').textContent = '100%';
+            document.getElementById('progressTitle').textContent = '🎉 生成完成！';
+            document.getElementById('currentStage').textContent = '全部完成';
+            
+            const elapsed = Math.ceil((Date.now() - startTime) / 1000);
+            document.getElementById('timeEstimate').textContent = `总耗时: ${elapsed} 秒`;
+            
+            // 标记所有阶段为完成
+            stages.forEach(stage => {
+                const item = document.querySelector(`[data-stage="${stage}"]`);
+                if (item) {
+                    item.classList.remove('waiting', 'active');
+                    item.classList.add('completed');
+                    item.querySelector('.stage-status').textContent = '已完成';
+                }
+            });
+            
+            // 隐藏取消按钮
+            document.getElementById('cancelBtn').style.display = 'none';
+            
+            // 确保所有图片都渲染了
+            if (data.image_urls) {
+                data.image_urls.forEach((url, index) => {
+                    const slot = document.getElementById(`image-slot-${index}`);
+                    if (slot && slot.classList.contains('loading')) {
+                        renderSingleImage(index, url, data.pages?.[index]?.page_type || 'content');
+                    }
+                });
+            }
+            
+            // 确保文案渲染了
+            if (data.titles || data.copywriting || data.tags) {
+                renderContent(data);
+            }
+            
+            document.getElementById('generateBtn').disabled = false;
+            
+            // 3秒后隐藏进度条
+            setTimeout(() => {
+                hideProgress();
+            }, 3000);
+        }
+        
+        function onGenerationError(message) {
+            document.getElementById('progressFill').style.background = '#ff4d4f';
+            document.getElementById('progressTitle').textContent = '❌ 生成失败';
+            document.getElementById('currentStage').textContent = message;
+            document.getElementById('currentStage').style.color = '#ff4d4f';
+            
+            document.getElementById('generateBtn').disabled = false;
+            showError(message);
+            
+            setTimeout(() => {
+                hideProgress();
+                document.getElementById('currentStage').style.color = '';
+                document.getElementById('progressFill').style.background = '';
+            }, 5000);
+        }
+        
+        function onGenerationCancelled() {
+            document.getElementById('progressFill').style.background = '#faad14';
+            document.getElementById('progressTitle').textContent = '⚠️ 已取消生成';
+            document.getElementById('currentStage').textContent = '任务已被用户取消';
+            document.getElementById('currentStage').style.color = '#faad14';
+            
+            document.getElementById('generateBtn').disabled = false;
+            
+            setTimeout(() => {
+                hideProgress();
+                document.getElementById('currentStage').style.color = '';
+                document.getElementById('progressFill').style.background = '';
+            }, 3000);
         }
 
         function showError(message) {
             const errorMsg = document.getElementById('errorMsg');
             errorMsg.textContent = '❌ ' + message;
             errorMsg.classList.add('show');
-        }
-        
-        // 存储当前生成结果
-        let currentResult = null;
-        
-        // 保存生成结果供发布使用
-        function saveResult(data) {
-            currentResult = data;
         }
         
         // 复制文案到剪贴板
@@ -525,34 +1484,51 @@
             }
             
             const urls = currentResult.image_urls;
-            alert(`开始下载 ${urls.length} 张图片，请允许浏览器下载多个文件`);
+            alert(`开始下载 ${urls.length} 张图片`);
             
             for (let i = 0; i < urls.length; i++) {
                 const url = urls[i];
                 try {
                     // 使用 fetch 下载并创建 blob
                     const response = await fetch(url);
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
                     const blob = await response.blob();
                     const blobUrl = URL.createObjectURL(blob);
                     
+                    // 创建下载链接并触发下载
                     const a = document.createElement('a');
                     a.href = blobUrl;
                     a.download = `xhs_${i + 1}.jpg`;
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
+                    
+                    // 等待下载完成后再释放 blob URL
+                    await new Promise(r => setTimeout(r, 200));
                     URL.revokeObjectURL(blobUrl);
                     
-                    // 延迟避免浏览器阻止
+                    console.log(`✓ 第 ${i + 1}/${urls.length} 张图片下载成功`);
+                    
+                    // 等待用户确认或延迟后再下载下一张
                     if (i < urls.length - 1) {
-                        await new Promise(r => setTimeout(r, 500));
+                        // 延迟 1.5 秒，确保当前下载完全完成
+                        await new Promise(r => setTimeout(r, 3000));
                     }
                 } catch (e) {
-                    console.error(`下载第 ${i + 1} 张图片失败:`, e);
+                    console.error(`✗ 下载第 ${i + 1} 张图片失败:`, e);
                     // 降级：直接打开链接
                     window.open(url, '_blank');
+                    // 失败也要延迟，避免快速重试
+                    if (i < urls.length - 1) {
+                        await new Promise(r => setTimeout(r, 1500));
+                    }
                 }
             }
+            
+            alert(`✓ 所有 ${urls.length} 张图片下载完成`);
+            console.log(`✓ 所有 ${urls.length} 张图片下载完成`);
         }
         
         // 打开发布弹窗
@@ -598,6 +1574,8 @@
         
         // 发布到小红书
         async function publishToXHS() {
+            console.log('🚀 publishToXHS 被调用');
+            
             const cookieText = document.getElementById('cookieInput').value.trim();
             
             if (!cookieText) {
@@ -616,11 +1594,17 @@
                 return;
             }
             
+            if (!currentResult.image_urls || currentResult.image_urls.length === 0) {
+                alert('没有可发布的图片');
+                return;
+            }
+            
             closePublishDialog();
             
             // 显示发布中状态
-            document.getElementById('loading').classList.add('show');
-            updateLoadingText('正在发布到小红书...');
+            showProgress();
+            document.getElementById('progressTitle').textContent = '📤 正在发布到小红书...';
+            document.getElementById('currentStage').textContent = '准备发布...';
             
             try {
                 const response = await fetch('/api/xhs/publish', {
@@ -628,7 +1612,7 @@
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
                         cookies: cookies,
-                        title: currentResult.titles?.[0] || '',
+                        title: currentResult.titles?.[0] || currentResult.topic || '',
                         content: currentResult.copywriting || '',
                         tags: currentResult.tags || [],
                         images: currentResult.image_urls || []
@@ -640,12 +1624,12 @@
                 if (result.success) {
                     alert('🎉 发布成功！' + (result.url ? '\n笔记链接: ' + result.url : ''));
                 } else {
-                    alert('❌ 发布失败: ' + (result.error || result.message));
+                    alert('❌ 发布失败: ' + (result.message || result.error || '未知错误'));
                 }
             } catch (error) {
                 alert('❌ 发布失败: ' + error.message);
             } finally {
-                document.getElementById('loading').classList.remove('show');
+                hideProgress();
             }
         }
         
@@ -656,18 +1640,114 @@
             }
         });
         
-        // 从 URL 参数读取博客信息（支持从 index.html 跳转）
-        (function() {
+        // 加载小红书历史记录详情
+        async function loadXhsHistory(historyId) {
+            console.log('🔍 开始加载历史记录:', historyId);
+            try {
+                const response = await fetch(`/api/history/${historyId}`);
+                console.log('📡 API 响应状态:', response.status);
+                const data = await response.json();
+                console.log('📦 API 返回数据:', data);
+                
+                if (data.success && data.record) {
+                    const record = data.record;
+                    console.log('✅ 记录加载成功:', record.id);
+                    
+                    // 填充主题
+                    document.getElementById('topicInput').value = record.topic || '';
+                    
+                    // 解析图片列表
+                    let imageUrls = [];
+                    try {
+                        imageUrls = JSON.parse(record.xhs_image_urls || '[]');
+                    } catch (e) {
+                        console.warn('解析图片列表失败:', e);
+                    }
+                    
+                    // 解析标签（数据库字段是 xhs_hashtags）
+                    let tags = [];
+                    try {
+                        tags = JSON.parse(record.xhs_hashtags || '[]');
+                    } catch (e) {
+                        console.warn('解析标签失败:', e);
+                    }
+                    
+                    // 构建结果对象（数据库字段是 xhs_copy_text）
+                    currentResult = {
+                        id: record.id,
+                        topic: record.topic,
+                        image_urls: imageUrls,
+                        video_url: record.cover_video || '',
+                        titles: [record.topic],  // 使用主题作为标题
+                        copywriting: record.xhs_copy_text || '',
+                        tags: tags
+                    };
+                    
+                    // 显示结果
+                    displayHistoryResult(currentResult);
+                } else {
+                    console.error('获取记录失败:', data.error);
+                    alert('加载历史记录失败: ' + (data.error || '未知错误'));
+                }
+            } catch (error) {
+                console.error('加载小红书历史详情失败:', error);
+                alert('加载历史记录失败');
+            }
+        }
+        
+        // 显示历史记录结果
+        function displayHistoryResult(result) {
+            // 显示结果区域
+            document.getElementById('resultSection').classList.add('show');
+            
+            // 创建图片槽位（注意：元素 ID 是 imagesGrid）
+            const imageGrid = document.getElementById('imagesGrid');
+            imageGrid.innerHTML = result.image_urls.map((url, index) => `
+                <div class="image-card" id="image-slot-${index}">
+                    <img src="${url}" alt="第${index + 1}张">
+                    <div class="caption">第 ${index + 1} 页${index === 0 ? ' (封面)' : ''}</div>
+                </div>
+            `).join('');
+            
+            // 显示文案
+            renderContent({
+                titles: result.titles,
+                copywriting: result.copywriting,
+                tags: result.tags
+            });
+            
+            // 显示视频（如果有）
+            if (result.video_url) {
+                const videoContainer = document.getElementById('videoContainer');
+                if (videoContainer) {
+                    videoContainer.innerHTML = `
+                        <video src="${result.video_url}" controls autoplay loop muted style="max-width: 200px; border-radius: 12px;"></video>
+                    `;
+                    videoContainer.style.display = 'block';
+                }
+            }
+        }
+        
+        // 页面加载完成后，检查 URL 参数
+        (function initFromUrlParams() {
+            console.log('🚀 初始化 URL 参数');
             const params = new URLSearchParams(window.location.search);
             const topic = params.get('topic');
             const sourceId = params.get('source_id');
+            const historyId = params.get('history_id');
+            console.log('📋 URL 参数:', { topic, sourceId, historyId });
             
             if (topic) {
                 document.getElementById('topicInput').value = topic;
             }
             if (sourceId) {
-                // 可以存储 sourceId 用于后续关联
                 window.xhsSourceId = sourceId;
+            }
+            
+            // 如果有 history_id，加载历史记录详情
+            if (historyId) {
+                console.log('📥 准备加载历史记录:', historyId);
+                loadXhsHistory(historyId);
             }
         })();
     </script>

@@ -466,6 +466,30 @@ class PromptManager:
             content=content
         )
     
+    def render_xhs_visual_prompts_batch(
+        self,
+        full_outline: str,
+        page_count: int,
+        user_topic: str = None
+    ) -> str:
+        """
+        渲染小红书视觉指令（批量版本）- 一次性生成所有页的视觉 Prompt
+        
+        Args:
+            full_outline: 完整大纲
+            page_count: 页面数量
+            user_topic: 用户原始主题
+            
+        Returns:
+            元指令 Prompt，让 LLM 生成所有页的视觉描述
+        """
+        return self.render(
+            'xhs_visual_prompt_ghibli_dynamic',
+            full_outline=full_outline,
+            page_count=page_count,
+            user_topic=user_topic
+        )
+    
     def render_xhs_image(
         self,
         page_content: str,
@@ -474,42 +498,13 @@ class PromptManager:
         reference_image: bool = False,
         user_topic: str = None,
         full_outline: str = None,
-        page_index: int = 0
+        page_index: int = 0,
+        layout: str = None,
+        shape: str = None
     ) -> str:
         """
-        渲染小红书图片生成 Prompt
-        
-        Args:
-            page_content: 页面内容
-            page_type: 页面类型（cover/content/summary）
-            style: 风格（hand_drawn/claymation/ghibli_summer）
-            reference_image: 是否有参考图片
-            user_topic: 用户原始主题
-            full_outline: 完整大纲
-            page_index: 页面序号
+        渲染小红书图片生成 Prompt（单页版本，用于非 ghibli_summer 风格）
         """
-        # 吉卜力夏日漫画风格 - 使用两步法专用模板（LLM 生成视觉 Prompt）
-        if style == 'ghibli_summer':
-            import random
-            # 漫画布局类型列表
-            layout_types = ['cinematic', 'standard', 'splash', 'dense', 'vertical']
-            # 封面固定使用 full_splash（纯单页大图），其他页面随机选择
-            if page_type == 'cover':
-                layout_type = 'full_splash'
-            else:
-                layout_type = random.choice(layout_types)
-            
-            return self.render(
-                'xhs_visual_prompt_ghibli',
-                page_content=page_content,
-                page_type=page_type,
-                layout_type=layout_type,
-                reference_image=reference_image,
-                user_topic=user_topic,
-                full_outline=full_outline,
-                page_index=page_index
-            )
-        
         # 默认风格
         return self.render(
             'xhs_image',

@@ -2764,6 +2764,14 @@
                 const data = await response.json();
                 if (data.success && data.record) {
                     const record = data.record;
+                    
+                    // 判断是否为小红书记录
+                    if (record.content_type === 'xhs') {
+                        // 跳转到小红书页面查看详情
+                        window.location.href = `/xhs.html?history_id=${historyId}`;
+                        return;
+                    }
+                    
                     let outline = {};
                     try {
                         outline = JSON.parse(record.outline || '{}');

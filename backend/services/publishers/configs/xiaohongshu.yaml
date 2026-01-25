@@ -4,7 +4,7 @@
 platform:
   id: xiaohongshu
   name: 小红书
-  editor_url: https://creator.xiaohongshu.com/publish/publish
+  editor_url: https://creator.xiaohongshu.com/publish/publish?source=official
   cookie_domain: .xiaohongshu.com
 
 # 登录检测
@@ -25,6 +25,35 @@ content_upload:
 
 # 发布工作流
 workflow:
+  - action: js_eval
+    name: 关闭弹窗并切换到图片上传Tab
+    script: |
+      // 先关闭"立即体验"弹窗（如果存在）
+      const closeButtons = document.querySelectorAll('[class*="close"], .close-btn, button[aria-label="关闭"], .modal-close');
+      closeButtons.forEach(btn => btn.click());
+      // 点击弹窗外部关闭
+      const overlay = document.querySelector('.modal-overlay, .mask, [class*="overlay"]');
+      if (overlay) overlay.click();
+      // 按 ESC 键关闭弹窗
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27 }));
+    wait_after: 500
+
+  - action: js_eval
+    name: 切换到图片上传Tab
+    script: |
+      // 点击"上传图文"或"图片"tab
+      const tabs = document.querySelectorAll('.tab, .creator-tab, [class*="tab"]');
+      for (const tab of tabs) {
+        if (tab.textContent.includes('图文') || tab.textContent.includes('图片')) {
+          tab.click();
+          break;
+        }
+      }
+      // 备选：直接点击包含"图片"文字的元素
+      const imgTab = document.evaluate("//span[contains(text(),'图文')] | //div[contains(text(),'图片')]", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue;
+      if (imgTab) imgTab.click();
+    wait_after: 1500
+
   - action: wait_for_images
     name: 等待图片上传完成
     timeout: 60000
@@ -32,7 +61,7 @@ workflow:
   
   - action: fill
     name: 填写标题
-    selector: '.c-input_inner, input[placeholder*="标题"], #title-input'
+    selector: '.c-input_inner input, input[placeholder*="标题"], #title-input, .d-input-wrapper input'
     value: "{{title}}"
     wait_after: 500
   
