@@ -129,8 +129,11 @@ class BookScannerService:
         
         # 应用分类结果（创建新书籍、关联博客到书籍）
         classification_result = self._apply_classification(classification, all_blogs, [])
-        logger.info(f"分类完成: 创建 {classification_result['books_created']} 本新书, "
-                   f"分配 {classification_result['blogs_assigned']} 篇博客")
+        logger.info(
+            f"分类完成: 创建 {classification_result['books_created']} 本新书, "
+            f"分配 {classification_result['blogs_assigned']} 篇博客, "
+            f"未归类 {classification_result.get('blogs_unassigned', 0)} 篇博客"
+        )
         
         # ========== 第二步：生成大纲（参考旧书籍大纲）==========
         books_to_update = classification_result.get('books_to_update', [])
@@ -159,7 +162,8 @@ class BookScannerService:
             "blogs_processed": len(all_blogs),
             "books_created": classification_result['books_created'],
             "books_updated": outlines_generated,
-            "summaries_generated": summaries_generated
+            "summaries_generated": summaries_generated,
+            "blogs_unassigned": classification_result.get('blogs_unassigned', 0)
         }
         
         logger.info(f"扫描完成: 处理 {result['blogs_processed']} 篇博客, "
@@ -496,11 +500,13 @@ class BookScannerService:
         应用分类结果：创建新书籍、关联博客到书籍
         
         Returns:
-            {books_created, blogs_assigned, books_to_update}
+            {books_created, blogs_assigned, blogs_unassigned, books_to_update}
         """
         result = {
             "books_created": 0,
             "blogs_assigned": 0,
+            "blogs_unassigned": 0,
+            "unassigned_blog_ids": [],
             "books_to_update": []
         }
         
@@ -519,6 +525,16 @@ class BookScannerService:
             target_book = item.get('target_book', '')
             
             if not blog_id or blog_id not in blog_map:
+                continue
+            
+            # 允许“留空不归类”
+            target_str = target_book.strip() if isinstance(target_book, str) else ''
+            normalized = target_str.lower()
+            if not target_str or normalized in {'none', 'null', 'nil', 'n/a', 'na', 'unassigned', 'uncategorized'} \
+               or target_str in {'不归类', '未归类', '不分类'}:
+                result['blogs_unassigned'] += 1
+                result['unassigned_blog_ids'].append(blog_id)
+                logger.info(f"博客未归类: {blog_id} - {blog_map[blog_id].get('topic', '')}")
                 continue
             
             book_id = None
