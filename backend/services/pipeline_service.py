@@ -111,7 +111,7 @@ class PipelineService:
             tm.send_progress(task_id, 'content', 100, f'✅ {total_pages} 页内容生成完成')
             
             # 阶段 5: 图片生成 - 每5页生成一张配图
-            if self.image_service and self.image_service.is_available() and len(pages) > 0:
+            if generate_images and self.image_service and self.image_service.is_available() and len(pages) > 0:
                 # 计算需要生成配图的页面（每5页一张，至少第1页有图）
                 image_pages = [i for i in range(len(pages)) if i % 5 == 0]
                 
