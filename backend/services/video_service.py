@@ -222,7 +222,7 @@ class Veo3Service:
     def _get_result(self, task_id: str) -> Dict[str, Any]:
         """获取任务结果"""
         url = f"{self.api_base}/v1/draw/result"
-        response = self.session.post(url, json={"id": task_id})
+        response = self.session.post(url, json={"id": task_id}, timeout=30)
         response.raise_for_status()
         return response.json()
 
@@ -242,7 +242,12 @@ class Veo3Service:
             if elapsed > max_wait_time:
                 raise TimeoutError(f"任务等待超时 (超过 {max_wait_time} 秒)")
 
-            result = self._get_result(task_id)
+            try:
+                result = self._get_result(task_id)
+            except requests.exceptions.RequestException as e:
+                logger.warning(f"获取任务结果失败，重试中: {e}")
+                time.sleep(poll_interval)
+                continue
 
             if result.get('code') == 0:
                 data = result.get('data', {})
