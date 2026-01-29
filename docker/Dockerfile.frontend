@@ -15,6 +15,9 @@ RUN npm ci
 # 复制源代码
 COPY . .
 
+# 设置 Node.js 内存限制，避免 OOM
+ENV NODE_OPTIONS="--max-old-space-size=512"
+
 # 构建生产版本
 RUN npm run build
 
