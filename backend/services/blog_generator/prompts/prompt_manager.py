@@ -138,7 +138,9 @@ class PromptManager:
         target_sections_count: int = None,
         target_images_count: int = None,
         target_code_blocks_count: int = None,
-        target_word_count: int = None
+        target_word_count: int = None,
+        instructional_analysis: dict = None,
+        verbatim_data: list = None
     ) -> str:
         """渲染 Planner Prompt"""
         return self.render(
@@ -153,7 +155,9 @@ class PromptManager:
             target_sections_count=target_sections_count,
             target_images_count=target_images_count,
             target_code_blocks_count=target_code_blocks_count,
-            target_word_count=target_word_count
+            target_word_count=target_word_count,
+            instructional_analysis=instructional_analysis,
+            verbatim_data=verbatim_data or []
         )
     
     def render_writer(
@@ -162,7 +166,10 @@ class PromptManager:
         previous_section_summary: str = None,
         next_section_preview: str = None,
         background_knowledge: str = None,
-        audience_adaptation: str = "technical-beginner"
+        audience_adaptation: str = "technical-beginner",
+        search_results: list = None,
+        verbatim_data: list = None,
+        learning_objectives: list = None
     ) -> str:
         """渲染 Writer Prompt"""
         return self.render(
@@ -171,7 +178,10 @@ class PromptManager:
             previous_section_summary=previous_section_summary,
             next_section_preview=next_section_preview,
             background_knowledge=background_knowledge,
-            audience_adaptation=audience_adaptation
+            audience_adaptation=audience_adaptation,
+            search_results=search_results or [],
+            verbatim_data=verbatim_data or [],
+            learning_objectives=learning_objectives or []
         )
     
     def render_writer_enhance(
@@ -235,13 +245,21 @@ class PromptManager:
     def render_reviewer(
         self,
         document: str,
-        outline: dict
+        outline: dict,
+        verbatim_data: list = None,
+        learning_objectives: list = None,
+        search_results: list = None,
+        background_knowledge: str = None
     ) -> str:
         """渲染 Reviewer Prompt"""
         return self.render(
             'reviewer',
             document=document,
-            outline=outline
+            outline=outline,
+            search_results=search_results or [],
+            verbatim_data=verbatim_data or [],
+            learning_objectives=learning_objectives or [],
+            background_knowledge=background_knowledge or ""
         )
     
     def render_assembler_header(

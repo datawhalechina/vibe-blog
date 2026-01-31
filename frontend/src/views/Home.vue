@@ -403,7 +403,12 @@
               <span class="code-line-number">1</span>
               <div class="code-line-content">
                 <span class="code-keyword">export</span>
-                <span class="code-blog-title">{{ record.topic }}</span>
+                <span 
+                  class="code-blog-title"
+                  @click.stop
+                  @dblclick.stop="copyToClipboard(record.topic)"
+                  :title="'双击复制: ' + record.topic"
+                >{{ record.topic }}</span>
               </div>
             </div>
             <div class="code-line">
@@ -917,6 +922,7 @@ const handleGenerate = async () => {
         topic: topic.value,
         article_type: articleType.value,
         audience_adaptation: audienceAdaptation.value,
+        image_style: imageStyle.value,
         generate_cover_video: generateCoverVideo.value,
         video_aspect_ratio: videoAspectRatio.value
       })
@@ -1100,6 +1106,34 @@ const closeProgress = () => {
   showProgress.value = false
   eventSource?.close()
   eventSource = null
+}
+
+// ========== 复制到粘贴板 ==========
+const copyToClipboard = async (text: string) => {
+  try {
+    await navigator.clipboard.writeText(text)
+    // 显示复制成功提示
+    const notification = document.createElement('div')
+    notification.textContent = '✓ 已复制'
+    notification.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(34, 197, 94, 0.9);
+      color: white;
+      padding: 12px 24px;
+      border-radius: 6px;
+      font-size: 14px;
+      z-index: 9999;
+      pointer-events: none;
+      animation: fadeInOut 1.5s ease-in-out;
+    `
+    document.body.appendChild(notification)
+    setTimeout(() => notification.remove(), 1500)
+  } catch (err) {
+    console.error('复制失败:', err)
+  }
 }
 
 // ========== 显示结果 ==========
@@ -3644,6 +3678,14 @@ onMounted(async () => {
 /* 旋转动画 */
 .spin { animation: spin 1s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
+
+/* 淡入淡出动画 */
+@keyframes fadeInOut {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  10% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  90% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+}
 
 /* 响应式 */
 @media (max-width: 1200px) {

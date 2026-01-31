@@ -1,6 +1,7 @@
 你是一个专业的技术配图设计师。你的任务是根据技术概念生成配图描述或 Mermaid 代码。
 
 ## 输入信息
+- 文章标题: {{ article_title }}
 - 图片类型: {{ image_type }}
 - 图片描述: {{ description }}
 {% if audience_adaptation %}
@@ -99,20 +100,14 @@ sequenceDiagram
 
 ### comparison (对比图)
 {% if audience_adaptation == "children" %}
-输出 AI 图片生成 Prompt，使用可爱卡通风格:
-"Cute cartoon-style comparison diagram showing [A] vs [B], split screen layout with colorful and playful elements, 
-left side shows [A features] with fun icons, right side shows [B features] with bright colors, 
-child-friendly design with simple shapes and happy characters"
+输出 AI 图片生成 Prompt，使用可爱卡通风格（所有文字必须是中文）:
+"可爱卡通风格对比图，展示[A]与[B]的对比，分屏布局，左侧展示[A的特点]，配合趣味图标，右侧展示[B的特点]，配合鲜艳颜色，儿童友好设计，简单形状和快乐角色，所有标签和文字使用中文"
 {% elif audience_adaptation == "professional" %}
-输出 AI 图片生成 Prompt，使用商务专业风格:
-"Professional business-style comparison chart showing [A] vs [B], clean corporate layout,
-left side shows [A features] with efficiency metrics, right side shows [B features] with performance data,
-blue and gray color scheme, modern minimalist design, suitable for boardroom presentation"
+输出 AI 图片生成 Prompt，使用商务专业风格（所有文字必须是中文）:
+"专业商务风格对比图，展示[A]与[B]的对比，简洁企业布局，左侧展示[A的特点]和效率指标，右侧展示[B的特点]和性能数据，蓝灰色配色方案，现代极简设计，适合会议演示，所有标签和文字使用中文"
 {% else %}
-输出 AI 图片生成 Prompt，示例:
-"Technical comparison diagram showing [A] vs [B], split screen layout, 
-left side shows [A features], right side shows [B features], 
-clean minimalist style, blue and orange color scheme"
+输出 AI 图片生成 Prompt，示例（所有文字必须是中文）:
+"技术对比图，展示[A]与[B]的对比，分屏布局，左侧展示[A的特点]，右侧展示[B的特点]，简洁极简风格，蓝橙色配色方案，所有标签和文字使用中文"
 {% endif %}
 
 ### chart (数据图表)
@@ -123,7 +118,7 @@ JSON 格式:
 {
   "render_method": "mermaid | ai_image | matplotlib",
   "content": "纯 Mermaid 代码（不要包含 ```mermaid 标记）或 AI Prompt 或 Python 代码",
-  "caption": "图片说明文字 (简洁描述图片内容)"
+  "caption": "{{ article_title }}"
 }
 
 ## ❗ Mermaid 语法禁忌（极其重要！）

@@ -222,10 +222,20 @@ class ResearcherAgent:
             if key_concepts:
                 logger.info(f"核心概念: {[c.get('name', c) if isinstance(c, dict) else c for c in key_concepts[:5]]}")
             
+            # 解析 Instructional Design 分析（新增）
+            instructional_analysis = result.get("instructional_analysis", {})
+            if instructional_analysis:
+                learning_objectives = instructional_analysis.get("learning_objectives", [])
+                verbatim_data = instructional_analysis.get("verbatim_data", [])
+                content_type = instructional_analysis.get("content_type", "tutorial")
+                logger.info(f"📚 教学设计分析: 学习目标 {len(learning_objectives)} 个, "
+                           f"Verbatim 数据 {len(verbatim_data)} 项, 内容类型: {content_type}")
+            
             return {
                 "background_knowledge": result.get("background_knowledge", ""),
                 "key_concepts": key_concepts,
-                "top_references": result.get("top_references", [])
+                "top_references": result.get("top_references", []),
+                "instructional_analysis": instructional_analysis  # 新增
             }
             
         except json.JSONDecodeError as e:
@@ -342,13 +352,25 @@ class ResearcherAgent:
             c.get('name', c) if isinstance(c, dict) else c
             for c in summary.get('key_concepts', [])
         ]
+        # 保留完整的引用信息（包含 title 和 url）
         state['reference_links'] = [
-            r.get('url', r) if isinstance(r, dict) else r
+            r if isinstance(r, dict) else {'title': '', 'url': r}
             for r in summary.get('top_references', summary.get('web_references', []))
         ]
+        
+        # 4. 更新 Instructional Design 相关状态（新增）
+        instructional_analysis = summary.get('instructional_analysis', {})
+        state['instructional_analysis'] = instructional_analysis
+        state['learning_objectives'] = instructional_analysis.get('learning_objectives', [])
+        state['verbatim_data'] = instructional_analysis.get('verbatim_data', [])
         
         stats = state['knowledge_source_stats']
         logger.info(f"✅ 素材收集完成: 文档知识 {stats['document_count']} 条, "
                     f"网络搜索 {stats['web_count']} 条, 核心概念 {len(state['key_concepts'])} 个")
+        
+        # 打印 Instructional Design 统计
+        if instructional_analysis:
+            logger.info(f"📚 教学设计: 学习目标 {len(state['learning_objectives'])} 个, "
+                       f"Verbatim 数据 {len(state['verbatim_data'])} 项")
         
         return state

@@ -33,7 +33,8 @@ class PipelineService:
         target_audience: str = "技术小白",
         style: str = "可爱卡通风",
         page_count: int = 8,
-        generate_images: bool = False
+        generate_images: bool = False,
+        aspect_ratio: str = "16:9"  # 新增：接收宽高比参数
     ) -> Dict[str, Any]:
         """运行完整的转化流水线"""
         tm = self.task_manager
@@ -137,9 +138,15 @@ class PipelineService:
                         
                         try:
                             from services.image_service import AspectRatio, ImageSize, STORYBOOK_STYLE_PREFIX
+                            # 第一页使用前端选择的宽高比，其他页保持 16:9
+                            if page_idx == 0:
+                                selected_aspect_ratio = AspectRatio.PORTRAIT_9_16 if aspect_ratio == "9:16" else AspectRatio.LANDSCAPE_16_9
+                            else:
+                                selected_aspect_ratio = AspectRatio.LANDSCAPE_16_9
+                            
                             image_result = self.image_service.generate(
                                 prompt=image_desc,
-                                aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+                                aspect_ratio=selected_aspect_ratio,
                                 image_size=ImageSize.SIZE_2K,
                                 style_prefix=STORYBOOK_STYLE_PREFIX,
                                 download=True
@@ -180,14 +187,14 @@ class PipelineService:
             return {'success': False, 'error': str(e)}
     
     def run_pipeline_async(self, task_id, content, title="", target_audience="技术小白",
-                          style="可爱卡通风", page_count=8, generate_images=False, app=None):
+                          style="可爱卡通风", page_count=8, generate_images=False, aspect_ratio="16:9", app=None):
         """异步运行流水线"""
         def _run():
             if app:
                 with app.app_context():
-                    self.run_pipeline(task_id, content, title, target_audience, style, page_count, generate_images)
+                    self.run_pipeline(task_id, content, title, target_audience, style, page_count, generate_images, aspect_ratio)
             else:
-                self.run_pipeline(task_id, content, title, target_audience, style, page_count, generate_images)
+                self.run_pipeline(task_id, content, title, target_audience, style, page_count, generate_images, aspect_ratio)
         
         thread = Thread(target=_run, daemon=True)
         thread.start()

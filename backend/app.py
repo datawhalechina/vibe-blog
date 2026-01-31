@@ -54,13 +54,15 @@ class TaskIdFilter(logging.Filter):
 log_format = logging.Formatter('%(asctime)s %(task_id)s - %(name)s - %(levelname)s - %(message)s')
 
 root_logger = logging.getLogger()
-root_logger.setLevel(logging.INFO)
+# 设置根日志器为 DEBUG，以便捕获所有级别的日志
+root_logger.setLevel(logging.DEBUG)
 
 # 添加任务 ID 过滤器
 task_id_filter = TaskIdFilter()
 root_logger.addFilter(task_id_filter)
 
 console_handler = logging.StreamHandler()
+# 控制台仅显示 INFO 及以上级别
 console_handler.setLevel(logging.INFO)
 console_handler.setFormatter(log_format)
 console_handler.addFilter(task_id_filter)
@@ -72,9 +74,13 @@ try:
     os.makedirs(LOG_DIR, exist_ok=True)
     LOG_FILE = os.path.join(LOG_DIR, 'app.log')
     file_handler = logging.FileHandler(LOG_FILE, encoding='utf-8')
+    # 文件处理器捕获 DEBUG 及以上级别（用于诊断）
     file_handler.setLevel(logging.DEBUG)
     file_handler.setFormatter(log_format)
+    file_handler.addFilter(task_id_filter)
     root_logger.addHandler(file_handler)
+    logger_init = logging.getLogger(__name__)
+    logger_init.info("✅ 日志文件已启用，DEBUG 级别日志将写入文件")
 except (OSError, IOError):
     # Vercel 环境是只读的，无法创建日志文件，仅使用控制台日志
     pass
@@ -589,6 +595,7 @@ def create_app(config_class=None):
             style = data.get('style', '可爱卡通风')
             page_count = data.get('page_count', 8)
             generate_images = data.get('generate_images', False)
+            aspect_ratio = data.get('aspect_ratio', '16:9')  # 新增：接收前端的宽高比
             
             # 检查 LLM 服务
             llm_service = get_llm_service()
@@ -616,6 +623,7 @@ def create_app(config_class=None):
                 style=style,
                 page_count=page_count,
                 generate_images=generate_images,
+                aspect_ratio=aspect_ratio,  # 新增：传递宽高比
                 app=current_app._get_current_object()
             )
             
@@ -1003,7 +1011,7 @@ def create_app(config_class=None):
                     return jsonify({'success': False, 'error': f'自定义配置验证失败: {str(e)}'}), 400
             
             # 记录请求信息
-            logger.info(f"📝 博客生成请求: topic={topic}, article_type={article_type}, target_audience={target_audience}, audience_adaptation={audience_adaptation}, target_length={target_length}, document_ids={document_ids}, generate_cover_video={generate_cover_video}, custom_config={custom_config}")
+            logger.info(f"📝 博客生成请求: topic={topic}, article_type={article_type}, target_audience={target_audience}, audience_adaptation={audience_adaptation}, target_length={target_length}, document_ids={document_ids}, image_style={image_style}, generate_cover_video={generate_cover_video}, video_aspect_ratio={video_aspect_ratio}, custom_config={custom_config}")
             
             # 检查博客生成服务
             blog_service = get_blog_service()
@@ -1095,9 +1103,11 @@ def create_app(config_class=None):
             
             article_type = data.get('article_type', 'tutorial')
             audience_adaptation = data.get('audience_adaptation', 'default')  # 新增受众适配参数
+            image_style = data.get('image_style', '')  # 图片风格 ID
             generate_cover_video = data.get('generate_cover_video', False)
+            video_aspect_ratio = data.get('video_aspect_ratio', '16:9')  # 视频尺寸
             
-            logger.info(f"📝 Mini 博客生成请求: topic={topic}, article_type={article_type}, audience_adaptation={audience_adaptation}, generate_cover_video={generate_cover_video}")
+            logger.info(f"📝 Mini 博客生成请求: topic={topic}, article_type={article_type}, audience_adaptation={audience_adaptation}, image_style={image_style}, generate_cover_video={generate_cover_video}, video_aspect_ratio={video_aspect_ratio}")
             
             # 检查博客生成服务
             blog_service = get_blog_service()
@@ -1120,8 +1130,9 @@ def create_app(config_class=None):
                 source_material=None,
                 document_ids=[],
                 document_knowledge=[],
-                image_style='',
+                image_style=image_style,
                 generate_cover_video=generate_cover_video,
+                video_aspect_ratio=video_aspect_ratio,
                 custom_config=None,
                 task_manager=task_manager,
                 app=current_app._get_current_object()

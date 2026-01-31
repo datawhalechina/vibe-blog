@@ -393,6 +393,7 @@ class UnifiedVideoService:
         kwargs = {
             'image_url': image_url,
             'prompt': prompt,
+            'aspect_ratio': aspect_ratio,
             'max_wait_time': max_wait_time,
             'progress_callback': progress_callback,
             'max_retries': max_retries
@@ -401,6 +402,8 @@ class UnifiedVideoService:
         # Sora2 支持续创作
         if remix_target_id and use_model.lower() in self.SORA2_MODELS:
             kwargs['remix_target_id'] = remix_target_id
+        
+        logger.info(f"[{model_name}] 视频参数: aspect_ratio={aspect_ratio.value}")
         
         # 调用对应服务的 generate_from_image
         result = service.generate_from_image(**kwargs)

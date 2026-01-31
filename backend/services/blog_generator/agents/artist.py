@@ -200,7 +200,8 @@ class ArtistAgent:
         image_type: str,
         description: str,
         context: str,
-        audience_adaptation: str = "technical-beginner"
+        audience_adaptation: str = "technical-beginner",
+        article_title: str = ""  # 新增：文章标题
     ) -> Dict[str, Any]:
         """
         生成配图
@@ -210,6 +211,7 @@ class ArtistAgent:
             description: 图片描述
             context: 所在章节上下文
             audience_adaptation: 受众适配类型
+            article_title: 文章标题（用于图片说明）
             
         Returns:
             图片资源字典
@@ -219,7 +221,8 @@ class ArtistAgent:
             image_type=image_type,
             description=description,
             context=context,
-            audience_adaptation=audience_adaptation
+            audience_adaptation=audience_adaptation,
+            article_title=article_title  # 新增：传递文章标题
         )
         
         # 调试日志：记录传入的上下文摘要
@@ -256,7 +259,13 @@ class ArtistAgent:
             logger.error(f"配图生成失败: {e}")
             raise
     
-    def _render_ai_image(self, prompt: str, caption: str, image_style: str = "") -> str:
+    def _render_ai_image(
+        self,
+        prompt: str,
+        caption: str,
+        image_style: str = "",
+        aspect_ratio: str = "16:9"
+    ) -> str:
         """
         调用 Nano Banana API 生成 AI 图片
         
@@ -264,6 +273,7 @@ class ArtistAgent:
             prompt: AI 图片生成 Prompt
             caption: 图片说明
             image_style: 图片风格 ID（可选，为空则使用默认卡通风格）
+            aspect_ratio: 宽高比（16:9 或 9:16）
             
         Returns:
             图片本地路径，失败返回 None
@@ -288,9 +298,13 @@ class ArtistAgent:
                 full_prompt = get_prompt_manager().render_artist_default(prompt, caption)
                 logger.info(f"开始生成【文章内容图】: {caption}")
             
+            # 根据前端选择的宽高比生成图片
+            aspect_ratio_enum = AspectRatio.PORTRAIT_9_16 if aspect_ratio == "9:16" else AspectRatio.LANDSCAPE_16_9
+            logger.info(f"使用宽高比: {aspect_ratio}")
+            
             result = image_service.generate(
                 prompt=full_prompt,
-                aspect_ratio=AspectRatio.LANDSCAPE_16_9,
+                aspect_ratio=aspect_ratio_enum,
                 image_size=ImageSize.SIZE_1K,
                 max_wait_time=600
             )
@@ -434,6 +448,7 @@ class ArtistAgent:
         image_id_counter = 1
         
         # 1. 从大纲中收集配图任务
+        article_title = state.get('topic', '')  # 获取文章标题
         for i, section_outline in enumerate(sections_outline):
             image_type = section_outline.get('image_type', 'none')
             if image_type == 'none':
@@ -454,7 +469,8 @@ class ArtistAgent:
                 'image_type': image_type,
                 'description': image_description,
                 'context': f"章节标题: {section_title}\n\n章节内容摘要:\n{section_content}",
-                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
+                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
+                'article_title': article_title  # 新增：文章标题
             })
             image_id_counter += 1
         
@@ -483,7 +499,8 @@ class ArtistAgent:
                     'image_type': placeholder['type'],
                     'description': placeholder['description'],
                     'context': f"章节标题: {section_title}\n\n相关内容:\n{surrounding_context}",
-                    'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
+                    'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
+                    'article_title': article_title  # 新增：文章标题
                 })
                 image_id_counter += 1
         
@@ -500,7 +517,8 @@ class ArtistAgent:
                 'image_type': task['image_type'],
                 'description': task['description'],
                 'context': f"章节标题: {section_title}\n\n相关内容:\n{task['context']}",
-                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
+                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
+                'article_title': article_title  # 新增：文章标题
             })
             image_id_counter += 1
         
@@ -528,7 +546,8 @@ class ArtistAgent:
                     image_type=task['image_type'],
                     description=task['description'],
                     context=task['context'],
-                    audience_adaptation=task.get('audience_adaptation', 'technical-beginner')
+                    audience_adaptation=task.get('audience_adaptation', 'technical-beginner'),
+                    article_title=task.get('article_title', '')  # 新增：传递文章标题
                 )
                 
                 render_method = image.get('render_method', 'mermaid')
@@ -538,10 +557,26 @@ class ArtistAgent:
                 if render_method == 'ai_image':
                     # 从 state 获取图片风格参数
                     image_style = state.get('image_style', '')
+                    
+                    # 区分封面图和内容图的宽高比
+                    # 第一个章节的图片作为封面图，使用前端选择的宽高比
+                    # 其他章节的图片保持 16:9
+                    if task['source'] == 'outline' and task['section_idx'] == 0:
+                        # 封面图（第一个章节）：使用前端选择的宽高比（与视频一致）
+                        aspect_ratio = state.get('aspect_ratio', '16:9')
+                        logger.info(f"检测到封面图，使用宽高比: {aspect_ratio}")
+                    else:
+                        # 内容图：保持 16:9
+                        aspect_ratio = '16:9'
+                    
+                    # 直接使用文章标题作为图片标题，不使用 LLM 生成的 caption
+                    article_title = task.get('article_title', '')
+                    
                     rendered_path = self._render_ai_image(
                         prompt=image.get('content', ''),
-                        caption=image.get('caption', ''),
-                        image_style=image_style
+                        caption=article_title,  # 使用文章标题，而不是 LLM 生成的 caption
+                        image_style=image_style,
+                        aspect_ratio=aspect_ratio
                     )
                     if rendered_path:
                         # 如果是 OSS URL，直接使用；否则转为相对路径

@@ -38,7 +38,9 @@ class PlannerAgent:
         target_sections_count: int = None,
         target_images_count: int = None,
         target_code_blocks_count: int = None,
-        target_word_count: int = None
+        target_word_count: int = None,
+        instructional_analysis: dict = None,
+        verbatim_data: list = None
     ) -> Dict[str, Any]:
         """
         生成文章大纲
@@ -56,11 +58,14 @@ class PlannerAgent:
             target_images_count: 目标配图数
             target_code_blocks_count: 目标代码块数
             target_word_count: 目标字数
+            instructional_analysis: 教学设计分析（新增）
+            verbatim_data: 需要原样保留的数据（新增）
             
         Returns:
             大纲字典
         """
         key_concepts = key_concepts or []
+        verbatim_data = verbatim_data or []
         
         pm = get_prompt_manager()
         prompt = pm.render_planner(
@@ -74,7 +79,9 @@ class PlannerAgent:
             target_sections_count=target_sections_count,
             target_images_count=target_images_count,
             target_code_blocks_count=target_code_blocks_count,
-            target_word_count=target_word_count
+            target_word_count=target_word_count,
+            instructional_analysis=instructional_analysis,
+            verbatim_data=verbatim_data
         )
         
         try:
@@ -158,10 +165,19 @@ class PlannerAgent:
                 target_sections_count=state.get('target_sections_count'),
                 target_images_count=state.get('target_images_count'),
                 target_code_blocks_count=state.get('target_code_blocks_count'),
-                target_word_count=state.get('target_word_count')
+                target_word_count=state.get('target_word_count'),
+                instructional_analysis=state.get('instructional_analysis'),
+                verbatim_data=state.get('verbatim_data', [])
             )
             
             state['outline'] = outline
+            
+            # 提取信息架构（新增）
+            information_architecture = outline.get('information_architecture')
+            if information_architecture:
+                state['information_architecture'] = information_architecture
+                logger.info(f"📐 信息架构: {information_architecture.get('structure_type', 'unknown')}")
+            
             logger.info(f"大纲生成完成: {outline.get('title', '')}, {len(outline.get('sections', []))} 个章节")
             
         except Exception as e:

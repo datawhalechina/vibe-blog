@@ -36,7 +36,10 @@ class WriterAgent:
         previous_section_summary: str = "",
         next_section_preview: str = "",
         background_knowledge: str = "",
-        audience_adaptation: str = "technical-beginner"
+        audience_adaptation: str = "technical-beginner",
+        search_results: List[Dict[str, Any]] = None,
+        verbatim_data: List[Dict[str, Any]] = None,
+        learning_objectives: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         撰写单个章节
@@ -47,6 +50,9 @@ class WriterAgent:
             next_section_preview: 后续章节预告
             background_knowledge: 背景知识
             audience_adaptation: 受众适配类型
+            search_results: 原始搜索结果（用于准确引用）
+            verbatim_data: 需要原样保留的数据
+            learning_objectives: 学习目标列表（用于约束内容）
             
         Returns:
             章节内容
@@ -57,8 +63,18 @@ class WriterAgent:
             previous_section_summary=previous_section_summary,
             next_section_preview=next_section_preview,
             background_knowledge=background_knowledge,
-            audience_adaptation=audience_adaptation
+            audience_adaptation=audience_adaptation,
+            search_results=search_results or [],
+            verbatim_data=verbatim_data or [],
+            learning_objectives=learning_objectives or []
         )
+        
+        # 输出完整的 Writer Prompt 到日志（用于诊断）
+        logger.debug("=" * 80)
+        logger.debug(f"【Writer Prompt - 章节: {section_outline.get('title', 'Unknown')}】")
+        logger.debug("=" * 80)
+        logger.debug(prompt)
+        logger.debug("=" * 80)
         
         try:
             response = self.llm.chat(
@@ -143,6 +159,9 @@ class WriterAgent:
         
         sections_outline = outline.get('sections', [])
         background_knowledge = state.get('background_knowledge', '')
+        search_results = state.get('search_results', [])
+        verbatim_data = state.get('verbatim_data', [])
+        learning_objectives = state.get('learning_objectives', [])
         
         if not sections_outline:
             logger.warning("没有章节大纲，跳过内容撰写")
@@ -169,7 +188,10 @@ class WriterAgent:
                 'prev_summary': prev_summary,
                 'next_preview': next_preview,
                 'background_knowledge': background_knowledge,
-                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner')
+                'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
+                'search_results': search_results,
+                'verbatim_data': verbatim_data,
+                'learning_objectives': learning_objectives
             })
         
         # 使用环境变量配置或传入的参数
@@ -189,7 +211,10 @@ class WriterAgent:
                     previous_section_summary=task['prev_summary'],
                     next_section_preview=task['next_preview'],
                     background_knowledge=task['background_knowledge'],
-                    audience_adaptation=task.get('audience_adaptation', 'technical-beginner')
+                    audience_adaptation=task.get('audience_adaptation', 'technical-beginner'),
+                    search_results=task.get('search_results', []),
+                    verbatim_data=task.get('verbatim_data', []),
+                    learning_objectives=task.get('learning_objectives', [])
                 )
                 return {
                     'success': True,

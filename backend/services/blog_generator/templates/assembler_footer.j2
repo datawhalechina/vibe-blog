@@ -25,6 +25,10 @@
 ### 🌐 网络来源
 
 {% for link in reference_links %}
+{% if link is mapping %}
+{{ loop.index }}. [{{ link.title or link.url }}]({{ link.url }})
+{% else %}
 {{ loop.index }}. {{ link }}
+{% endif %}
 {% endfor %}
 {% endif %}

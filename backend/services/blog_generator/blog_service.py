@@ -248,7 +248,7 @@ class BlogService:
                         f"code_blocks={article_config['code_blocks_count']}, "
                         f"words={article_config['target_word_count']}")
             
-            # 创建初始状态（支持文档知识、图片风格和文章长度配置）
+            # 创建初始状态（支持文档知识、图片风格、文章长度配置和宽高比）
             initial_state = create_initial_state(
                 topic=topic,
                 article_type=article_type,
@@ -259,6 +259,7 @@ class BlogService:
                 document_ids=document_ids or [],
                 document_knowledge=document_knowledge or [],
                 image_style=image_style,
+                aspect_ratio=video_aspect_ratio,  # 新增：传递宽高比
                 custom_config=custom_config,
                 target_sections_count=article_config['sections_count'],
                 target_images_count=article_config['images_count'],
@@ -726,6 +727,8 @@ class BlogService:
             else:
                 image_aspect_ratio = AspectRatio.LANDSCAPE_16_9
             
+            logger.info(f"封面图参数: video_aspect_ratio={video_aspect_ratio}, image_aspect_ratio={image_aspect_ratio.value}")
+            
             # 调用图片生成服务
             result = image_service.generate(
                 prompt=cover_prompt,
@@ -825,6 +828,8 @@ class BlogService:
                 '9:16': VideoAspectRatio.PORTRAIT_9_16
             }
             aspect_ratio = aspect_ratio_map.get(video_aspect_ratio, VideoAspectRatio.LANDSCAPE_16_9)
+            
+            logger.info(f"封面视频参数: video_aspect_ratio={video_aspect_ratio}, aspect_ratio={aspect_ratio.value}")
             
             # 调用视频生成服务
             result = video_service.generate_from_image(

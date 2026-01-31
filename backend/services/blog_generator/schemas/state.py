@@ -81,10 +81,48 @@ class QuestionResult(BaseModel):
 class ReviewIssue(BaseModel):
     """审核问题"""
     section_id: str
-    issue_type: Literal["logic", "accuracy", "completeness", "image", "readability"]
+    issue_type: Literal["hallucination", "verbatim_violation", "learning_objective_gap", "logic", "accuracy", "completeness", "image", "readability"]
     severity: Literal["high", "medium", "low"]
     description: str
     suggestion: str
+    original_value: Optional[str] = None  # 仅 verbatim_violation 类型需要
+    found_value: Optional[str] = None  # 仅 verbatim_violation 类型需要
+
+
+class LearningObjective(BaseModel):
+    """学习目标"""
+    type: Literal["primary", "secondary", "tertiary"]
+    objective: str
+
+
+class AudienceAnalysis(BaseModel):
+    """受众分析"""
+    knowledge_level: Literal["beginner", "intermediate", "advanced"]
+    reading_purpose: str
+    expected_outcome: str
+
+
+class VerbatimDataItem(BaseModel):
+    """Verbatim 数据项（需要原样保留的数据）"""
+    type: Literal["statistic", "quote", "term"]
+    value: str
+    context: Optional[str] = None
+    source: Optional[str] = None
+    definition: Optional[str] = None  # 仅 term 类型需要
+
+
+class InstructionalAnalysis(BaseModel):
+    """教学设计分析（Researcher 输出）"""
+    learning_objectives: List[LearningObjective] = Field(default_factory=list)
+    audience: Optional[AudienceAnalysis] = None
+    content_type: Literal["tutorial", "concept", "comparison", "problem-solving", "overview"] = "tutorial"
+    verbatim_data: List[VerbatimDataItem] = Field(default_factory=list)
+
+
+class InformationArchitecture(BaseModel):
+    """信息架构（Planner 输出）"""
+    structure_type: Literal["linear-progression", "hierarchical", "comparison", "problem-solving"]
+    learning_objectives_mapping: List[dict] = Field(default_factory=list)  # [{"objective": "...", "supported_by_sections": ["section_1"]}]
 
 
 class SearchResult(BaseModel):
@@ -124,6 +162,7 @@ class SharedState(TypedDict):
     target_length: Literal["mini", "short", "medium", "long", "custom"]
     source_material: Optional[str]
     image_style: str  # 图片风格 ID
+    aspect_ratio: str  # 宽高比: 16:9 或 9:16（前端选择）
     
     # 文档知识 (用户上传的文档)
     document_ids: List[str]  # 用户上传的文档 ID 列表
@@ -136,6 +175,14 @@ class SharedState(TypedDict):
     reference_links: List[str]  # 参考链接 (网络来源)
     document_references: List[dict]  # 文档来源引用
     knowledge_source_stats: dict  # 知识来源统计
+    
+    # Instructional Design 分析 (Researcher 输出)
+    instructional_analysis: Optional[dict]  # 教学设计分析
+    learning_objectives: List[dict]  # 学习目标列表
+    verbatim_data: List[dict]  # 需要原样保留的数据
+    
+    # 信息架构 (Planner 输出)
+    information_architecture: Optional[dict]  # 信息架构设计
     
     # 多轮搜索相关
     search_count: int  # 当前搜索次数
@@ -214,6 +261,7 @@ def create_initial_state(
     document_ids: List[str] = None,
     document_knowledge: List[dict] = None,
     image_style: str = "",
+    aspect_ratio: str = "16:9",  # 新增：宽高比参数
     # 新增：文章长度配置参数
     custom_config: dict = None,
     target_sections_count: int = None,
@@ -230,6 +278,7 @@ def create_initial_state(
         target_length=target_length,
         source_material=source_material,
         image_style=image_style,
+        aspect_ratio=aspect_ratio,  # 新增：宽高比
         # 文档知识
         document_ids=document_ids or [],
         document_knowledge=document_knowledge or [],
@@ -240,6 +289,12 @@ def create_initial_state(
         reference_links=[],
         document_references=[],
         knowledge_source_stats={},
+        # Instructional Design 分析
+        instructional_analysis=None,
+        learning_objectives=[],
+        verbatim_data=[],
+        # 信息架构
+        information_architecture=None,
         # 多轮搜索相关
         search_count=0,
         max_search_count=get_max_search_count(target_length),

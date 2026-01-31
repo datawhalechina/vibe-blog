@@ -404,6 +404,8 @@ class BlogGenerator:
         if not state.get('review_approved', True):
             if state.get('revision_count', 0) < self.max_revision_rounds:
                 return "revision"
+        
+        logger.info("审核通过或修订完成，进入组装")
         return "assemble"
 
     def _should_refine_search(self, state: SharedState) -> Literal["search", "continue"]:
