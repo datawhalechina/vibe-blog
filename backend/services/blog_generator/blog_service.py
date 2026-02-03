@@ -556,12 +556,15 @@ class BlogService:
             cover_video_path = None
             cover_video_enabled = os.environ.get('COVER_VIDEO_ENABLED', 'true').lower() == 'true'
             if generate_cover_video and cover_image_url and cover_video_enabled:
+                # 获取章节配图（用于多图序列模式）
+                section_images = final_state.get('section_images', [])
                 cover_video_path = self._generate_cover_video(
                     history_id=task_id,
                     cover_image_url=cover_image_url,
                     video_aspect_ratio=video_aspect_ratio,
                     task_manager=task_manager,
-                    task_id=task_id
+                    task_id=task_id,
+                    section_images=section_images
                 )
             
             # 保存历史记录（使用包含封面图的 markdown）
@@ -759,28 +762,48 @@ class BlogService:
             logger.error(f"封面图生成失败: {e}")
             return None
     
+    # 动画 Prompt - 解决中文汉字变形问题
+    ANIMATION_PROMPT = """Add subtle animations to non-text elements only:
+- Gears: rotate slowly (max 5 degrees/sec)
+- Arrows: gentle glow pulse
+- Icons: slight floating effect
+
+CRITICAL: ALL TEXT (Chinese characters, English, numbers) MUST remain completely static.
+Do NOT animate, move, scale, blur, or distort any text.
+Text areas are NO-ANIMATION zones.
+
+Duration: 6-8 seconds. Professional educational style."""
+
     def _generate_cover_video(
         self,
         history_id: str,
         cover_image_url: str,
         video_aspect_ratio: str = "16:9",
         task_manager=None,
-        task_id: str = None
+        task_id: str = None,
+        section_images: list = None
     ) -> Optional[str]:
         """
         生成封面动画视频
         
+        支持两种模式：
+        1. 单图模式：只有封面图，生成简单动画
+        2. 多图序列模式：封面图 + 章节配图，生成 [静态→动画→静态→...] 序列
+        
         Args:
             history_id: 历史记录 ID
-            cover_image_url: 封面图外网 URL（直接使用图片生成服务返回的 URL）
+            cover_image_url: 封面图外网 URL
+            video_aspect_ratio: 视频宽高比
             task_manager: 任务管理器
             task_id: 任务 ID
+            section_images: 章节配图 URL 列表（可选，用于多图序列模式）
             
         Returns:
             视频访问 URL 或 None
         """
         try:
-            from services.video_service import get_video_service
+            from services.video_service import get_video_service, VideoAspectRatio
+            from services.oss_service import get_oss_service
             import os
             
             # 发送进度事件
@@ -802,15 +825,14 @@ class BlogService:
                 logger.warning("视频生成服务不可用，跳过封面动画生成")
                 return None
             
-            # 直接使用图片生成服务返回的外网 URL
-            logger.info(f"使用封面图 URL: {cover_image_url}")
+            oss_service = get_oss_service()
             
-            if task_manager and task_id:
-                task_manager.send_event(task_id, 'log', {
-                    'level': 'INFO',
-                    'logger': 'blog_service',
-                    'message': '开始生成动画视频...'
-                })
+            # 将宽高比转换为 VideoAspectRatio 枚举值
+            aspect_ratio_map = {
+                '16:9': VideoAspectRatio.LANDSCAPE_16_9,
+                '9:16': VideoAspectRatio.PORTRAIT_9_16
+            }
+            aspect_ratio = aspect_ratio_map.get(video_aspect_ratio, VideoAspectRatio.LANDSCAPE_16_9)
             
             # 定义进度回调
             def progress_callback(progress, status):
@@ -821,49 +843,263 @@ class BlogService:
                         'message': f'视频生成进度: {progress}%'
                     })
             
-            # 将宽高比转换为 VideoAspectRatio 枚举值
-            from services.video_service import VideoAspectRatio
-            aspect_ratio_map = {
-                '16:9': VideoAspectRatio.LANDSCAPE_16_9,
-                '9:16': VideoAspectRatio.PORTRAIT_9_16
-            }
-            aspect_ratio = aspect_ratio_map.get(video_aspect_ratio, VideoAspectRatio.LANDSCAPE_16_9)
-            
-            logger.info(f"封面视频参数: video_aspect_ratio={video_aspect_ratio}, aspect_ratio={aspect_ratio.value}")
-            
-            # 调用视频生成服务
-            result = video_service.generate_from_image(
-                image_url=cover_image_url,
-                aspect_ratio=aspect_ratio,
-                progress_callback=progress_callback
-            )
-            
-            if not result:
-                logger.warning("视频生成失败")
-                return None
-            
-            # 优先使用 OSS URL，否则使用本地路径
-            if result.oss_url:
-                video_access_url = result.oss_url
-            elif result.local_path:
-                video_filename = os.path.basename(result.local_path)
-                video_access_url = f"/outputs/videos/{video_filename}"
+            # 判断使用哪种模式
+            if section_images and len(section_images) >= 1:
+                # 多图序列模式
+                logger.info(f"使用多图序列模式: 封面图 + {len(section_images)} 张章节配图")
+                return self._generate_sequence_video(
+                    cover_image_url=cover_image_url,
+                    section_images=section_images,
+                    video_aspect_ratio=video_aspect_ratio,
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    oss_service=oss_service
+                )
             else:
-                video_access_url = result.url
+                # 单图模式
+                logger.info(f"使用单图模式: {cover_image_url}")
+                
+                # 调用视频生成服务（带动画 Prompt）
+                result = video_service.generate_from_image(
+                    image_url=cover_image_url,
+                    prompt=self.ANIMATION_PROMPT,
+                    aspect_ratio=aspect_ratio,
+                    progress_callback=progress_callback
+                )
+                
+                if not result:
+                    logger.warning("视频生成失败")
+                    return None
+                
+                # 优先使用 OSS URL
+                if result.oss_url:
+                    video_access_url = result.oss_url
+                elif result.local_path:
+                    video_filename = os.path.basename(result.local_path)
+                    video_access_url = f"/outputs/videos/{video_filename}"
+                else:
+                    video_access_url = result.url
+                
+                logger.info(f"封面动画生成成功: {video_access_url}")
+                
+                if task_manager and task_id:
+                    task_manager.send_event(task_id, 'log', {
+                        'level': 'INFO',
+                        'logger': 'blog_service',
+                        'message': '封面动画生成完成'
+                    })
+                
+                return video_access_url
             
-            logger.info(f"封面动画生成成功: {video_access_url}")
+        except Exception as e:
+            logger.error(f"封面动画生成失败: {e}", exc_info=True)
+            return None
+    
+    def _generate_sequence_video(
+        self,
+        cover_image_url: str,
+        section_images: list,
+        video_aspect_ratio: str = "16:9",
+        task_manager=None,
+        task_id: str = None,
+        oss_service=None
+    ) -> Optional[str]:
+        """
+        生成多图序列视频
+        
+        模式: [静态1] → [动画1→2] → [静态2] → [动画2→3] → ...
+        
+        Args:
+            cover_image_url: 封面图 URL
+            section_images: 章节配图 URL 列表
+            video_aspect_ratio: 视频宽高比
+            task_manager: 任务管理器
+            task_id: 任务 ID
+            oss_service: OSS 服务
             
+        Returns:
+            合并后的视频 URL 或 None
+        """
+        from services.video_service import get_video_service, VideoAspectRatio
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        
+        video_service = get_video_service()
+        
+        # 构建图片序列：封面图 + 章节配图
+        all_images = [cover_image_url] + section_images
+        veo3_count = len(all_images) - 1  # 动画视频数量 = 图片数 - 1
+        
+        logger.info(f"开始生成混合序列视频: {len(all_images)} 张图片 → {veo3_count} 个 Veo3 动画")
+        
+        if task_manager and task_id:
+            task_manager.send_event(task_id, 'log', {
+                'level': 'INFO',
+                'logger': 'blog_service',
+                'message': f'开始生成混合序列视频: {len(all_images)} 张图片'
+            })
+        
+        # 转换宽高比
+        aspect_ratio_map = {
+            '16:9': VideoAspectRatio.LANDSCAPE_16_9,
+            '9:16': VideoAspectRatio.PORTRAIT_9_16
+        }
+        aspect_ratio = aspect_ratio_map.get(video_aspect_ratio, VideoAspectRatio.LANDSCAPE_16_9)
+        
+        # 最大并行数
+        MAX_VIDEO_WORKERS = 2
+        
+        def generate_veo3_video(idx: int, first_frame: str, last_frame: str):
+            """生成 Veo3 动画视频（带动画 Prompt）"""
+            try:
+                logger.info(f"[并行] 生成 Veo3 动画视频 {idx+1}: {first_frame[:50]}... → {last_frame[:50]}...")
+                result = video_service.generate_from_image(
+                    image_url=first_frame,
+                    prompt=self.ANIMATION_PROMPT,
+                    aspect_ratio=aspect_ratio,
+                    last_frame_url=last_frame
+                )
+                if result and (result.oss_url or result.url):
+                    video_url = result.oss_url or result.url
+                    logger.info(f"✅ Veo3 动画视频 {idx+1} 生成成功")
+                    return {'idx': idx, 'url': video_url}
+                else:
+                    logger.warning(f"⚠️ Veo3 动画视频 {idx+1} 生成失败")
+                    return {'idx': idx, 'url': None}
+            except Exception as e:
+                logger.warning(f"⚠️ Veo3 动画视频 {idx+1} 生成异常: {e}")
+                return {'idx': idx, 'url': None}
+        
+        if task_manager and task_id:
+            task_manager.send_event(task_id, 'log', {
+                'level': 'INFO',
+                'logger': 'blog_service',
+                'message': f'开始并行生成视频（最大并行数 {MAX_VIDEO_WORKERS}）...'
+            })
+        
+        # 收集所有结果
+        veo3_results = [None] * veo3_count
+        
+        # 并行提交所有任务
+        with ThreadPoolExecutor(max_workers=MAX_VIDEO_WORKERS) as executor:
+            futures = []
+            
+            for i in range(veo3_count):
+                first_frame = all_images[i]
+                last_frame = all_images[i + 1]
+                futures.append(executor.submit(generate_veo3_video, i, first_frame, last_frame))
+            
+            # 收集结果
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    veo3_results[result['idx']] = result['url']
+        
+        # 过滤掉失败的视频
+        video_urls = [url for url in veo3_results if url]
+        
+        if not video_urls:
+            logger.error("没有成功生成的视频片段")
+            return None
+        
+        logger.info(f"成功生成 {len(video_urls)} 个视频片段，开始合并...")
+        
+        if task_manager and task_id:
+            task_manager.send_event(task_id, 'log', {
+                'level': 'INFO',
+                'logger': 'blog_service',
+                'message': f'成功生成 {len(video_urls)} 个片段，开始合并...'
+            })
+        
+        # 如果只有一个视频，直接返回
+        if len(video_urls) == 1:
+            return video_urls[0]
+        
+        # 合并视频
+        final_video_url = self._merge_videos(video_urls, oss_service)
+        
+        if final_video_url:
+            logger.info(f"序列视频合并成功: {final_video_url}")
             if task_manager and task_id:
                 task_manager.send_event(task_id, 'log', {
                     'level': 'INFO',
                     'logger': 'blog_service',
-                    'message': '封面动画生成完成'
+                    'message': f'序列视频生成完成: {len(video_urls)} 个片段已合并'
                 })
+        
+        return final_video_url
+    
+    def _merge_videos(self, video_urls: list, oss_service) -> Optional[str]:
+        """
+        使用 FFmpeg 合并多个视频
+        
+        Args:
+            video_urls: 视频 URL 列表
+            oss_service: OSS 服务
             
-            return video_access_url
-            
+        Returns:
+            合并后的视频 URL 或 None
+        """
+        import tempfile
+        import subprocess
+        import uuid
+        import os
+        import requests
+        
+        try:
+            with tempfile.TemporaryDirectory() as temp_dir:
+                # 下载所有视频
+                local_videos = []
+                for i, url in enumerate(video_urls):
+                    local_path = os.path.join(temp_dir, f"segment_{i}.mp4")
+                    logger.info(f"下载视频片段 {i+1}: {url[:80]}...")
+                    
+                    response = requests.get(url, timeout=120, stream=True)
+                    response.raise_for_status()
+                    with open(local_path, 'wb') as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            f.write(chunk)
+                    
+                    local_videos.append(local_path)
+                    logger.info(f"视频片段 {i+1} 下载完成")
+                
+                # 创建 FFmpeg concat 文件
+                concat_file = os.path.join(temp_dir, "concat.txt")
+                with open(concat_file, 'w') as f:
+                    for video_path in local_videos:
+                        f.write(f"file '{video_path}'\n")
+                
+                # 合并视频
+                output_path = os.path.join(temp_dir, f"merged_{uuid.uuid4().hex[:8]}.mp4")
+                
+                cmd = [
+                    'ffmpeg', '-y',
+                    '-f', 'concat',
+                    '-safe', '0',
+                    '-i', concat_file,
+                    '-c', 'copy',
+                    output_path
+                ]
+                
+                logger.info(f"执行 FFmpeg 合并: {' '.join(cmd)}")
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+                
+                if result.returncode != 0:
+                    logger.error(f"FFmpeg 合并失败: {result.stderr}")
+                    return None
+                
+                # 上传到 OSS
+                if oss_service and os.path.exists(output_path):
+                    oss_key = f"videos/merged_{uuid.uuid4().hex[:8]}.mp4"
+                    oss_url = oss_service.upload_file(output_path, oss_key)
+                    if oss_url:
+                        logger.info(f"合并视频已上传到 OSS: {oss_url}")
+                        return oss_url
+                
+                # 如果 OSS 上传失败，返回本地路径
+                return output_path
+                
         except Exception as e:
-            logger.error(f"封面动画生成失败: {e}", exc_info=True)
+            logger.error(f"视频合并失败: {e}", exc_info=True)
             return None
     
     def _save_markdown(

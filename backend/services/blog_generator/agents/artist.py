@@ -428,6 +428,12 @@ class ArtistAgent:
             state['images'] = []
             return state
         
+        # ========== Mini 模式：使用专用的章节配图生成 ==========
+        target_length = state.get('target_length', 'medium')
+        if target_length in ('mini', 'short'):
+            logger.info(f"[{target_length}] 模式：使用章节配图生成")
+            return self._generate_mini_section_images(state, sections)
+        
         # ========== 新增：ASCII 流程图预处理 ==========
         # 检测并将 ASCII 流程图转换为占位符，复用现有配图生成流程
         sections = self.preprocess_ascii_flowcharts(sections)
@@ -648,5 +654,148 @@ class ArtistAgent:
         
         state['images'] = images
         logger.info(f"配图生成完成: 共 {len(images)} 张图片")
+        
+        return state
+    
+    def _generate_mini_section_images(
+        self,
+        state: Dict[str, Any],
+        sections: List[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """
+        Mini 模式：为每个章节生成统一风格的配图
+        
+        这些配图同时用于：
+        1. 博客文章展示（插入到章节末尾）
+        2. 视频生成（作为首尾帧过渡的素材）
+        
+        Args:
+            state: 共享状态
+            sections: 章节列表
+            
+        Returns:
+            更新后的状态
+        """
+        from ..prompts.prompt_manager import get_prompt_manager
+        from ...image_service import get_image_service, AspectRatio, ImageSize
+        
+        image_service = get_image_service()
+        if not image_service or not image_service.is_available():
+            logger.warning("[Mini 模式] 图片生成服务不可用，跳过章节配图生成")
+            state['images'] = []
+            state['section_images'] = []
+            return state
+        
+        pm = get_prompt_manager()
+        
+        # 获取配置
+        image_style = state.get('image_style', '')
+        aspect_ratio = state.get('aspect_ratio', '16:9')
+        article_title = state.get('topic', '')
+        
+        # 根据宽高比选择图片比例
+        if aspect_ratio == "9:16":
+            image_aspect_ratio = AspectRatio.PORTRAIT_9_16
+        else:
+            image_aspect_ratio = AspectRatio.LANDSCAPE_16_9
+        
+        images = []
+        section_images = []  # 用于视频生成的图片 URL 列表
+        
+        max_workers = MAX_WORKERS
+        
+        def generate_section_image(idx: int, section: Dict[str, Any]):
+            """生成单个章节的配图"""
+            section_title = section.get('title', f'章节{idx + 1}')
+            section_content = section.get('content', '')
+            
+            # 提取章节摘要（取前 2000 字）
+            section_summary = section_content[:2000] if section_content else section_title
+            
+            try:
+                # 生成图片 Prompt
+                if image_style:
+                    from ...image_styles import get_style_manager
+                    style_manager = get_style_manager()
+                    image_prompt = style_manager.render_prompt(image_style, section_summary)
+                else:
+                    # 使用封面图模板
+                    image_prompt = pm.render_cover_image_prompt(
+                        article_summary=f"章节标题：{section_title}\n\n{section_summary}"
+                    )
+                
+                logger.info(f"[Mini 模式] 生成章节 {idx + 1} 配图: {section_title}")
+                
+                result = image_service.generate(
+                    prompt=image_prompt,
+                    aspect_ratio=image_aspect_ratio,
+                    image_size=ImageSize.SIZE_1K,
+                    max_wait_time=600
+                )
+                
+                if result and (result.oss_url or result.url):
+                    image_url = result.oss_url or result.url
+                    
+                    return {
+                        'success': True,
+                        'idx': idx,
+                        'section_title': section_title,
+                        'image_url': image_url,
+                        'image_resource': {
+                            'id': f'mini_img_{idx + 1}',
+                            'render_method': 'ai_image',
+                            'content': image_prompt,
+                            'caption': section_title,
+                            'rendered_path': image_url
+                        }
+                    }
+                else:
+                    logger.warning(f"[Mini 模式] 章节 {idx + 1} 配图生成失败")
+                    return {'success': False, 'idx': idx}
+                    
+            except Exception as e:
+                logger.error(f"[Mini 模式] 章节 {idx + 1} 配图生成异常: {e}")
+                return {'success': False, 'idx': idx, 'error': str(e)}
+        
+        # 并行生成所有章节配图
+        logger.info(f"[Mini 模式] 开始并行生成 {len(sections)} 张章节配图")
+        
+        results = [None] * len(sections)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            futures = {
+                executor.submit(generate_section_image, idx, section): idx
+                for idx, section in enumerate(sections)
+            }
+            
+            for future in as_completed(futures):
+                result = future.result()
+                if result:
+                    results[result['idx']] = result
+        
+        # 按顺序组装结果
+        for idx, result in enumerate(results):
+            if result and result.get('success'):
+                images.append(result['image_resource'])
+                section_images.append(result['image_url'])
+                
+                # 更新章节的 image_ids
+                if idx < len(sections):
+                    if 'image_ids' not in sections[idx]:
+                        sections[idx]['image_ids'] = []
+                    sections[idx]['image_ids'].append(result['image_resource']['id'])
+                
+                logger.info(f"[Mini 模式] 章节 {idx + 1} 配图完成: {result['image_url'][:80]}...")
+            else:
+                # 配图失败，添加空占位
+                section_images.append(None)
+        
+        # 过滤掉失败的配图
+        section_images = [url for url in section_images if url]
+        
+        state['images'] = images
+        state['section_images'] = section_images  # 用于视频生成
+        state['sections'] = sections
+        
+        logger.info(f"[Mini 模式] 章节配图生成完成: 共 {len(images)} 张")
         
         return state

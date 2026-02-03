@@ -337,9 +337,17 @@ class BlogGenerator:
             coder_future = executor.submit(run_coder)
             artist_future = executor.submit(run_artist)
             
-            # 等待两者完成
-            coder_future.result()
-            artist_future.result()
+            # 等待两者完成，并合并结果
+            coder_result = coder_future.result()
+            artist_result = artist_future.result()
+            
+            # 合并 artist 的结果到 state（特别是 section_images）
+            if artist_result:
+                if 'section_images' in artist_result:
+                    state['section_images'] = artist_result['section_images']
+                    logger.info(f"合并 section_images: {len(state['section_images'])} 张")
+                if 'images' in artist_result:
+                    state['images'] = artist_result['images']
         
         code_count = len(state.get('code_blocks', []))
         image_count = len(state.get('images', []))
@@ -401,6 +409,20 @@ class BlogGenerator:
     
     def _should_revise(self, state: SharedState) -> Literal["revision", "assemble"]:
         """判断是否需要修订"""
+        target_length = state.get('target_length', 'medium')
+        
+        # Mini/Short 模式只处理 high 级别问题
+        if target_length in ('mini', 'short'):
+            review_issues = state.get('review_issues', [])
+            high_issues = [i for i in review_issues if i.get('severity') == 'high']
+            if high_issues and state.get('revision_count', 0) < self.max_revision_rounds:
+                logger.info(f"[{target_length}] 模式：只处理 {len(high_issues)} 个 high 级别问题")
+                # 只保留 high 级别问题
+                state['review_issues'] = high_issues
+                return "revision"
+            logger.info(f"[{target_length}] 模式：无 high 级别问题，跳过修订")
+            return "assemble"
+        
         if not state.get('review_approved', True):
             if state.get('revision_count', 0) < self.max_revision_rounds:
                 return "revision"
@@ -410,6 +432,12 @@ class BlogGenerator:
 
     def _should_refine_search(self, state: SharedState) -> Literal["search", "continue"]:
         """判断是否需要细化搜索"""
+        # Mini/Short 模式跳过知识增强，直接进入追问阶段
+        target_length = state.get('target_length', 'medium')
+        if target_length in ('mini', 'short'):
+            logger.info(f"[{target_length}] 模式跳过知识增强")
+            return "continue"
+        
         gaps = state.get('knowledge_gaps', [])
         search_count = state.get('search_count', 0)
         max_count = state.get('max_search_count', 5)

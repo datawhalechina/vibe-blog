@@ -365,6 +365,27 @@ class PromptManager:
         """渲染默认图片生成 Prompt（卡通手绘风格）"""
         return self.render('artist_default', prompt=prompt, caption=caption)
     
+    def render_section_summary_image(
+        self,
+        section_title: str,
+        section_summary: str,
+        key_concepts: list = None
+    ) -> str:
+        """
+        渲染章节总结配图 Prompt
+        
+        Args:
+            section_title: 章节标题
+            section_summary: 章节内容摘要
+            key_concepts: 关键概念列表
+        """
+        return self.render(
+            'section_summary_image',
+            section_title=section_title,
+            section_summary=section_summary,
+            key_concepts=key_concepts or []
+        )
+    
     def render_book_scanner(
         self,
         existing_books_info: str,
