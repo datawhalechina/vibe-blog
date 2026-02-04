@@ -16,6 +16,8 @@ import logging
 import argparse
 import sys
 import os
+from pathlib import Path
+from datetime import datetime
 
 # 添加项目根目录到 Python 路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
@@ -112,6 +114,25 @@ def test_mini_blog(topic: str):
     print(f"   - '[mini] 模式跳过知识增强'")
     print(f"   - '[mini] 模式：使用章节配图生成'")
     print(f"   - '[mini] 模式：只处理 X 个 high 级别问题'")
+    
+    # 保存文章到文件
+    markdown_content = result.get('markdown', '')
+    if markdown_content:
+        output_dir = Path(__file__).parent.parent / 'outputs'
+        output_dir.mkdir(parents=True, exist_ok=True)
+        
+        # 生成文件名
+        safe_title = topic.replace('/', '_').replace('\\', '_')[:50]
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        filename = f"{safe_title}_{timestamp}.md"
+        filepath = output_dir / filename
+        
+        # 保存文件
+        filepath.write_text(markdown_content, encoding='utf-8')
+        print(f"\n✅ 文章已保存到: {filepath}")
+        print(f"   - 文件大小: {len(markdown_content)} 字节")
+        print(f"   - 章节数: {sections_count}")
+        print(f"   - 配图数: {images_count}")
     
     print(f"\n{'='*50}")
     print("📋 下一步：运行完整测试（包含视频生成）")
