@@ -35,6 +35,7 @@ def test_mini_blog(topic: str):
     import os
     from backend.services.blog_generator.blog_service import init_blog_service, get_blog_service
     from backend.services.llm_service import init_llm_service
+    from backend.services.image_service import init_image_service
     
     # 构建配置
     config = {
@@ -43,10 +44,15 @@ def test_mini_blog(topic: str):
         'OPENAI_API_BASE': os.getenv('OPENAI_API_BASE', ''),
         'GOOGLE_API_KEY': os.getenv('GOOGLE_API_KEY', ''),
         'TEXT_MODEL': os.getenv('TEXT_MODEL', 'gpt-4o'),
+        # 图片服务配置
+        'NANO_BANANA_API_KEY': os.getenv('NANO_BANANA_API_KEY', ''),
+        'NANO_BANANA_API_BASE': os.getenv('NANO_BANANA_API_BASE', 'https://grsai.dakka.com.cn'),
+        'NANO_BANANA_MODEL': os.getenv('NANO_BANANA_MODEL', 'nano-banana-pro'),
     }
     
     # 初始化服务
     llm_client = init_llm_service(config)
+    init_image_service(config)  # 初始化图片服务
     init_blog_service(llm_client)
     blog_service = get_blog_service()
     
