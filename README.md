@@ -453,6 +453,12 @@ vibe-reviewer 是一个专为技术教程和博客设计的 AI 质量评估工�
    # 编辑 .env 配置 API key
    ```
 
+#### 🚀 快速启动（一键部署）
+
+```bash
+./docker/redeploy.sh
+```
+
 2. **启动服务**
    ```bash
    docker compose -f docker/docker-compose.yml up -d

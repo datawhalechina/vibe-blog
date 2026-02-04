@@ -211,6 +211,12 @@ All Agents share unified state management and Prompt template library, ensuring 
    # Edit .env to configure API keys
    ```
 
+#### 🚀 Quick Start (One-Click Redeploy)
+
+```bash
+./docker/redeploy.sh
+```
+
 2. **Start services**
    ```bash
    docker compose -f docker/docker-compose.yml up -d
