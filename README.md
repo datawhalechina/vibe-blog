@@ -441,50 +441,69 @@ vibe-reviewer 是一个专为技术教程和博客设计的 AI 质量评估工�
 
 ## 📖 使用方法
 
-### 快速开始
+> ⚡️ **推荐方式**：使用 Docker 部署（简单、一致性保证）
+>
+> 📖 详细文档：[Docker 部署指南](./docker/DOCKER_DEPLOY.md)
+
+### 方式一：Docker 部署（推荐）
+
+1. **配置环境变量**
+   ```bash
+   cp backend/.env.example backend/.env
+   # 编辑 .env 配置 API key
+   ```
+
+2. **启动服务**
+   ```bash
+   docker compose -f docker/docker-compose.yml up -d
+   ```
+
+3. **访问应用**
+   - 前端：http://localhost:3000
+   - API：http://localhost:5000
+
+4. **管理命令**
+   ```bash
+   # 查看日志
+   docker compose -f docker/docker-compose.yml logs -f
+   # 停止服务
+   docker compose -f docker/docker-compose.yml down
+   ```
+
+### 方式二：本地开发部署
 
 1. **克隆代码仓库**
-```bash
-git clone https://github.com/datawhalechina/vibe-blog
-```
+   ```bash
+   git clone https://github.com/datawhalechina/vibe-blog
+   ```
 
-2. **安装依赖**
-```bash
-cd backend
-pip install -r requirements.txt
-```
+2. **创建虚拟环境**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # venv\Scripts\activate  # Windows
+   ```
 
-3. **配置环境变量**
-```bash
-cp .env.example .env
-```
+3. **安装依赖**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-编辑 `.env` 文件，配置必要的环境变量：
-```env
-# AI Provider 格式配置
-AI_PROVIDER_FORMAT=openai
+4. **配置环境变量**
+   ```bash
+   cp .env.example .env
+   # 编辑 .env 配置必要环境变量
+   ```
 
-# OpenAI 兼容 API 配置
-OPENAI_API_KEY=your-api-key-here
-OPENAI_API_BASE=https://dashscope.aliyuncs.com/compatible-mode/v1
-TEXT_MODEL=qwen3-max-preview
+5. **启动服务**
+   ```bash
+   python app.py
+   ```
 
-# 智谱搜索 API（可选，用于深度调研）
-ZAI_SEARCH_API_KEY=your-zhipu-api-key
-
-# Nano Banana Pro API（可选，用于 AI 封面图）
-NANO_BANANA_API_KEY=your-nano-banana-api-key
-NANO_BANANA_API_BASE=https://grsai.dakka.com.cn
-```
-
-4. **启动服务**
-```bash
-python app.py
-```
-
-5. **访问应用**
-- 前端：http://localhost:5001
-- API：http://localhost:5001/api
+6. **访问应用**
+   - 前端：http://localhost:5001
+   - API：http://localhost:5001/api
 
 
 ## 🛠️ 技术架构

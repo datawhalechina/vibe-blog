@@ -199,49 +199,69 @@ All Agents share unified state management and Prompt template library, ensuring 
 
 ## 📦 Usage
 
-### Quick Start
+> ⚡️ **Recommended**: Docker deployment (simple, consistent)
+>
+> 📖 Full Guide: [Docker Deployment Guide](./docker/DOCKER_DEPLOY.md)
+
+### Method 1: Docker Deployment (Recommended)
+
+1. **Configure environment variables**
+   ```bash
+   cp backend/.env.example backend/.env
+   # Edit .env to configure API keys
+   ```
+
+2. **Start services**
+   ```bash
+   docker compose -f docker/docker-compose.yml up -d
+   ```
+
+3. **Access the application**
+   - Frontend: http://localhost:3000
+   - API: http://localhost:5000
+
+4. **Management commands**
+   ```bash
+   # View logs
+   docker compose -f docker/docker-compose.yml logs -f
+   # Stop services
+   docker compose -f docker/docker-compose.yml down
+   ```
+
+### Method 2: Local Development Deployment
 
 1. **Clone the repository**
-```bash
-git clone https://github.com/datawhalechina/vibe-blog
-```
+   ```bash
+   git clone https://github.com/datawhalechina/vibe-blog
+   ```
 
-2. **Install dependencies**
-```bash
-cd backend
-pip install -r requirements.txt
-```
+2. **Create virtual environment**
+   ```bash
+   cd backend
+   python -m venv venv
+   source venv/bin/activate  # Linux/Mac
+   # venv\Scripts\activate  # Windows
+   ```
 
-3. **Configure environment variables**
-```bash
-cp .env.example .env
-```
+3. **Install dependencies**
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-Edit the `.env` file to configure necessary environment variables:
-```env
-# AI Provider format configuration (openai)
-AI_PROVIDER_FORMAT=openai
+4. **Configure environment variables**
+   ```bash
+   cp .env.example .env
+   # Edit .env to configure necessary environment variables
+   ```
 
-# OpenAI format configuration
-OPENAI_API_KEY=your-api-key-here
-OPENAI_API_BASE=https://api.openai.com/v1
-TEXT_MODEL=gpt-4o
+5. **Start the service**
+   ```bash
+   python app.py
+   ```
 
-# Zhipu Search API (optional, for deep research)
-ZHIPU_API_KEY=your-zhipu-api-key
-
-# Nano Banana Pro API (optional, for AI cover images)
-NANO_BANANA_API_KEY=your-nano-banana-api-key
-```
-
-4. **Start the service**
-```bash
-python app.py
-```
-
-5. **Access the application**
-- Frontend: http://localhost:5001
-- API: http://localhost:5001/api
+6. **Access the application**
+   - Frontend: http://localhost:5001
+   - API: http://localhost:5001/api
 
 
 ## 🛠️ Technical Architecture
