@@ -106,8 +106,8 @@ def get_config():
 # 文章长度预设配置
 ARTICLE_LENGTH_PRESETS = {
     'mini': {
-        'sections_count': 2,
-        'images_count': 3,          # 每章节 1 张配图 + 1 张封面图
+        'sections_count': 4,        # 2-4 个知识点章节
+        'images_count': 5,          # 每章节 1 张配图 + 1 张封面图
         'code_blocks_count': 0,
         'target_word_count': 800,
         'description': '精品短文（2-4个知识点章节）'
