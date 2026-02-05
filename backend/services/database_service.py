@@ -49,6 +49,8 @@ class DatabaseService:
         """获取数据库连接的上下文管理器"""
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row  # 返回字典形式的结果
+        # 启用外键约束，确保 ON DELETE CASCADE 生效
+        conn.execute("PRAGMA foreign_keys = ON")
         try:
             yield conn
             conn.commit()
