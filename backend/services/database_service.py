@@ -47,8 +47,10 @@ class DatabaseService:
     @contextmanager
     def get_connection(self):
         """获取数据库连接的上下文管理器"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=5)
         conn.row_factory = sqlite3.Row  # 返回字典形式的结果
+        # 避免并发写入时频繁触发 database is locked
+        conn.execute("PRAGMA busy_timeout = 5000")
         try:
             yield conn
             conn.commit()
