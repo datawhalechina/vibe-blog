@@ -8,67 +8,52 @@
     <!-- Hero 区域 -->
     <HeroSection />
 
-    <!-- 博客卡片容器 -->
-    <div class="code-cards-container">
-      <!-- 主输入框 - 终端风格搜索栏 -->
-      <BlogInputCard
-        v-model:topic="topic"
-        v-model:show-advanced-options="showAdvancedOptions"
-        :uploaded-documents="uploadedDocuments"
-        :is-loading="isLoading"
-        @generate="handleGenerate"
-        @file-upload="handleFileUpload"
-        @remove-document="removeDocument"
-      />
+    <!-- 主内容区 - 统一容器宽度 -->
+    <div class="main-content-wrapper">
+      <div class="content-container">
+        <!-- 主输入框 - 终端风格搜索栏 -->
+        <BlogInputCard
+          v-model:topic="topic"
+          v-model:show-advanced-options="showAdvancedOptions"
+          :uploaded-documents="uploadedDocuments"
+          :is-loading="isLoading"
+          @generate="handleGenerate"
+          @file-upload="handleFileUpload"
+          @remove-document="removeDocument"
+        />
 
-      <!-- 高级选项面板 -->
-      <AdvancedOptionsPanel
-        v-if="showAdvancedOptions"
-        v-model:article-type="articleType"
-        v-model:target-length="targetLength"
-        v-model:audience-adaptation="audienceAdaptation"
-        v-model:image-style="imageStyle"
-        v-model:generate-cover-video="generateCoverVideo"
-        v-model:video-aspect-ratio="videoAspectRatio"
-        v-model:custom-config="customConfig"
-        :image-styles="imageStyles"
-        :app-config="appConfig"
-      />
+        <!-- 高级选项面板 -->
+        <AdvancedOptionsPanel
+          v-if="showAdvancedOptions"
+          v-model:article-type="articleType"
+          v-model:target-length="targetLength"
+          v-model:audience-adaptation="audienceAdaptation"
+          v-model:image-style="imageStyle"
+          v-model:generate-cover-video="generateCoverVideo"
+          v-model:video-aspect-ratio="videoAspectRatio"
+          v-model:custom-config="customConfig"
+          :image-styles="imageStyles"
+          :app-config="appConfig"
+        />
 
-      <!-- 进度面板 -->
-      <ProgressDrawer
-        :visible="showProgress"
-        :expanded="terminalExpanded"
-        :is-loading="isLoading"
-        :status-badge="statusBadge"
-        :progress-text="progressText"
-        :progress-items="progressItems"
-        :article-type="articleType"
-        :target-length="targetLength"
-        :task-id="currentTaskId"
-        @toggle="toggleTerminal"
-        @close="closeProgress"
-        @stop="stopGeneration"
-      />
-
-      <!-- 博客列表 -->
-      <BlogHistoryList
-        :show-list="showBlogList"
-        :current-tab="currentHistoryTab"
-        :content-type="historyContentType"
-        v-model:show-cover-preview="showCoverPreview"
-        :records="historyRecords"
-        :total="historyTotal"
-        :current-page="historyCurrentPage"
-        :total-pages="historyTotalPages"
-        :content-type-filters="contentTypeFilters"
-        @toggle-list="showBlogList = !showBlogList"
-        @switch-tab="switchHistoryTab"
-        @filter-content-type="filterByContentType"
-        @load-detail="loadHistoryDetail"
-        @load-page="loadHistory"
-      />
+      </div>
     </div>
+
+    <!-- 进度面板 - fixed 定位，放在顶层 -->
+    <ProgressDrawer
+      :visible="showProgress"
+      :expanded="terminalExpanded"
+      :is-loading="isLoading"
+      :status-badge="statusBadge"
+      :progress-text="progressText"
+      :progress-items="progressItems"
+      :article-type="articleType"
+      :target-length="targetLength"
+      :task-id="currentTaskId"
+      @toggle="toggleTerminal"
+      @close="closeProgress"
+      @stop="stopGeneration"
+    />
 
     <!-- 发布弹窗 -->
     <PublishModal
@@ -81,6 +66,29 @@
       @close="showPublishModal = false"
       @publish="doPublish"
     />
+
+    <!-- 历史记录区域 - 独立区块，使用相同容器宽度 -->
+    <div class="history-section">
+      <div class="content-container">
+        <!-- 博客历史列表 -->
+        <BlogHistoryList
+          :show-list="showBlogList"
+          :current-tab="currentHistoryTab"
+          :content-type="historyContentType"
+          v-model:show-cover-preview="showCoverPreview"
+          :records="historyRecords"
+          :total="historyTotal"
+          :current-page="historyCurrentPage"
+          :total-pages="historyTotalPages"
+          :content-type-filters="contentTypeFilters"
+          @toggle-list="showBlogList = !showBlogList"
+          @switch-tab="switchHistoryTab"
+          @filter-content-type="filterByContentType"
+          @load-detail="loadHistoryDetail"
+          @load-page="loadHistory"
+        />
+      </div>
+    </div>
 
     <!-- 底部备案信息 -->
     <Footer />
@@ -339,53 +347,113 @@ const handleGenerate = async () => {
 }
 
 const connectSSE = (taskId: string) => {
-  const url = `/api/blog/stream/${taskId}`
-  eventSource = new EventSource(url)
+  eventSource = api.createTaskStream(taskId)
 
-  eventSource.onmessage = (event) => {
-    try {
-      const data = JSON.parse(event.data)
-      handleSSEMessage(data)
-    } catch (error) {
-      console.error('Parse SSE message error:', error)
+  eventSource.addEventListener('connected', () => {
+    addProgressItem('🔗 已连接到服务器')
+    statusBadge.value = '运行中'
+  })
+
+  eventSource.addEventListener('progress', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    const icon = getStageIcon(d.stage)
+    addProgressItem(`${icon} ${d.message}`, d.stage === 'error' ? 'error' : 'info')
+    progressText.value = d.message
+  })
+
+  eventSource.addEventListener('log', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    let icon = '📝'
+    const loggerIcons: Record<string, string> = {
+      generator: '⚙️', researcher: '🔍', planner: '📋', writer: '✍️',
+      questioner: '❓', coder: '💻', artist: '🎨', reviewer: '✅',
+      assembler: '📦', search_service: '🌐', blog_service: '🖼️'
     }
-  }
+    icon = loggerIcons[d.logger] || icon
+    const isSuccess = d.message?.includes('完成') || d.message?.includes('成功')
+    addProgressItem(`${icon} ${d.message}`, isSuccess ? 'success' : 'info')
+    progressText.value = d.message
+  })
+
+  eventSource.addEventListener('stream', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    if (d.stage === 'outline') updateStreamItem(d.accumulated)
+  })
+
+  eventSource.addEventListener('result', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    if (d.type === 'researcher_complete') {
+      const data = d.data
+      if (data.document_count > 0 || data.web_count > 0) {
+        addProgressItem(`📊 知识来源: 文档 ${data.document_count} 条, 网络 ${data.web_count} 条`, 'info')
+      }
+      if (data.key_concepts?.length > 0) {
+        addProgressItem(`💡 核心概念: ${data.key_concepts.join(', ')}`, 'success')
+      }
+    }
+  })
+
+  eventSource.addEventListener('complete', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    addProgressItem('🎉 生成完成！', 'success')
+    statusBadge.value = '已完成'
+    progressText.value = '生成完成'
+    isLoading.value = false
+
+    loadHistory(1)
+    eventSource?.close()
+    eventSource = null
+
+    setTimeout(() => {
+      if (d.id) {
+        router.push(`/blog/${d.id}`)
+      } else if (d.book_id) {
+        router.push(`/book/${d.book_id}`)
+      }
+    }, 1000)
+  })
+
+  eventSource.addEventListener('error', (e: MessageEvent) => {
+    if (e.data) {
+      const d = JSON.parse(e.data)
+      addProgressItem(`❌ 错误: ${d.message}`, 'error')
+    }
+    statusBadge.value = '错误'
+    isLoading.value = false
+  })
 
   eventSource.onerror = () => {
-    eventSource?.close()
-    if (isLoading.value) {
-      addProgressItem('✗ 连接中断', 'error')
-      statusBadge.value = '错误'
+    if (eventSource?.readyState === EventSource.CLOSED) {
+      addProgressItem('🔌 连接已关闭')
       isLoading.value = false
     }
   }
 }
 
-const handleSSEMessage = (data: any) => {
-  if (data.type === 'progress') {
-    addProgressItem(data.message, 'info')
-    progressText.value = data.message
-    statusBadge.value = '运行中'
-  } else if (data.type === 'complete') {
-    addProgressItem('✓ 生成完成', 'success')
-    statusBadge.value = '已完成'
-    progressText.value = '生成完成'
-    isLoading.value = false
-    eventSource?.close()
-    loadHistory(1)
-  } else if (data.type === 'error') {
-    addProgressItem(`✗ ${data.message}`, 'error')
-    statusBadge.value = '错误'
-    isLoading.value = false
-    eventSource?.close()
+const getStageIcon = (stage: string) => {
+  const icons: Record<string, string> = {
+    start: '🚀', research: '🔍', plan: '📋', write: '✍️',
+    code: '💻', review: '✅', image: '🎨', assemble: '📦',
+    complete: '🎉', error: '❌'
+  }
+  return icons[stage] || '○'
+}
+
+const updateStreamItem = (content: string) => {
+  const existing = progressItems.value.find(item => item.type === 'stream')
+  if (existing) {
+    existing.message = content
+  } else {
+    addProgressItem(content, 'stream')
   }
 }
 
-const addProgressItem = (message: string, type: string) => {
+const addProgressItem = (message: string, type = 'info', detail?: string) => {
   progressItems.value.push({
     time: new Date().toLocaleTimeString(),
     message,
-    type
+    type,
+    ...(detail ? { detail } : {})
   })
 }
 
@@ -494,9 +562,9 @@ const doPublish = async () => {
 onMounted(async () => {
   // Load app config
   try {
-    const data = await api.getAppConfig()
-    if (data.success) {
-      appConfig.features = data.features || {}
+    const data = await api.getFrontendConfig()
+    if (data.success && data.config) {
+      Object.assign(appConfig, data.config)
     }
   } catch (error) {
     console.error('Load app config error:', error)
@@ -559,12 +627,26 @@ onMounted(async () => {
   }
 }
 
-.code-cards-container {
+/* 统一容器宽度 - 所有内容使用相同宽度 */
+.main-content-wrapper {
   position: relative;
   z-index: 1;
+  width: 100%;
+}
+
+.content-container {
   max-width: 1200px;
   margin: 0 auto;
-  padding: var(--space-xl) var(--space-lg);
+  padding: 2rem 1.5rem;
+}
+
+/* 历史记录区域 - 使用相同容器 */
+.history-section {
+  position: relative;
+  z-index: 1;
+  margin-top: 4rem;
+  padding: 4rem 0;
+  background: linear-gradient(to bottom, transparent, var(--color-muted) 50%, transparent);
 }
 
 /* Dark Mode */
@@ -572,32 +654,43 @@ onMounted(async () => {
   background: var(--color-bg-base);
 }
 
-/* Mobile Responsive */
+/* Mobile Responsive - 最小 8px 间距 */
 @media (max-width: 767px) {
   .home-container {
     padding-top: 56px;
   }
 
-  .code-cards-container {
-    padding: var(--space-lg) var(--space-md);
+  .content-container {
+    padding: 1.5rem 1rem;
+  }
+
+  .history-section {
+    margin-top: 3rem;
+    padding: 3rem 0;
   }
 }
 
-/* Tablet */
+/* Tablet - 中等间距 */
 @media (min-width: 768px) and (max-width: 1023px) {
-  .code-cards-container {
-    padding: var(--space-xl) var(--space-lg);
+  .content-container {
+    padding: 2rem 1.5rem;
   }
 }
 
-/* Large Desktop */
+/* Large Desktop - 更大容器 */
 @media (min-width: 1440px) {
-  .code-cards-container {
+  .content-container {
     max-width: 1400px;
+    padding: 3rem 2rem;
+  }
+
+  .history-section {
+    margin-top: 5rem;
+    padding: 5rem 0;
   }
 }
 
-/* Reduce motion */
+/* Reduce motion - 可访问性 */
 @media (prefers-reduced-motion: reduce) {
   .bg-animation::before {
     animation: none;

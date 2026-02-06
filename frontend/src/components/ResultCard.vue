@@ -1,56 +1,56 @@
 <template>
-  <div class="result-card">
+  <div class="bg-white/95 dark:bg-card border border-border rounded-xl overflow-hidden my-8 hover:border-primary/50 transition-all duration-300 hover:shadow-card-hover">
     <!-- 终端风格头部 -->
-    <div class="terminal-header">
-      <div class="terminal-dots">
-        <span class="dot red"></span>
-        <span class="dot yellow"></span>
-        <span class="dot green"></span>
+    <div class="flex items-center gap-3 px-4 py-3 bg-white/90 dark:bg-muted border-b border-border font-mono text-xs">
+      <div class="flex gap-1.5">
+        <span class="w-3 h-3 rounded-full bg-red-500 hover:bg-red-600 transition-colors cursor-pointer"></span>
+        <span class="w-3 h-3 rounded-full bg-yellow-500 hover:bg-yellow-600 transition-colors cursor-pointer"></span>
+        <span class="w-3 h-3 rounded-full bg-green-500 hover:bg-green-600 transition-colors cursor-pointer"></span>
       </div>
-      <span class="terminal-title">$ blog-output</span>
-      <span class="terminal-status">ready</span>
+      <span class="flex-1 text-slate-500 dark:text-muted-foreground">$ blog-output</span>
+      <span class="text-green-500 font-semibold">ready</span>
     </div>
 
     <!-- 结果内容 -->
-    <div class="result-content">
+    <div class="p-6">
       <!-- 文章信息 -->
-      <div class="article-info">
-        <div class="info-row">
-          <span class="info-label">$ title:</span>
-          <span class="info-value">{{ blog.title }}</span>
+      <div class="mb-6 p-4 bg-primary/5 border border-primary/20 rounded-lg">
+        <div class="flex items-center gap-3 mb-2 font-mono text-sm last:mb-0">
+          <span class="text-primary font-semibold min-w-[80px]">$ title:</span>
+          <span class="text-slate-900 dark:text-foreground flex-1">{{ blog.title }}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">$ type:</span>
-          <span class="info-value tag" :class="blog.type">{{ blog.type }}</span>
+        <div class="flex items-center gap-3 mb-2 font-mono text-sm last:mb-0">
+          <span class="text-primary font-semibold min-w-[80px]">$ type:</span>
+          <span class="inline-block px-2 py-1 bg-primary/10 rounded text-xs text-slate-900 dark:text-foreground">{{ blog.type }}</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">$ length:</span>
-          <span class="info-value">{{ blog.length }} 字</span>
+        <div class="flex items-center gap-3 mb-2 font-mono text-sm last:mb-0">
+          <span class="text-primary font-semibold min-w-[80px]">$ length:</span>
+          <span class="text-slate-900 dark:text-foreground flex-1">{{ blog.length }} 字</span>
         </div>
-        <div class="info-row">
-          <span class="info-label">$ created:</span>
-          <span class="info-value">{{ formatDate(blog.createdAt) }}</span>
+        <div class="flex items-center gap-3 font-mono text-sm">
+          <span class="text-primary font-semibold min-w-[80px]">$ created:</span>
+          <span class="text-slate-900 dark:text-foreground flex-1">{{ formatDate(blog.createdAt) }}</span>
         </div>
       </div>
 
       <!-- 文章摘要 -->
-      <div class="article-summary">
-        <div class="summary-header">
-          <span class="font-mono text-xs text-muted-foreground">$ cat summary.md</span>
+      <div class="mb-6 bg-black/5 dark:bg-muted rounded-lg overflow-hidden">
+        <div class="px-3 py-2 bg-black/10 dark:bg-black/20 border-b border-border font-mono">
+          <span class="text-xs text-muted-foreground">$ cat summary.md</span>
         </div>
-        <div class="summary-content">
+        <div class="p-3 text-sm leading-relaxed text-slate-600 dark:text-slate-400 max-h-[150px] overflow-y-auto">
           {{ blog.summary }}
         </div>
       </div>
 
       <!-- 标签 -->
-      <div class="article-tags">
-        <span class="tag-label">$ tags:</span>
-        <div class="tags-list">
+      <div class="flex items-start gap-3 mb-6 font-mono text-sm">
+        <span class="text-primary font-semibold flex-shrink-0">$ tags:</span>
+        <div class="flex flex-wrap gap-2">
           <span
             v-for="tag in blog.tags"
             :key="tag"
-            class="tag"
+            class="inline-block px-3 py-1.5 bg-primary/10 border border-primary/30 rounded text-xs text-primary transition-all duration-200 hover:bg-primary/20 hover:border-primary cursor-pointer"
           >
             {{ tag }}
           </span>
@@ -58,48 +58,65 @@
       </div>
 
       <!-- 统计信息 -->
-      <div class="stats-grid">
-        <div class="stat-box">
-          <div class="stat-label">章节数</div>
-          <div class="stat-value">{{ blog.sections }}</div>
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+        <div class="flex flex-col gap-1.5 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-center">
+          <div class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">章节数</div>
+          <div class="text-xl font-bold text-blue-500 font-mono">{{ blog.sections }}</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">配图数</div>
-          <div class="stat-value">{{ blog.images }}</div>
+        <div class="flex flex-col gap-1.5 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-center">
+          <div class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">配图数</div>
+          <div class="text-xl font-bold text-blue-500 font-mono">{{ blog.images }}</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">代码块</div>
-          <div class="stat-value">{{ blog.codeBlocks }}</div>
+        <div class="flex flex-col gap-1.5 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-center">
+          <div class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">代码块</div>
+          <div class="text-xl font-bold text-blue-500 font-mono">{{ blog.codeBlocks }}</div>
         </div>
-        <div class="stat-box">
-          <div class="stat-label">阅读时间</div>
-          <div class="stat-value">{{ blog.readTime }}分钟</div>
+        <div class="flex flex-col gap-1.5 p-3 bg-blue-500/5 border border-blue-500/20 rounded-lg text-center">
+          <div class="text-xs text-slate-500 dark:text-slate-400 uppercase tracking-wide">阅读时间</div>
+          <div class="text-xl font-bold text-blue-500 font-mono">{{ blog.readTime }}分钟</div>
         </div>
       </div>
 
       <!-- 操作按钮 -->
-      <div class="actions">
-        <button class="btn-primary" @click="$emit('view')">
+      <div class="flex gap-3 mb-4 flex-wrap">
+        <button
+          class="flex-1 min-w-[100px] px-5 py-2.5 rounded-lg font-mono text-xs cursor-pointer transition-all duration-200 bg-primary/10 border border-primary text-primary hover:bg-primary/20 hover:shadow-[0_0_20px_rgba(139,92,246,0.3)]"
+          @click="$emit('view')"
+        >
           $ view
         </button>
-        <button class="btn-secondary" @click="$emit('edit')">
+        <button
+          class="px-5 py-2.5 rounded-lg font-mono text-xs cursor-pointer transition-all duration-200 bg-slate-500/10 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-500/20"
+          @click="$emit('edit')"
+        >
           $ edit
         </button>
-        <button class="btn-secondary" @click="$emit('download')">
+        <button
+          class="px-5 py-2.5 rounded-lg font-mono text-xs cursor-pointer transition-all duration-200 bg-slate-500/10 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-500/20"
+          @click="$emit('download')"
+        >
           $ download
         </button>
-        <button class="btn-secondary" @click="$emit('share')">
+        <button
+          class="px-5 py-2.5 rounded-lg font-mono text-xs cursor-pointer transition-all duration-200 bg-slate-500/10 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-500/20"
+          @click="$emit('share')"
+        >
           $ share
         </button>
       </div>
 
       <!-- 代码块预览 -->
-      <div class="code-preview" v-if="showCodePreview">
-        <div class="preview-header">
-          <span class="font-mono text-xs text-muted-foreground">$ head -20 article.md</span>
-          <button class="close-btn" @click="showCodePreview = false">×</button>
+      <div v-if="showCodePreview" class="bg-black/5 dark:bg-muted rounded-lg overflow-hidden mt-4">
+        <div class="flex justify-between items-center px-3 py-2 bg-black/10 dark:bg-black/20 border-b border-border font-mono">
+          <span class="text-xs text-muted-foreground">$ head -20 article.md</span>
+          <button
+            class="bg-transparent border-none text-slate-400 text-lg cursor-pointer p-0 w-6 h-6 flex items-center justify-center transition-colors duration-200 hover:text-slate-600 dark:hover:text-slate-300"
+            @click="showCodePreview = false"
+          >
+            ×
+          </button>
         </div>
-        <pre class="preview-content"><code>{{ blog.content.substring(0, 500) }}...</code></pre>
+        <pre class="p-3 m-0 font-mono text-xs leading-relaxed text-slate-600 dark:text-slate-400 max-h-[200px] overflow-y-auto bg-white/50 dark:bg-slate-900/50"><code>{{ blog.content.substring(0, 500) }}...</code></pre>
       </div>
     </div>
   </div>
@@ -136,295 +153,10 @@ const emit = defineEmits<{
   share: []
 }>()
 
+
 const showCodePreview = ref(false)
 
 const formatDate = (date: Date) => {
   return new Date(date).toLocaleDateString('zh-CN')
 }
 </script>
-
-<style scoped>
-.result-card {
-  background: rgba(255, 255, 255, 0.95);
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  margin: 24px 0;
-}
-
-.terminal-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  background: rgba(255, 255, 255, 0.9);
-  border-bottom: 1px solid #e2e8f0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-}
-
-.terminal-dots {
-  display: flex;
-  gap: 6px;
-}
-
-.dot {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-}
-
-.dot.red { background: #ef4444; }
-.dot.yellow { background: #eab308; }
-.dot.green { background: #22c55e; }
-
-.terminal-title {
-  flex: 1;
-  color: #64748b;
-}
-
-.terminal-status {
-  color: #22c55e;
-  font-weight: 600;
-}
-
-.result-content {
-  padding: 20px;
-}
-
-.article-info {
-  margin-bottom: 20px;
-  padding: 16px;
-  background: rgba(139, 92, 246, 0.05);
-  border: 1px solid rgba(139, 92, 246, 0.2);
-  border-radius: 6px;
-}
-
-.info-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-}
-
-.info-row:last-child {
-  margin-bottom: 0;
-}
-
-.info-label {
-  color: #8b5cf6;
-  font-weight: 600;
-  min-width: 80px;
-}
-
-.info-value {
-  color: #1e293b;
-  flex: 1;
-}
-
-.info-value.tag {
-  display: inline-block;
-  padding: 4px 8px;
-  background: rgba(139, 92, 246, 0.1);
-  border-radius: 4px;
-  font-size: 12px;
-}
-
-.article-summary {
-  margin-bottom: 20px;
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  overflow: hidden;
-}
-
-.summary-header {
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.08);
-  border-bottom: 1px solid #e2e8f0;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.summary-content {
-  padding: 12px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #475569;
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.article-tags {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  margin-bottom: 20px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 13px;
-}
-
-.tag-label {
-  color: #8b5cf6;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.tags-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.tag {
-  display: inline-block;
-  padding: 6px 12px;
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 4px;
-  font-size: 12px;
-  color: #8b5cf6;
-  transition: all 0.3s;
-}
-
-.tag:hover {
-  background: rgba(139, 92, 246, 0.2);
-  border-color: #8b5cf6;
-}
-
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 12px;
-  margin-bottom: 20px;
-}
-
-.stat-box {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  padding: 12px;
-  background: rgba(59, 130, 246, 0.05);
-  border: 1px solid rgba(59, 130, 246, 0.2);
-  border-radius: 6px;
-  text-align: center;
-}
-
-.stat-label {
-  font-size: 11px;
-  color: #94a3b8;
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-}
-
-.stat-value {
-  font-size: 20px;
-  font-weight: 700;
-  color: #3b82f6;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.actions {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-}
-
-.btn-primary,
-.btn-secondary {
-  padding: 10px 20px;
-  border-radius: 6px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.3s;
-  border: none;
-}
-
-.btn-primary {
-  background: rgba(139, 92, 246, 0.1);
-  border: 1px solid #8b5cf6;
-  color: #8b5cf6;
-  flex: 1;
-  min-width: 100px;
-}
-
-.btn-primary:hover {
-  background: rgba(139, 92, 246, 0.2);
-  box-shadow: 0 0 15px rgba(139, 92, 246, 0.3);
-}
-
-.btn-secondary {
-  background: rgba(100, 116, 139, 0.1);
-  border: 1px solid #cbd5e1;
-  color: #64748b;
-}
-
-.btn-secondary:hover {
-  background: rgba(100, 116, 139, 0.2);
-}
-
-.code-preview {
-  background: rgba(0, 0, 0, 0.05);
-  border-radius: 6px;
-  overflow: hidden;
-  margin-top: 16px;
-}
-
-.preview-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.08);
-  border-bottom: 1px solid #e2e8f0;
-  font-family: 'JetBrains Mono', monospace;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  color: #94a3b8;
-  font-size: 18px;
-  cursor: pointer;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: color 0.3s;
-}
-
-.close-btn:hover {
-  color: #64748b;
-}
-
-.preview-content {
-  padding: 12px;
-  margin: 0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 12px;
-  line-height: 1.5;
-  color: #475569;
-  max-height: 200px;
-  overflow-y: auto;
-  background: rgba(255, 255, 255, 0.5);
-}
-
-@media (max-width: 768px) {
-  .actions {
-    flex-direction: column;
-  }
-
-  .btn-primary,
-  .btn-secondary {
-    width: 100%;
-  }
-
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-</style>
