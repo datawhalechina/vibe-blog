@@ -1,5 +1,5 @@
 <template>
-  <section class="text-center py-16 sm:py-20 lg:py-24 px-4 animate-fade-up">
+  <section class="text-center pt-64 pb-16 sm:pt-72 sm:pb-20 lg:pt-80 lg:pb-24 px-4 animate-fade-up">
     <!-- 主标题 -->
     <h1 class="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground mb-6 font-mono leading-tight">
       <span class="text-primary">&gt;</span> Create Amazing Blogs
