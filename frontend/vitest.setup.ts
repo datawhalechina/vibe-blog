@@ -34,20 +34,34 @@ global.ResizeObserver = class ResizeObserver {
   unobserve() {}
 } as any
 
-// Mock localStorage
+// Mock localStorage with actual storage
+const localStorageData: Record<string, string> = {}
 const localStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+  getItem: (key: string) => localStorageData[key] || null,
+  setItem: (key: string, value: string) => {
+    localStorageData[key] = value
+  },
+  removeItem: (key: string) => {
+    delete localStorageData[key]
+  },
+  clear: () => {
+    Object.keys(localStorageData).forEach(key => delete localStorageData[key])
+  },
 }
 global.localStorage = localStorageMock as any
 
-// Mock sessionStorage
+// Mock sessionStorage with actual storage
+const sessionStorageData: Record<string, string> = {}
 const sessionStorageMock = {
-  getItem: vi.fn(),
-  setItem: vi.fn(),
-  removeItem: vi.fn(),
-  clear: vi.fn(),
+  getItem: (key: string) => sessionStorageData[key] || null,
+  setItem: (key: string, value: string) => {
+    sessionStorageData[key] = value
+  },
+  removeItem: (key: string) => {
+    delete sessionStorageData[key]
+  },
+  clear: () => {
+    Object.keys(sessionStorageData).forEach(key => delete sessionStorageData[key])
+  },
 }
 global.sessionStorage = sessionStorageMock as any
