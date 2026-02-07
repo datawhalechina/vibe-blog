@@ -9,7 +9,7 @@ import re
 from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-from ..prompts.prompt_manager import get_prompt_manager
+from ..prompts import get_prompt_manager
 from ...image_service import get_image_service, AspectRatio, ImageSize
 
 # 从环境变量读取并行配置，默认为 3
@@ -294,7 +294,7 @@ class ArtistAgent:
                 logger.info(f"开始生成【文章内容图】({image_style}): {caption}")
             else:
                 # 兼容旧逻辑：使用默认卡通手绘风格
-                from ..prompts.prompt_manager import get_prompt_manager
+                from ..prompts import get_prompt_manager
                 full_prompt = get_prompt_manager().render_artist_default(prompt, caption)
                 logger.info(f"开始生成【文章内容图】: {caption}")
             
@@ -676,7 +676,7 @@ class ArtistAgent:
         Returns:
             更新后的状态
         """
-        from ..prompts.prompt_manager import get_prompt_manager
+        from ..prompts import get_prompt_manager
         from ...image_service import get_image_service, AspectRatio, ImageSize
         
         image_service = get_image_service()

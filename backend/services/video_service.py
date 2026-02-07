@@ -49,7 +49,7 @@ class Veo3Service:
     @staticmethod
     def get_default_animation_prompt() -> str:
         """获取默认动画提示词（从 Jinja2 模板加载）"""
-        from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+        from services.blog_generator.prompts import get_prompt_manager
         return get_prompt_manager().render_cover_video_prompt()
 
     def __init__(

@@ -229,7 +229,7 @@ class Sora2Service:
         """
         # 如果没有提供 prompt，使用默认的动画提示词
         if not prompt:
-            from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+            from services.blog_generator.prompts import get_prompt_manager
             prompt = get_prompt_manager().render_cover_video_prompt()
         
         if remix_target_id:

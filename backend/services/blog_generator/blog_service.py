@@ -283,6 +283,15 @@ class BlogService:
             
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
             
+            # 注入 Langfuse 追踪回调（如果已启用）
+            try:
+                from app import get_langfuse_handler
+                langfuse_handler = get_langfuse_handler()
+                if langfuse_handler:
+                    config["callbacks"] = [langfuse_handler]
+            except Exception:
+                pass
+            
             # 阶段进度映射
             stage_progress = {
                 'researcher': (10, '正在搜索资料...'),
@@ -719,7 +728,7 @@ class BlogService:
                 logger.info(f"开始生成【封面图】({image_style}): {title}")
             else:
                 # 兼容旧逻辑：使用原有模板
-                from .prompts.prompt_manager import get_prompt_manager
+                from .prompts import get_prompt_manager
                 pm = get_prompt_manager()
                 cover_prompt = pm.render_cover_image_prompt(article_summary=article_summary)
                 logger.info(f"开始生成【封面图】: {title}")
@@ -1293,7 +1302,7 @@ def extract_article_summary(llm_client, title: str, content: str, max_length: in
     content_for_summary = content[:18000] if len(content) > 18000 else content
     
     # 使用统一的 article_summary.j2 模板，在 Prompt 中限定字数
-    from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+    from services.blog_generator.prompts import get_prompt_manager
     summary_prompt = get_prompt_manager().render_article_summary(title, content_for_summary, max_length=max_length)
 
     try:

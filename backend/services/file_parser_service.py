@@ -22,7 +22,7 @@ from jinja2 import Environment, FileSystemLoader
 logger = logging.getLogger(__name__)
 
 # 初始化 Jinja2 模板环境
-_templates_dir = Path(__file__).parent / 'prompts'
+_templates_dir = Path(__file__).parent.parent / 'infrastructure' / 'prompts' / 'shared'
 _jinja_env = Environment(loader=FileSystemLoader(str(_templates_dir)))
 
 

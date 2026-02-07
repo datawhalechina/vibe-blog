@@ -7,7 +7,7 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
-from ..prompts.prompt_manager import get_prompt_manager
+from ..prompts import get_prompt_manager
 from ..services.smart_search_service import get_smart_search_service, init_smart_search_service
 
 logger = logging.getLogger(__name__)

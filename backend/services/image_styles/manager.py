@@ -10,10 +10,10 @@ from jinja2 import Environment, FileSystemLoader
 
 logger = logging.getLogger(__name__)
 
-# 获取当前目录
-CURRENT_DIR = Path(__file__).parent
-TEMPLATES_DIR = CURRENT_DIR / "templates"
-STYLES_CONFIG = CURRENT_DIR / "styles.yaml"
+# 模板和配置目录指向 infrastructure/prompts/image_styles/
+INFRA_DIR = Path(__file__).parent.parent.parent / "infrastructure" / "prompts" / "image_styles"
+TEMPLATES_DIR = INFRA_DIR
+STYLES_CONFIG = INFRA_DIR / "styles.yaml"
 
 
 class ImageStyleManager:

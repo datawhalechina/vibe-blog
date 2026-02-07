@@ -6,7 +6,7 @@ import logging
 from typing import Dict, Any, List, Optional
 
 from services.database_service import DatabaseService
-from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+from services.blog_generator.prompts import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 

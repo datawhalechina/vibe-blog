@@ -6,7 +6,7 @@ import json
 import logging
 from typing import Dict, Any
 
-from ..prompts.prompt_manager import get_prompt_manager
+from ..prompts import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 

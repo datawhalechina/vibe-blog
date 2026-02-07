@@ -6,7 +6,7 @@ import logging
 import re
 from typing import Dict, Any, List
 
-from ..prompts.prompt_manager import get_prompt_manager
+from ..prompts import get_prompt_manager
 from ..utils.helpers import (
     replace_placeholders,
     estimate_reading_time

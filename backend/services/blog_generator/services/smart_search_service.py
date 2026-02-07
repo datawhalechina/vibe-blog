@@ -140,7 +140,7 @@ class SmartSearchService:
             # 无 LLM 时使用简单规则匹配
             return self._rule_based_routing(topic)
         
-        from ..prompts.prompt_manager import get_prompt_manager
+        from ..prompts import get_prompt_manager
         prompt = get_prompt_manager().render_search_router(topic)
 
         try:

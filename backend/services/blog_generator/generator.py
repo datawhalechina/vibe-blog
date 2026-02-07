@@ -225,7 +225,7 @@ class BlogGenerator:
             logger.info("没有需要增强的内容")
             return state
         
-        from .prompts.prompt_manager import get_prompt_manager
+        from .prompts import get_prompt_manager
         pm = get_prompt_manager()
         
         # 第一步：收集需要增强的任务

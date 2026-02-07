@@ -221,7 +221,7 @@ class TestWriterCorrect:
     
     def test_render_writer_correct(self):
         """测试 render_writer_correct 方法"""
-        from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+        from services.blog_generator.prompts import get_prompt_manager
         
         pm = get_prompt_manager()
         prompt = pm.render_writer_correct(
@@ -244,7 +244,7 @@ class TestWriterCorrect:
     
     def test_render_writer_correct_empty_issues(self):
         """测试空问题列表"""
-        from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+        from services.blog_generator.prompts import get_prompt_manager
         
         pm = get_prompt_manager()
         prompt = pm.render_writer_correct(

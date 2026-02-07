@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional
 
 from services.database_service import DatabaseService
 from services.outline_expander_service import OutlineExpanderService
-from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+from services.blog_generator.prompts import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 

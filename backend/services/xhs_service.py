@@ -68,7 +68,7 @@ class XHSService:
         self.oss_service = oss_service
         
         # 导入 PromptManager
-        from services.blog_generator.prompts.prompt_manager import get_prompt_manager
+        from services.blog_generator.prompts import get_prompt_manager
         self.prompt_manager = get_prompt_manager()
         
         # 导入智能搜索服务
