@@ -6,6 +6,9 @@ flask>=3.0.0
 flask-cors>=4.0.0
 gunicorn>=21.0.0
 
+# 控制台彩色日志
+rich>=13.7.0
+
 # LLM 集成
 langchain>=1.0.0
 langchain-openai>=1.0.0

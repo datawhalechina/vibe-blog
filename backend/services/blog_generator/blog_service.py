@@ -10,6 +10,8 @@ from typing import Dict, Any, Optional, Callable
 from queue import Queue
 from contextvars import copy_context
 
+from logging_config import task_id_context
+
 from .generator import BlogGenerator
 from .schemas.state import create_initial_state
 from .services.search_service import SearchService, init_search_service, get_search_service
@@ -114,9 +116,6 @@ class BlogService:
             app: Flask 应用实例
         """
         def run_in_thread():
-            # 导入 task_id_context
-            from app import task_id_context
-            
             # 在线程中设置 task_id 上下文
             token = task_id_context.set(task_id)
             
@@ -206,26 +205,27 @@ class BlogService:
         
         # 添加日志处理器
         sse_handler = None
+        sse_logger_names = [
+            "services.blog_generator.generator",
+            "services.blog_generator.agents.researcher",
+            "services.blog_generator.agents.planner",
+            "services.blog_generator.agents.writer",
+            "services.blog_generator.agents.questioner",
+            "services.blog_generator.agents.coder",
+            "services.blog_generator.agents.artist",
+            "services.blog_generator.agents.reviewer",
+            "services.blog_generator.agents.assembler",
+            "services.blog_generator.agents.search_coordinator",
+            "services.blog_generator.services.search_service",
+            "services.image_service",
+        ]
         if task_manager:
             sse_handler = SSELogHandler(task_manager, task_id)
             sse_handler.setLevel(logging.INFO)
             sse_handler.setFormatter(logging.Formatter('%(message)s'))
             
             # 给所有 blog_generator 相关的 logger 添加处理器
-            for logger_name in [
-                'services.blog_generator.generator',
-                'services.blog_generator.agents.researcher',
-                'services.blog_generator.agents.planner',
-                'services.blog_generator.agents.writer',
-                'services.blog_generator.agents.questioner',
-                'services.blog_generator.agents.coder',
-                'services.blog_generator.agents.artist',
-                'services.blog_generator.agents.reviewer',
-                'services.blog_generator.agents.assembler',
-                'services.blog_generator.agents.search_coordinator',
-                'services.blog_generator.services.search_service',
-                'services.image_service',
-            ]:
+            for logger_name in sse_logger_names:
                 logging.getLogger(logger_name).addHandler(sse_handler)
         
         # 等待 SSE 连接建立
@@ -650,18 +650,7 @@ class BlogService:
         finally:
             # 清理日志处理器
             if sse_handler:
-                for logger_name in [
-                    'services.blog_generator.generator',
-                    'services.blog_generator.agents.researcher',
-                    'services.blog_generator.agents.planner',
-                    'services.blog_generator.agents.writer',
-                    'services.blog_generator.agents.questioner',
-                    'services.blog_generator.agents.coder',
-                    'services.blog_generator.agents.artist',
-                    'services.blog_generator.agents.reviewer',
-                    'services.blog_generator.agents.assembler',
-                    'services.blog_generator.services.search_service',
-                ]:
+                for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
     
     def _generate_cover_image(

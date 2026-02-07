@@ -1,53 +1,153 @@
 """
-日志配置模块
-从 app.py 抽取的日志初始化逻辑
+全局日志配置（带任务上下文与 Rich 彩色输出）
 """
-import os
-import logging
-from contextvars import ContextVar
 
-# 创建任务 ID 上下文变量
-task_id_context: ContextVar[str] = ContextVar('task_id', default='')
+from __future__ import annotations
+
+import logging
+import os
+from contextvars import ContextVar
+from typing import Iterable
+
+# 任务 ID 上下文变量（供异步任务链路注入）
+task_id_context: ContextVar[str] = ContextVar("task_id", default="")
 
 
 class TaskIdFilter(logging.Filter):
-    """自定义日志过滤器，添加任务 ID"""
-    def filter(self, record):
+    """为日志记录注入 task_id 字段，避免格式化时报 KeyError。"""
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
         task_id = task_id_context.get()
-        if task_id:
-            record.task_id = f"[{task_id}]"
-        else:
-            record.task_id = ""
+        record.task_id = f"[{task_id}]" if task_id else ""
         return True
 
 
-def setup_logging():
-    """配置日志系统"""
-    log_format = logging.Formatter('%(asctime)s %(task_id)s - %(name)s - %(levelname)s - %(message)s')
+class RichLevelFormatter(logging.Formatter):
+    """在控制台为 levelname 注入 rich markup 颜色（文件日志仍为纯文本）。"""
 
+    LEVEL_STYLES = {
+        logging.DEBUG: "dim",
+        logging.INFO: "green",
+        logging.WARNING: "yellow",
+        logging.ERROR: "bold red",
+        logging.CRITICAL: "bold white on red",
+    }
+
+    def __init__(self, *args, enable_markup: bool = False, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.enable_markup = enable_markup
+
+    def format(self, record: logging.LogRecord) -> str:  # noqa: D401
+        if not self.enable_markup:
+            return super().format(record)
+
+        original_levelname = record.levelname
+        style = self.LEVEL_STYLES.get(record.levelno)
+        if style:
+            record.levelname = f"[{style}]{original_levelname}[/]"
+        try:
+            return super().format(record)
+        finally:
+            record.levelname = original_levelname
+
+
+def _resolve_level(level: str | int) -> int:
+    if isinstance(level, int):
+        return level
+    return getattr(logging, str(level).upper(), logging.INFO)
+
+
+def _iter_vibe_handlers(handlers: Iterable[logging.Handler]) -> list[logging.Handler]:
+    return [h for h in handlers if getattr(h, "_vibe_blog_handler", False)]
+
+
+def _ensure_task_filter(root_logger: logging.Logger) -> TaskIdFilter:
+    for f in root_logger.filters:
+        if isinstance(f, TaskIdFilter):
+            return f
+    task_filter = TaskIdFilter()
+    task_filter._vibe_blog_filter = True  # type: ignore[attr-defined]
+    root_logger.addFilter(task_filter)
+    return task_filter
+
+
+def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, enable_file: bool = True) -> None:
+    """
+    配置全局日志：
+    1) 控制台使用 Rich 彩色输出（若 rich 不可用则自动降级）
+    2) 文件日志保留 DEBUG 级别（在可写环境下）
+    3) 注入 task_id 上下文字段
+    """
+
+    level = _resolve_level(log_level)
     root_logger = logging.getLogger()
+
+    # 放开 root 级别，让 handler 自己控流量（否则 DEBUG 文件日志会被 root 卡掉）
     root_logger.setLevel(logging.DEBUG)
+    task_filter = _ensure_task_filter(root_logger)
 
-    task_id_filter = TaskIdFilter()
-    root_logger.addFilter(task_id_filter)
+    existing_handlers = _iter_vibe_handlers(root_logger.handlers)
+    if existing_handlers:
+        # 已配置过：只更新级别，避免重复添加 handler
+        for handler in existing_handlers:
+            if isinstance(handler, logging.FileHandler):
+                handler.setLevel(logging.DEBUG)
+            else:
+                handler.setLevel(level)
+        return
 
-    console_handler = logging.StreamHandler()
-    console_handler.setLevel(logging.INFO)
-    console_handler.setFormatter(log_format)
-    console_handler.addFilter(task_id_filter)
+    fmt = "%(asctime)s %(task_id)s - %(name)s - %(levelname)s - %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+    plain_formatter = logging.Formatter(fmt=fmt, datefmt=datefmt)
+
+    # 控制台 handler：优先 Rich
+    console_handler: logging.Handler
+    console_formatter: logging.Formatter = plain_formatter
+    try:
+        from rich.console import Console
+        from rich.logging import RichHandler
+
+        console = Console(stderr=True, color_system="auto")
+        console_handler = RichHandler(
+            console=console,
+            rich_tracebacks=True,
+            show_time=False,
+            show_level=False,
+            show_path=False,
+            markup=True,
+        )
+        console_formatter = RichLevelFormatter(fmt=fmt, datefmt=datefmt, enable_markup=True)
+    except Exception:
+        console_handler = logging.StreamHandler()
+
+    console_handler.setLevel(level)
+    console_handler.setFormatter(console_formatter)
+    console_handler.addFilter(task_filter)
+    console_handler._vibe_blog_handler = True  # type: ignore[attr-defined]
     root_logger.addHandler(console_handler)
 
-    # 尝试配置文件日志，如果失败则跳过（Vercel 环境是只读的）
+    if not enable_file:
+        return
+
+    # 文件 handler：在只读环境（如 Vercel）下自动跳过
     try:
-        log_dir = os.path.join(os.path.dirname(__file__), 'logs')
-        os.makedirs(log_dir, exist_ok=True)
-        log_file = os.path.join(log_dir, 'app.log')
-        file_handler = logging.FileHandler(log_file, encoding='utf-8')
+        base_dir = os.path.dirname(os.path.realpath(__file__))
+        resolved_log_dir = log_dir or os.path.join(base_dir, "logs")
+        os.makedirs(resolved_log_dir, exist_ok=True)
+
+        log_file = os.path.join(resolved_log_dir, "app.log")
+        file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(log_format)
-        file_handler.addFilter(task_id_filter)
+        file_handler.setFormatter(plain_formatter)
+        file_handler.addFilter(task_filter)
+        file_handler._vibe_blog_handler = True  # type: ignore[attr-defined]
         root_logger.addHandler(file_handler)
-        logger_init = logging.getLogger(__name__)
-        logger_init.info("✅ 日志文件已启用，DEBUG 级别日志将写入文件")
     except (OSError, IOError):
-        pass
+        # 只读文件系统：保留控制台日志即可
+        return
+
+
+def get_logger(name: str) -> logging.Logger:
+    """统一入口，便于未来切换日志实现。"""
+    return logging.getLogger(name)
+

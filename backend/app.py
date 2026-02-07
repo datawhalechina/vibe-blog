@@ -9,6 +9,11 @@ from dotenv import load_dotenv
 # 加载 .env 文件
 load_dotenv()
 
+from logging_config import setup_logging, task_id_context, get_logger
+
+# 先用环境变量做一次基础日志配置，避免 import 期日志裸奔
+setup_logging(os.getenv('LOG_LEVEL', 'INFO'))
+
 # === Langfuse 追踪初始化 ===
 _langfuse_handler = None
 if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
@@ -59,9 +64,9 @@ def create_app(config_class=None):
         config_class = get_config()
     app.config.from_object(config_class)
 
-    # 设置日志级别
-    log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO'))
-    logging.getLogger().setLevel(log_level)
+    # 根据配置再次校准日志级别（setup_logging 是幂等的）
+    log_level = app.config.get('LOG_LEVEL', 'INFO')
+    setup_logging(log_level)
 
     # CORS
     CORS(app, origins=app.config.get('CORS_ORIGINS', ['*']))
