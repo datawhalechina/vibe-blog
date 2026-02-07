@@ -40,6 +40,11 @@ All notable changes to the Vibe Blog project will be documented in this file.
   - 零功能变更，全部 110 个测试通过
 
 ### Added
+- ✨ **Langfuse LLM 调用链路追踪**（参考 47 号方案）
+  - 集成 Langfuse Cloud，通过 `CallbackHandler` 自动追踪 LangGraph 工作流
+  - 支持 Trace 视图、调用树、耗时统计、Token 费用分析
+  - 环境变量 `TRACE_ENABLED=true` 开启，`LANGFUSE_PUBLIC_KEY` / `LANGFUSE_SECRET_KEY` 配置
+  - 每个 Agent 节点（Planner/Writer/Deepener/Coder/Reviewer/Artist）独立追踪
 - ✨ 底部 `scroll ↓` 提示动画，引导用户下滑查看历史记录
 - ✨ 滚动触发 `terminal-boot` 淡入上滑动画（0.8s）
 - ✨ 卡片打字机效果，每张卡片依次出现（间隔 120ms）
@@ -55,6 +60,9 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - 🎨 统一前端配色方案，对齐 main 分支
 
 ### Fixed
+- 🐛 Langfuse `ThreadPoolExecutor` 上下文丢失：追踪模式下改为串行执行，直接调用 `@observe` 装饰的方法以保持上下文链路
+  - 涉及 `writer.py`、`questioner.py`、`coder.py`、`artist.py`、`generator.py`
+  - 添加 `_should_use_parallel()` 方法，`TRACE_ENABLED=true` 时自动切换串行模式
 - 🐛 高级选项展开/收起时 history 区域跳动问题
 - 🐛 历史记录封面图片居中显示
 
