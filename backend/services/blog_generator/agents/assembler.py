@@ -15,6 +15,20 @@ from ..utils.helpers import (
 logger = logging.getLogger(__name__)
 
 
+def _fix_markdown_separators(text: str) -> str:
+    """
+    修复 Markdown 分隔线 (---) 的格式问题：
+    1. 确保 --- 前后都有空行，避免 Setext 标题解析（文本紧挨 --- 会被渲染为加粗标题）
+    2. 确保 --- 和 ## 标题之间有空行，避免 ---## 连写
+    """
+    # 将 --- 统一规范化：确保 --- 独占一行且前后各有一个空行
+    # 匹配 --- 前后可能缺少空行的情况
+    text = re.sub(r'\n*---\n*', '\n\n---\n\n', text)
+    # 清理可能产生的多余空行（超过2个连续空行压缩为2个）
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text
+
+
 class AssemblerAgent:
     """
     文档组装师 - 负责最终文档组装
@@ -113,7 +127,10 @@ class AssemblerAgent:
         # 5. 组装完整文档
         full_document = header + body + footer
         
-        # 6. 统计信息
+        # 6. 修复 Markdown 分隔线格式（防止 ---## 连写和 Setext 标题误判）
+        full_document = _fix_markdown_separators(full_document)
+        
+        # 7. 统计信息
         word_count = len(full_document)
         image_count = len(images)
         code_block_count = len(code_blocks)

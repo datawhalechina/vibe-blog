@@ -25,6 +25,9 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - 🐛 后端 `complete` 事件缺少 `id` 字段，导致前端生成完成后不自动跳转到博客详情页
   - `blog_service.py` 的 `send_event('complete', ...)` 添加 `'id': task_id`
   - 前端 `Home.vue` 依赖 `d.id` 执行 `router.push('/blog/${d.id}')`
+- 🐛 **Markdown 分隔线排版修复**：修复 `---##` 连写和文本紧挨 `---` 导致 Setext 标题误判（加粗）的问题
+  - 后端 `assembler.py` 新增 `_fix_markdown_separators()` 后处理，确保所有 `---` 前后都有空行
+  - 前端 `useMarkdownRenderer.ts` 新增 `fixMarkdownSeparators()` 预处理，修复已有文章数据的渲染
 
 ---
 
