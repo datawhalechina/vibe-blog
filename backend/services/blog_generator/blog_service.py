@@ -628,6 +628,7 @@ class BlogService:
             if task_manager:
                 task_manager.send_event(task_id, 'complete', {
                     'success': True,
+                    'id': task_id,
                     'markdown': markdown_with_cover,
                     'outline': final_state.get('outline', {}),
                     'sections_count': len(final_state.get('sections', [])),

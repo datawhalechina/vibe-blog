@@ -4,6 +4,9 @@
 - 文章标题: {{ article_title }}
 - 图片类型: {{ image_type }}
 - 图片描述: {{ description }}
+{% if illustration_type %}
+- 插图类型: {{ illustration_type }}（请确保生成的图表结构与此类型匹配）
+{% endif %}
 {% if audience_adaptation %}
 - 受众适配: {{ audience_adaptation }}
 {% endif %}

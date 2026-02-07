@@ -129,6 +129,7 @@
       "content_outline": ["要点1", "要点2", "要点3"],
       "verbatim_data_refs": ["需要在本章节使用的关键数据（原样引用）"],
       "image_type": "flowchart | architecture | sequence | comparison | chart | none",
+      "illustration_type": "infographic | scene | flowchart | comparison | framework | timeline",
       "image_description": "图片内容描述 (用于生成，如果 image_type 不是 none)",
       "code_blocks": 代码块数量 (tutorial类型0-1，其他类型必须为0),
       "has_output_block": true/false,
@@ -165,13 +166,14 @@
 
 ### 3. 视觉机会映射
 识别可以用视觉元素替代文字的内容：
-| 内容类型 | 推荐视觉处理 |
-|---------|-------------|
-| 流程/步骤 | flowchart |
-| 对比 | comparison 表格 |
-| 层次结构 | architecture |
-| 时序关系 | sequence |
-| 数据趋势 | chart |
+| 内容类型 | 推荐 image_type | 推荐 illustration_type |
+|---------|-------------|---------------------|
+| 流程/步骤 | flowchart | flowchart |
+| 对比 | comparison | comparison |
+| 层次结构 | architecture | framework |
+| 时序关系 | sequence | timeline |
+| 数据趋势 | chart | infographic |
+| 叙事/场景 | comparison | scene |
 
 ### 4. 认知负荷控制
 - 概念章节：信息密度中等，添加类比帮助理解

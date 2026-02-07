@@ -243,7 +243,8 @@ class PromptManager:
         description: str,
         context: str,
         audience_adaptation: str = "technical-beginner",
-        article_title: str = ""
+        article_title: str = "",
+        illustration_type: str = ""
     ) -> str:
         """渲染 Artist Prompt"""
         return self.render(
@@ -252,7 +253,8 @@ class PromptManager:
             description=description,
             context=context,
             audience_adaptation=audience_adaptation,
-            article_title=article_title
+            article_title=article_title,
+            illustration_type=illustration_type
         )
 
     def render_questioner(

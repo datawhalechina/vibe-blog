@@ -1,6 +1,47 @@
 # 图片风格配置文件
-# 每种风格包含：name, name_en, description, icon, template, default(可选)
+# 每种风格包含：name, name_en, description, icon, template, default(可选), best_types(可选)
+# 插图类型(types)定义信息骨架，风格(styles)定义视觉皮肤
+# 兼容性矩阵(compatibility)定义 Type × Style 的推荐组合
 
+# ===== 插图类型定义 =====
+types:
+  infographic:
+    name: 信息图
+    name_en: Infographic
+    description: 数据、指标、技术概念总览
+    template: types/infographic.j2
+
+  scene:
+    name: 场景图
+    name_en: Scene Illustration
+    description: 叙事、情感、故事化表达
+    template: types/scene.j2
+
+  flowchart:
+    name: 流程图
+    name_en: Flowchart
+    description: 步骤、工作流、决策树
+    template: types/flowchart.j2
+
+  comparison:
+    name: 对比图
+    name_en: Comparison
+    description: 两个方案/技术的优劣对比
+    template: types/comparison.j2
+
+  framework:
+    name: 框架图
+    name_en: Framework Diagram
+    description: 架构、模型、层级关系
+    template: types/framework.j2
+
+  timeline:
+    name: 时间线
+    name_en: Timeline
+    description: 历史演进、版本变化、路线图
+    template: types/timeline.j2
+
+# ===== 视觉风格定义 =====
 styles:
   cartoon:
     name: 卡通手绘
@@ -9,6 +50,7 @@ styles:
     icon: "🎨"
     template: cartoon.j2
     default: true
+    best_types: [infographic, flowchart, scene, comparison]
 
   ink_wash:
     name: 水墨古风
@@ -16,6 +58,7 @@ styles:
     description: 中国传统水墨画风格，意境悠远，适合文化类内容
     icon: "🖌️"
     template: ink_wash.j2
+    best_types: [scene, timeline]
 
   academic:
     name: 科研学术
@@ -23,6 +66,7 @@ styles:
     description: CVPR/NeurIPS 顶刊风格，专业架构图，适合技术论文
     icon: "📊"
     template: academic.j2
+    best_types: [framework, infographic, flowchart, comparison, timeline]
 
   chiikawa:
     name: Chiikawa萌系
@@ -30,6 +74,7 @@ styles:
     description: 吉伊卡哇风格，圆润软萌，适合轻松有趣的内容
     icon: "🐰"
     template: chiikawa.j2
+    best_types: [scene, infographic]
 
   biesty:
     name: Biesty剖面图
@@ -37,6 +82,7 @@ styles:
     description: 精细手绘剖面图风格，展示系统内部结构，适合架构解析
     icon: "🔍"
     template: biesty.j2
+    best_types: [framework, scene]
 
   whiteboard:
     name: 白板笔记
@@ -44,6 +90,7 @@ styles:
     description: 课堂白板/黑板笔记风格，适合教学讲解和知识梳理
     icon: "📝"
     template: whiteboard.j2
+    best_types: [flowchart, infographic, comparison, framework, timeline]
 
   minimalist:
     name: 简约极简
@@ -51,6 +98,7 @@ styles:
     description: 超极简风格，大量留白，极细线条，适合高端简洁呈现
     icon: "⬜"
     template: minimalist.j2
+    best_types: [infographic, flowchart, comparison, framework, timeline]
 
   dark_tech:
     name: 深色科技
@@ -58,3 +106,64 @@ styles:
     description: 深色模式科技美学，霓虹色强调，适合技术/数据主题
     icon: "🌙"
     template: dark_tech.j2
+    best_types: [infographic, flowchart, framework, comparison, timeline]
+
+# ===== Type × Style 兼容性矩阵 =====
+# recommended: 推荐组合
+# acceptable: 可用但效果一般
+# incompatible: 不兼容，需要降级
+compatibility:
+  infographic:
+    cartoon: recommended
+    ink_wash: acceptable
+    academic: recommended
+    chiikawa: acceptable
+    biesty: incompatible
+    whiteboard: recommended
+    minimalist: recommended
+    dark_tech: recommended
+  scene:
+    cartoon: recommended
+    ink_wash: recommended
+    academic: incompatible
+    chiikawa: recommended
+    biesty: recommended
+    whiteboard: acceptable
+    minimalist: acceptable
+    dark_tech: recommended
+  flowchart:
+    cartoon: recommended
+    ink_wash: acceptable
+    academic: recommended
+    chiikawa: acceptable
+    biesty: incompatible
+    whiteboard: recommended
+    minimalist: recommended
+    dark_tech: recommended
+  comparison:
+    cartoon: recommended
+    ink_wash: incompatible
+    academic: recommended
+    chiikawa: acceptable
+    biesty: incompatible
+    whiteboard: recommended
+    minimalist: recommended
+    dark_tech: recommended
+  framework:
+    cartoon: recommended
+    ink_wash: acceptable
+    academic: recommended
+    chiikawa: incompatible
+    biesty: recommended
+    whiteboard: recommended
+    minimalist: recommended
+    dark_tech: recommended
+  timeline:
+    cartoon: recommended
+    ink_wash: recommended
+    academic: recommended
+    chiikawa: acceptable
+    biesty: incompatible
+    whiteboard: recommended
+    minimalist: recommended
+    dark_tech: recommended

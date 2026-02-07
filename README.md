@@ -292,9 +292,18 @@ _点击问题，自动跳转到原文位置，方便快速定位和修改_
 - **Mermaid 图表**：自动生成流程图、架构图、时序图
 - **AI 封面图**：基于 nano-banana-pro 生成风格化封面
 - **上下文感知**：根据章节内容生成独特的配图
-- **多风格支持**：8 种配图风格可选（卡通手绘、水墨古风、科研学术、Chiikawa萌系、Biesty剖面图、白板笔记、简约极简、深色科技）
+- **多风格支持**：8 种配图风格（Style）可选（卡通手绘、水墨古风、科研学术、Chiikawa萌系、Biesty剖面图、白板笔记、简约极简、深色科技）
+- **Type×Style 二维系统** 🆕：引入 6 种插图类型（Type）—— 信息图、场景图、流程图、对比图、框架图、时间线，基于内容信号自动推荐最佳类型，Type 决定结构骨架，Style 决定视觉皮肤
 
-### 4. 多格式导出
+### 4. LLM 调用链路追踪（Langfuse）🆕
+
+- **Langfuse 集成**：通过 `CallbackHandler` 自动追踪 LangGraph 工作流中每个 Agent 的 LLM 调用
+- **可视化分析**：Trace 视图、调用树、耗时统计、Token 费用分析
+- **零侵入**：环境变量 `TRACE_ENABLED=true` 一键开启，不影响现有代码
+
+![Langfuse 追踪视图](./logo/langfuse-trace.png)
+
+### 5. 多格式导出
 
 - **Markdown**：标准 Markdown 格式，支持直接发布
 - **图片导出**：一键将文章导出为长图
@@ -319,9 +328,10 @@ _点击问题，自动跳转到原文位置，方便快速定位和修改_
 | 11  | ✅   | AI 科普绘本风格                  | 支持将技术内容转化为通俗易懂的科普绘本                                                                                   |
 | 12  | ✅   | 在线体验                         | 域名申请中，当前可先加入项目内测讨论群, 群里有IP链接                                                                     |
 | 13  | ✅   | **教程评估模块 (vibe-reviewer)** | Git 仓库教程质量评估：深度检查 + 质量审核 + 可读性分析，支持搜索增强评估、SSE 实时进度、Markdown 报告导出                |
-| 14  | ✅   | **多风格配图系统**               | 8 种配图风格可选：🎨卡通手绘、🖌️水墨古风、📊科研学术、🐰Chiikawa萌系、🔍Biesty剖面图、📝白板笔记、⬜简约极简、🌙深色科技 |
+| 14  | ✅   | **自动配图**      | 8 种配图风格（Style）+ 6 种插图类型（Type）：内容信号自动推荐、兼容性降级，Type 决定结构骨架，Style 决定视觉皮肤        |
 | 15  | ✅   | **智能书籍构建系统**             | 一键扫描聚合博客成书籍、智能大纲生成、书籍首页生成、Docsify 阅读器、博客归属标签                                         |
 | 16  | ✅   | **CSDN 一键发布**                | 基于 Playwright 浏览器自动化，支持 Cookie 认证、智能标签、封面图处理                                                     |
+| 17  | ✅   | **Langfuse LLM 调用链路追踪**    | 集成 Langfuse Cloud，自动追踪每个 Agent 的 LLM 调用，支持 Trace 视图、耗时统计、Token 费用分析                           |
 
 <details>
 <summary><b>🚀 未来规划（6 大方向，点击展开）</b></summary>
@@ -688,6 +698,17 @@ banana-blog/
 | `KNOWLEDGE_MAX_DOC_ITEMS`      | 最大文档项数 | 10     |
 | `KNOWLEDGE_CHUNK_SIZE`         | 知识分块大小 | 2000   |
 | `KNOWLEDGE_CHUNK_OVERLAP`      | 知识分块重叠 | 200    |
+
+### Langfuse 追踪配置（可选）
+
+| 变量名               | 说明                        | 示例值                          |
+| -------------------- | --------------------------- | ------------------------------- |
+| `TRACE_ENABLED`      | 是否开启 LLM 调用链路追踪  | true                            |
+| `LANGFUSE_PUBLIC_KEY` | Langfuse Public Key         | pk-lf-xxx                       |
+| `LANGFUSE_SECRET_KEY` | Langfuse Secret Key         | sk-lf-xxx                       |
+| `LANGFUSE_HOST`      | Langfuse 服务地址（自托管） | https://cloud.langfuse.com      |
+
+> 💡 Langfuse Cloud 免费版提供 50k traces/月，注册地址：https://cloud.langfuse.com
 
 </details>
 

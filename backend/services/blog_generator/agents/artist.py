@@ -240,6 +240,7 @@ class ArtistAgent:
         context: str,
         audience_adaptation: str = "technical-beginner",
         article_title: str = "",  # 新增：文章标题
+        illustration_type: str = "",  # 新增：插图类型（Type × Style 二维系统）
         **kwargs  # 接收 langfuse_parent_trace_id 等参数
     ) -> Dict[str, Any]:
         """
@@ -251,6 +252,7 @@ class ArtistAgent:
             context: 所在章节上下文
             audience_adaptation: 受众适配类型
             article_title: 文章标题（用于图片说明）
+            illustration_type: 插图类型 ID（infographic/scene/flowchart/comparison/framework/timeline）
             
         Returns:
             图片资源字典
@@ -261,7 +263,8 @@ class ArtistAgent:
             description=description,
             context=context,
             audience_adaptation=audience_adaptation,
-            article_title=article_title  # 新增：传递文章标题
+            article_title=article_title,
+            illustration_type=illustration_type
         )
         
         # 调试日志：记录传入的上下文摘要
@@ -303,7 +306,8 @@ class ArtistAgent:
         prompt: str,
         caption: str,
         image_style: str = "",
-        aspect_ratio: str = "16:9"
+        aspect_ratio: str = "16:9",
+        illustration_type: str = ""
     ) -> str:
         """
         调用 Nano Banana API 生成 AI 图片
@@ -313,6 +317,7 @@ class ArtistAgent:
             caption: 图片说明
             image_style: 图片风格 ID（可选，为空则使用默认卡通风格）
             aspect_ratio: 宽高比（16:9 或 9:16）
+            illustration_type: 插图类型 ID（可选，用于 Type × Style 二维渲染）
             
         Returns:
             图片本地路径，失败返回 None
@@ -325,12 +330,13 @@ class ArtistAgent:
         try:
             # 构建完整的 Prompt
             if image_style:
-                # 使用风格管理器渲染 Prompt
+                # 使用风格管理器渲染 Prompt（支持 Type × Style 二维渲染）
                 from services.image_styles import get_style_manager
                 style_manager = get_style_manager()
                 content = f"{prompt}\n\n图片说明：{caption}"
-                full_prompt = style_manager.render_prompt(image_style, content)
-                logger.info(f"开始生成【文章内容图】({image_style}): {caption}")
+                full_prompt = style_manager.render_prompt(image_style, content, illustration_type=illustration_type)
+                type_label = f", type={illustration_type}" if illustration_type else ""
+                logger.info(f"开始生成【文章内容图】({image_style}{type_label}): {caption}")
             else:
                 # 兼容旧逻辑：使用默认卡通手绘风格
                 from ..prompts import get_prompt_manager
@@ -509,6 +515,13 @@ class ArtistAgent:
             if i < len(sections):
                 section_content = sections[i].get('content', '')[:1000]
             
+            # Type × Style: 优先使用大纲指定的 illustration_type，否则自动推荐
+            illustration_type = section_outline.get('illustration_type', '')
+            if not illustration_type and section_content:
+                from services.image_styles import get_style_manager
+                illustration_type = get_style_manager().auto_recommend_type(section_content)
+                logger.debug(f"章节 {i} 自动推荐 illustration_type: {illustration_type}")
+            
             tasks.append({
                 'order_idx': len(tasks),
                 'image_id': f"img_{image_id_counter}",
@@ -518,7 +531,8 @@ class ArtistAgent:
                 'description': image_description,
                 'context': f"章节标题: {section_title}\n\n章节内容摘要:\n{section_content}",
                 'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
-                'article_title': article_title  # 新增：文章标题
+                'article_title': article_title,
+                'illustration_type': illustration_type
             })
             image_id_counter += 1
         
@@ -539,6 +553,10 @@ class ArtistAgent:
                 else:
                     surrounding_context = content[:2000]
                 
+                # Type × Style: 根据占位符上下文自动推荐
+                from services.image_styles import get_style_manager
+                ph_illustration_type = get_style_manager().auto_recommend_type(surrounding_context)
+                
                 tasks.append({
                     'order_idx': len(tasks),
                     'image_id': f"img_{image_id_counter}",
@@ -548,7 +566,8 @@ class ArtistAgent:
                     'description': placeholder['description'],
                     'context': f"章节标题: {section_title}\n\n相关内容:\n{surrounding_context}",
                     'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
-                    'article_title': article_title  # 新增：文章标题
+                    'article_title': article_title,
+                    'illustration_type': ph_illustration_type
                 })
                 image_id_counter += 1
         
@@ -556,6 +575,10 @@ class ArtistAgent:
         for task in missing_diagram_tasks:
             section_idx = task['section_idx']
             section_title = sections[section_idx].get('title', '') if section_idx < len(sections) else ''
+            
+            # Type × Style: 根据缺失图表上下文自动推荐
+            from services.image_styles import get_style_manager
+            md_illustration_type = get_style_manager().auto_recommend_type(task['context'])
             
             tasks.append({
                 'order_idx': len(tasks),
@@ -566,7 +589,8 @@ class ArtistAgent:
                 'description': task['description'],
                 'context': f"章节标题: {section_title}\n\n相关内容:\n{task['context']}",
                 'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
-                'article_title': article_title  # 新增：文章标题
+                'article_title': article_title,
+                'illustration_type': md_illustration_type
             })
             image_id_counter += 1
         
@@ -599,7 +623,8 @@ class ArtistAgent:
                     description=task['description'],
                     context=task['context'],
                     audience_adaptation=task.get('audience_adaptation', 'technical-beginner'),
-                    article_title=task.get('article_title', '')
+                    article_title=task.get('article_title', ''),
+                    illustration_type=task.get('illustration_type', '')
                 )
                 
                 render_method = image.get('render_method', 'mermaid')
@@ -628,7 +653,8 @@ class ArtistAgent:
                         prompt=image.get('content', ''),
                         caption=article_title,  # 使用文章标题，而不是 LLM 生成的 caption
                         image_style=image_style,
-                        aspect_ratio=aspect_ratio
+                        aspect_ratio=aspect_ratio,
+                        illustration_type=task.get('illustration_type', '')
                     )
                     if rendered_path:
                         # 如果是 OSS URL，直接使用；否则转为相对路径
@@ -820,7 +846,9 @@ class ArtistAgent:
                 if image_style:
                     from ...image_styles import get_style_manager
                     style_manager = get_style_manager()
-                    image_prompt = style_manager.render_prompt(image_style, section_summary)
+                    # Type × Style: Mini 模式也自动推荐 illustration_type
+                    mini_illustration_type = style_manager.auto_recommend_type(section_summary)
+                    image_prompt = style_manager.render_prompt(image_style, section_summary, illustration_type=mini_illustration_type)
                 else:
                     # 使用封面图模板
                     image_prompt = pm.render_cover_image_prompt(
