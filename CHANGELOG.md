@@ -4,6 +4,30 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-08
+
+### Added
+- ✨ **Type×Style 二维配图系统**（参考 46 号方案）
+  - 新增 6 种 illustration_type 模板：infographic、scene、flowchart、comparison、framework、timeline
+  - 新增 `type_signals.py` 内容信号自动推荐模块，基于关键词和正则匹配推荐 illustration_type
+  - `ImageStyleManager` 支持二维渲染（先 Type 骨架 → 再 Style 皮肤）、兼容性检查、自动降级
+  - `styles.yaml` 增加 types、best_types、compatibility 配置
+  - `artist.j2` / `planner.j2` 模板增加 illustration_type 字段
+  - `prompt_manager.py` 的 `render_artist()` 支持 illustration_type 参数
+  - `artist.py` 的 `generate_image` / `render_ai_image` / `run` 方法支持 illustration_type
+  - 完全向后兼容：illustration_type 为空时退回纯 Style 模式
+- ✅ Playwright 浏览器 E2E 自动化测试脚本 (`backend/tests/test_browser_e2e.py`)
+  - 六步流程：打开首页 → 输入主题 → 选配图风格 → 点击生成 → 等待完成 → 验证结果
+  - 自动捕获 task_id、博客详情页 URL、Markdown 文件路径
+  - 支持 headed/headless 模式、自定义主题和风格、超时配置
+
+### Fixed
+- 🐛 后端 `complete` 事件缺少 `id` 字段，导致前端生成完成后不自动跳转到博客详情页
+  - `blog_service.py` 的 `send_event('complete', ...)` 添加 `'id': task_id`
+  - 前端 `Home.vue` 依赖 `d.id` 执行 `router.push('/blog/${d.id}')`
+
+---
+
 ## 2026-02-07
 
 ### Refactored
