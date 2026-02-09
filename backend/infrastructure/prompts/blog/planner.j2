@@ -132,9 +132,14 @@
 
 在设计完叙事流和章节后，需要为每个章节分配目标字数（`target_words`）。
 
-### 总目标字数映射
+### 当前任务的目标字数
 
-根据 `target_length` 参数确定总目标字数：
+**当前 target_length**: `{{ target_length }}`
+**对应总目标字数**: {% if target_length == 'mini' %}**2000 字**{% elif target_length == 'short' %}**4000 字**{% elif target_length == 'medium' %}**6000 字**{% elif target_length == 'long' %}**10000 字**{% else %}**未知**{% endif %}
+
+⚠️ **重要**：你必须确保所有章节的 `target_words` 之和等于上述总目标字数！
+
+### 总目标字数映射表（参考）
 
 | target_length | 总目标字数 |
 |--------------|----------|
@@ -157,9 +162,9 @@
 | summary | 5-10% | 总结章节，简洁收尾 |
 | catalog_item | 按条目数均分 | 每个条目字数相近 |
 
-### 分配约束
+### 分配约束（必须严格遵守）
 
-1. **总和约束**：所有章节的 `target_words` 之和必须等于总目标字数
+1. **总和约束（最重要）**：所有章节的 `target_words` 之和**必须精确等于**总目标字数（{% if target_length == 'mini' %}2000{% elif target_length == 'short' %}4000{% elif target_length == 'medium' %}6000{% elif target_length == 'long' %}10000{% endif %} 字）
 2. **最小值约束**：每个章节的 `target_words` 必须 ≥ 200 字
 3. **最大值约束**：单个章节的 `target_words` 不应超过总字数的 40%
 4. **比例匹配**：字数分配应符合上述 narrative_role 推荐比例
