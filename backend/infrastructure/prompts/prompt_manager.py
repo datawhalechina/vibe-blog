@@ -180,7 +180,9 @@ class PromptManager:
         audience_adaptation: str = "technical-beginner",
         search_results: list = None,
         verbatim_data: list = None,
-        learning_objectives: list = None
+        learning_objectives: list = None,
+        narrative_mode: str = "",
+        narrative_flow: dict = None
     ) -> str:
         """渲染 Writer Prompt"""
         return self.render(
@@ -192,7 +194,9 @@ class PromptManager:
             audience_adaptation=audience_adaptation,
             search_results=search_results or [],
             verbatim_data=verbatim_data or [],
-            learning_objectives=learning_objectives or []
+            learning_objectives=learning_objectives or [],
+            narrative_mode=narrative_mode,
+            narrative_flow=narrative_flow or {}
         )
 
     def render_writer_enhance(

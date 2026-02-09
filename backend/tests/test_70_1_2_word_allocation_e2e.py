@@ -109,6 +109,12 @@ def validate_field_completeness(outline: dict, expected_total: int) -> dict:
     # Check 1: 每个 section 有 target_words 字段
     total_words = 0
     for i, section in enumerate(sections):
+        # 确保 section 是字典类型
+        if not isinstance(section, dict):
+            results["has_target_words"] = False
+            results["details"].append(f"Section {i+1} is not a dict: {type(section)}")
+            continue
+
         if "target_words" not in section:
             results["has_target_words"] = False
             results["details"].append(f"Section {i+1} '{section.get('title', '')}' missing target_words")
@@ -155,6 +161,8 @@ def validate_allocation_ratios(outline: dict, expected_total: int) -> dict:
     }
 
     sections = outline.get("sections", [])
+    # 确保所有 sections 都是字典
+    sections = [s for s in sections if isinstance(s, dict)]
     total_words = sum(s.get("target_words", 0) for s in sections)
 
     if total_words == 0:
@@ -413,9 +421,12 @@ def _print_validation_results(field_results: dict, ratio_results: dict):
     logger.info(f"    {icon} A2: 所有 target_words 为正整数")
 
     # A3: 总和准确性
-    if field_results["sum_accuracy"] is not None:
-        icon = "✅" if field_results["sum_accuracy"] else "❌"
-        logger.info(f"    {icon} A3: 字数总和准确性（误差 {field_results['sum_error_pct']:.1%}）")
+    if field_results.get("sum_error_pct") is not None:
+        icon = "✅" if field_results.get("sum_accuracy") else "❌"
+        error_pct = field_results["sum_error_pct"]
+        logger.info(f"    {icon} A3: 字数总和准确性（误差 {error_pct:.1%}）")
+    else:
+        logger.info(f"    ❌ A3: 字数总和准确性（无法计算）")
 
     # 详细信息
     for detail in field_results["details"]:

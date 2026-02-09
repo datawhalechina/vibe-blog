@@ -397,6 +397,7 @@ class BlogService:
                                         'data': {
                                             'section_index': i + 1,
                                             'title': section.get('title', ''),
+                                            'content': section.get('content', ''),
                                             'content_length': len(section.get('content', '')),
                                             'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
                                         }

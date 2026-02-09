@@ -1,0 +1,164 @@
+{
+  "title": "手把手搭建 RAG 系统：从零到生产级问答引擎",
+  "subtitle": "RAG | 向量检索 | LLM 集成 | LangChain | FAISS | 语义搜索",
+  "reading_time": 30,
+  "article_type": "tutorial",
+  "narrative_mode": "tutorial",
+  "narrative_flow": {
+    "reader_start": "读者了解基本的 Python 编程和机器学习概念，听说过 LLM 和向量数据库，但从未亲手搭建过 RAG 系统，不清楚其内部组件如何协同工作。",
+    "reader_end": "读者能够独立搭建一个端到端的 RAG 系统，理解其核心组件（文档加载、分块、嵌入、检索、生成）的作用，并能对系统进行基础验证和调试。",
+    "logic_chain": [
+      "明确 RAG 系统的最终目标和我们将要构建的具体功能。",
+      "准备必要的软件依赖和环境，并理解 RAG 的核心架构。",
+      "实现数据处理流水线：加载、分块、生成嵌入并存入向量数据库。",
+      "集成检索器与大语言模型，构建完整的问答链。",
+      "通过具体问题测试系统性能，并分析结果以确认系统按预期工作。"
+    ]
+  },
+  "introduction": "大型语言模型（LLM）虽然强大，但其知识截止于训练数据，无法访问你的私有文档或最新信息。检索增强生成（Retrieval-Augmented Generation, RAG）技术巧妙地解决了这一痛点，通过在生成答案前先从外部知识库中检索相关信息，为 LLM 提供上下文。本文将带你一步步从零开始，使用现代工具栈（如 LangChain 和 FAISS）搭建一个功能完备的 RAG 系统，让你的 LLM 能够基于你自己的文档进行智能问答。",
+  "core_value": "本文提供了一套清晰、可复现的步骤，让中级开发者能在一小时内搭建并运行自己的 RAG 问答系统。",
+  "table_of_contents": [
+    "我们的目标：构建一个文档问答机器人",
+    "准备工作：环境、依赖与架构概览",
+    "构建知识库：文档处理与向量化",
+    "连接大脑：集成检索器与语言模型",
+    "验证成果：提问、回答与效果分析"
+  ],
+  "information_architecture": {
+    "structure_type": "linear-progression",
+    "learning_objectives_mapping": [
+      {
+        "objective": "理解 RAG 系统的核心组件及其交互方式",
+        "supported_by_sections": [
+          "section_2"
+        ]
+      },
+      {
+        "objective": "能够使用 LangChain 实现文档的加载、分块和向量化",
+        "supported_by_sections": [
+          "section_3"
+        ]
+      },
+      {
+        "objective": "能够构建一个完整的 RAG 问答链并进行测试",
+        "supported_by_sections": [
+          "section_4",
+          "section_5"
+        ]
+      }
+    ]
+  },
+  "sections": [
+    {
+      "id": "section_1",
+      "title": "我们的目标：构建一个文档问答机器人",
+      "narrative_role": "hook",
+      "key_concept": "RAG 应用场景",
+      "content_outline": [
+        "提出核心问题：如何让 LLM 回答关于我私有文档的问题？",
+        "展示最终成果：一个命令行问答界面，输入问题即可获得基于文档的答案。",
+        "概述我们将使用的工具：Python, LangChain, Hugging Face 嵌入模型, FAISS 向量库。"
+      ],
+      "verbatim_data_refs": [],
+      "image_type": "scene",
+      "illustration_type": "scene",
+      "image_description": "一个开发者在终端输入问题 '项目的核心目标是什么？'，系统返回一个基于内部项目文档生成的精准答案。",
+      "code_blocks": 0,
+      "has_output_block": false,
+      "key_quote": "我们的目标是创建一个能读懂你文档的 AI 助手。",
+      "cognitive_load": "low"
+    },
+    {
+      "id": "section_2",
+      "title": "准备工作：环境、依赖与架构概览",
+      "narrative_role": "what",
+      "key_concept": "RAG 架构",
+      "content_outline": [
+        "安装必要的 Python 包：langchain, faiss-cpu, transformers, sentence-transformers, pypdf (用于 PDF)。",
+        "解释 RAG 的五大核心步骤：Document Loading → Text Splitting → Embedding → Vector Store → Retrieval & Generation。",
+        "介绍 LangChain 在此流程中的角色：提供标准化的接口和链（Chains）来连接各个组件。"
+      ],
+      "verbatim_data_refs": [],
+      "image_type": "architecture",
+      "illustration_type": "framework",
+      "image_description": "一个清晰的 RAG 架构图，展示 'User Query' -> 'Retriever (Vector Store)' -> 'Context + Prompt' -> 'LLM' -> 'Answer' 的数据流向，并标注出 Document Ingestion 流程。",
+      "code_blocks": 0,
+      "has_output_block": false,
+      "key_quote": "理解数据流是成功搭建 RAG 的第一步。",
+      "cognitive_load": "medium"
+    },
+    {
+      "id": "section_3",
+      "title": "构建知识库：文档处理与向量化",
+      "narrative_role": "how",
+      "key_concept": "文档嵌入与向量存储",
+      "content_outline": [
+        "使用 LangChain 的 Document Loaders 加载本地文本或 PDF 文件。",
+        "应用 RecursiveCharacterTextSplitter 对长文档进行智能分块，确保语义完整性。",
+        "选择并初始化一个开源嵌入模型（例如 all-MiniLM-L6-v2）来将文本块转换为向量。",
+        "将生成的向量和对应的元数据存入 FAISS 向量数据库，并将其持久化到磁盘。"
+      ],
+      "verbatim_data_refs": [],
+      "image_type": "flowchart",
+      "illustration_type": "flowchart",
+      "image_description": "一个 Mermaid 流程图，展示从 'Load Document' 开始，经过 'Split Text'，再到 'Generate Embeddings'，最后到 'Store in FAISS' 的完整 ingestion 流程。",
+      "code_blocks": 1,
+      "has_output_block": true,
+      "key_quote": "高质量的分块和嵌入是 RAG 系统准确性的基石。",
+      "cognitive_load": "high"
+    },
+    {
+      "id": "section_4",
+      "title": "连接大脑：集成检索器与语言模型",
+      "narrative_role": "how",
+      "key_concept": "检索-生成链",
+      "content_outline": [
+        "从磁盘加载已构建好的 FAISS 向量库，并创建一个检索器（Retriever）。",
+        "定义一个提示模板（Prompt Template），将用户问题和检索到的上下文整合成 LLM 能理解的指令。",
+        "选择一个 LLM（可以是本地模型或 API），并使用 LangChain 的 RetrievalQA 链将检索器、提示模板和 LLM 连接起来。",
+        "配置检索参数，如返回的文档片段数量（k值）。"
+      ],
+      "verbatim_data_refs": [],
+      "image_type": "sequence",
+      "illustration_type": "flowchart",
+      "image_description": "一个 Mermaid 序列图，展示 'User' 发送 'Question' 给 'RAG Chain'，'RAG Chain' 向 'Vector Store' 查询，'Vector Store' 返回 'Relevant Chunks'，然后 'RAG Chain' 将 'Question + Chunks' 发送给 'LLM'，最后 'LLM' 返回 'Answer' 给 'User'。",
+      "code_blocks": 1,
+      "has_output_block": false,
+      "key_quote": "检索到的信息只有与 LLM 有效结合，才能产生有价值的答案。",
+      "cognitive_load": "high"
+    },
+    {
+      "id": "section_5",
+      "title": "验证成果：提问、回答与效果分析",
+      "narrative_role": "verify",
+      "key_concept": "系统验证",
+      "content_outline": [
+        "使用预设的几个问题对系统进行测试，观察返回的答案是否准确且基于文档。",
+        "分析失败案例：如果答案错误，是因为检索不到相关片段，还是 LLM 未能正确利用上下文？",
+        "讨论可能的优化方向：调整分块策略、更换嵌入模型、改进提示词等。",
+        "总结整个搭建过程，并鼓励读者尝试用自己的文档进行实验。"
+      ],
+      "verbatim_data_refs": [],
+      "image_type": "none",
+      "illustration_type": "none",
+      "image_description": "",
+      "code_blocks": 0,
+      "has_output_block": true,
+      "key_quote": "一个成功的 RAG 系统，其答案应当既有事实依据，又流畅自然。",
+      "cognitive_load": "medium"
+    }
+  ],
+  "conclusion": {
+    "summary_points": [
+      "我们成功搭建了一个端到端的 RAG 系统，涵盖了从文档处理到问答生成的完整流程。",
+      "LangChain 极大地简化了不同组件（加载器、分块器、嵌入、向量库、LLM）的集成工作。",
+      "系统的性能高度依赖于文档分块和嵌入的质量，这是后续优化的关键点。"
+    ],
+    "next_steps": "尝试接入不同的向量数据库（如 Chroma、Pinecone），或使用更强大的开源 LLM（如 Llama 3）来提升生成质量。探索 LangChain 的高级特性，如查询路由和多跳检索。"
+  },
+  "reference_links": [
+    "https://python.langchain.com/docs/use_cases/question_answering/",
+    "https://github.com/facebookresearch/faiss",
+    "https://www.sbert.net/docs/pretrained_models.html"
+  ]
+}

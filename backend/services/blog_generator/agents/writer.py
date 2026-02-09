@@ -78,6 +78,8 @@ class WriterAgent:
         search_results: List[Dict[str, Any]] = None,
         verbatim_data: List[Dict[str, Any]] = None,
         learning_objectives: List[Dict[str, Any]] = None,
+        narrative_mode: str = "",
+        narrative_flow: Dict[str, Any] = None,
         **kwargs  # 接收 langfuse_parent_trace_id 等参数
     ) -> Dict[str, Any]:
         """
@@ -92,6 +94,8 @@ class WriterAgent:
             search_results: 原始搜索结果（用于准确引用）
             verbatim_data: 需要原样保留的数据
             learning_objectives: 学习目标列表（用于约束内容）
+            narrative_mode: 叙事模式（如 what-why-how, tutorial, catalog）
+            narrative_flow: 叙事流（reader_start, reader_end, logic_chain）
             
         Returns:
             章节内容
@@ -105,7 +109,9 @@ class WriterAgent:
             audience_adaptation=audience_adaptation,
             search_results=search_results or [],
             verbatim_data=verbatim_data or [],
-            learning_objectives=learning_objectives or []
+            learning_objectives=learning_objectives or [],
+            narrative_mode=narrative_mode,
+            narrative_flow=narrative_flow or {}
         )
         
         # 输出完整的 Writer Prompt 到日志（用于诊断）
@@ -267,6 +273,8 @@ class WriterAgent:
         search_results = state.get('search_results', [])
         verbatim_data = state.get('verbatim_data', [])
         learning_objectives = state.get('learning_objectives', [])
+        narrative_mode = outline.get('narrative_mode', '')
+        narrative_flow = outline.get('narrative_flow', {})
         
         if not sections_outline:
             logger.warning("没有章节大纲，跳过内容撰写")
@@ -296,7 +304,9 @@ class WriterAgent:
                 'audience_adaptation': state.get('audience_adaptation', 'technical-beginner'),
                 'search_results': search_results,
                 'verbatim_data': verbatim_data,
-                'learning_objectives': learning_objectives
+                'learning_objectives': learning_objectives,
+                'narrative_mode': narrative_mode,
+                'narrative_flow': narrative_flow
             })
         
         # 使用环境变量配置或传入的参数
@@ -323,7 +333,9 @@ class WriterAgent:
                     audience_adaptation=task.get('audience_adaptation', 'technical-beginner'),
                     search_results=task.get('search_results', []),
                     verbatim_data=task.get('verbatim_data', []),
-                    learning_objectives=task.get('learning_objectives', [])
+                    learning_objectives=task.get('learning_objectives', []),
+                    narrative_mode=task.get('narrative_mode', ''),
+                    narrative_flow=task.get('narrative_flow', {})
                 )
                 return {
                     'success': True,
@@ -363,7 +375,9 @@ class WriterAgent:
                         audience_adaptation=task.get('audience_adaptation', 'technical-beginner'),
                         search_results=task.get('search_results', []),
                         verbatim_data=task.get('verbatim_data', []),
-                        learning_objectives=task.get('learning_objectives', [])
+                        learning_objectives=task.get('learning_objectives', []),
+                        narrative_mode=task.get('narrative_mode', ''),
+                        narrative_flow=task.get('narrative_flow', {})
                     )
                     results[task['order_idx']] = {
                         'success': True,

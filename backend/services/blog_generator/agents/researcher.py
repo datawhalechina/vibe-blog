@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 
 from ..prompts import get_prompt_manager
 from ..services.smart_search_service import get_smart_search_service, init_smart_search_service
+from ..utils.cache_utils import get_cache_manager
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +23,7 @@ class ResearcherAgent:
     def __init__(self, llm_client, search_service=None, knowledge_service=None):
         """
         初始化 Researcher Agent
-        
+
         Args:
             llm_client: LLM 客户端
             search_service: 搜索服务 (可选，如果不提供则跳过搜索)
@@ -31,7 +32,15 @@ class ResearcherAgent:
         self.llm = llm_client
         self.search_service = search_service
         self.knowledge_service = knowledge_service
-        
+
+        # 初始化缓存管理器
+        self.cache_enabled = os.environ.get('RESEARCHER_CACHE_ENABLED', 'true').lower() == 'true'
+        if self.cache_enabled:
+            self.cache = get_cache_manager()
+            logger.info("💾 Researcher 缓存已启用")
+        else:
+            self.cache = None
+
         # 检查是否启用智能搜索
         self.smart_search_enabled = os.environ.get('SMART_SEARCH_ENABLED', 'false').lower() == 'true'
         if self.smart_search_enabled:
@@ -86,22 +95,33 @@ class ResearcherAgent:
     def search(self, topic: str, target_audience: str, max_results: int = 10) -> List[Dict]:
         """
         执行搜索
-        
+
         Args:
             topic: 技术主题
             target_audience: 目标受众
             max_results: 最大结果数
-            
+
         Returns:
             搜索结果列表
         """
+        # 尝试从缓存获取
+        if self.cache:
+            cached_result = self.cache.get(
+                'search',
+                topic=topic,
+                target_audience=target_audience,
+                max_results=max_results
+            )
+            if cached_result is not None:
+                return cached_result
+
         if not self.search_service:
             logger.warning("搜索服务未配置，跳过搜索")
             return []
-        
+
         queries = self.generate_search_queries(topic, target_audience)
         all_results = []
-        
+
         for query in queries:
             try:
                 result = self.search_service.search(query, max_results=max_results // len(queries))
@@ -109,7 +129,7 @@ class ResearcherAgent:
                     all_results.extend(result['results'])
             except Exception as e:
                 logger.error(f"搜索失败 [{query}]: {e}")
-        
+
         # 去重
         seen_urls = set()
         unique_results = []
@@ -118,41 +138,76 @@ class ResearcherAgent:
             if url and url not in seen_urls:
                 seen_urls.add(url)
                 unique_results.append(item)
-        
-        return unique_results[:max_results]
+
+        final_results = unique_results[:max_results]
+
+        # 保存到缓存
+        if self.cache:
+            self.cache.set(
+                'search',
+                final_results,
+                topic=topic,
+                target_audience=target_audience,
+                max_results=max_results
+            )
+
+        return final_results
     
     def _smart_search(self, topic: str, target_audience: str, max_results: int = 15) -> List[Dict]:
         """
         使用智能搜索服务（LLM 路由 + 多源并行）
-        
+
         Args:
             topic: 技术主题
             target_audience: 目标受众
             max_results: 最大结果数
-            
+
         Returns:
             搜索结果列表
         """
+        # 尝试从缓存获取
+        if self.cache:
+            cached_result = self.cache.get(
+                'smart_search',
+                topic=topic,
+                target_audience=target_audience,
+                max_results=max_results
+            )
+            if cached_result is not None:
+                return cached_result
+
         smart_service = get_smart_search_service()
         if not smart_service:
             logger.warning("智能搜索服务未初始化，回退到普通搜索")
             return self.search(topic, target_audience, max_results)
-        
+
         try:
             result = smart_service.search(
                 topic=topic,
                 article_type=target_audience,
                 max_results_per_source=5
             )
-            
+
             if result.get('success'):
                 sources_used = result.get('sources_used', [])
                 logger.info(f"🧠 智能搜索完成，使用搜索源: {sources_used}")
-                return result.get('results', [])[:max_results]
+                search_results = result.get('results', [])[:max_results]
+
+                # 保存到缓存
+                if self.cache:
+                    self.cache.set(
+                        'smart_search',
+                        search_results,
+                        topic=topic,
+                        target_audience=target_audience,
+                        max_results=max_results
+                    )
+
+                return search_results
             else:
                 logger.warning(f"智能搜索失败: {result.get('error')}，回退到普通搜索")
                 return self.search(topic, target_audience, max_results)
-                
+
         except Exception as e:
             logger.error(f"智能搜索异常: {e}，回退到普通搜索")
             return self.search(topic, target_audience, max_results)
@@ -166,13 +221,13 @@ class ResearcherAgent:
     ) -> Dict[str, Any]:
         """
         整理搜索结果，生成背景知识摘要
-        
+
         Args:
             topic: 技术主题
             search_results: 搜索结果
             target_audience: 目标受众
             search_depth: 搜索深度
-            
+
         Returns:
             整理后的结果
         """
@@ -182,7 +237,20 @@ class ResearcherAgent:
                 "key_concepts": [],
                 "top_references": []
             }
-        
+
+        # 尝试从缓存获取（基于 topic 和搜索结果的 URL 列表）
+        if self.cache:
+            result_urls = [r.get('url', '') for r in search_results[:10]]
+            cached_result = self.cache.get(
+                'summarize',
+                topic=topic,
+                target_audience=target_audience,
+                search_depth=search_depth,
+                result_urls=result_urls
+            )
+            if cached_result is not None:
+                return cached_result
+
         pm = get_prompt_manager()
         prompt = pm.render_researcher(
             topic=topic,
@@ -190,26 +258,26 @@ class ResearcherAgent:
             target_audience=target_audience,
             search_results=search_results[:10]
         )
-        
+
         try:
             response = self.llm.chat(
                 messages=[{"role": "user", "content": prompt}]
             )
-            
+
             # 提取 JSON（处理 markdown 代码块）
             json_str = response
             if '```json' in response:
                 json_str = response.split('```json')[1].split('```')[0].strip()
             elif '```' in response:
                 json_str = response.split('```')[1].split('```')[0].strip()
-            
+
             # 尝试解析 JSON
             result = json.loads(json_str)
             key_concepts = result.get("key_concepts", [])
-            
+
             # 调试：打印实际返回内容
             logger.info(f"LLM 返回 key_concepts 类型: {type(key_concepts)}, 值: {key_concepts}")
-            
+
             # 如果 key_concepts 为空但有其他可能的字段名
             if not key_concepts:
                 # 尝试其他可能的字段名
@@ -218,10 +286,10 @@ class ResearcherAgent:
                         key_concepts = result.get(alt_key)
                         logger.info(f"使用备选字段 {alt_key}: {key_concepts}")
                         break
-            
+
             if key_concepts:
                 logger.info(f"核心概念: {[c.get('name', c) if isinstance(c, dict) else c for c in key_concepts[:5]]}")
-            
+
             # 解析 Instructional Design 分析（新增）
             instructional_analysis = result.get("instructional_analysis", {})
             if instructional_analysis:
@@ -230,19 +298,33 @@ class ResearcherAgent:
                 content_type = instructional_analysis.get("content_type", "tutorial")
                 logger.info(f"📚 教学设计分析: 学习目标 {len(learning_objectives)} 个, "
                            f"Verbatim 数据 {len(verbatim_data)} 项, 内容类型: {content_type}")
-            
-            return {
+
+            summary_result = {
                 "background_knowledge": result.get("background_knowledge", ""),
                 "key_concepts": key_concepts,
                 "top_references": result.get("top_references", []),
                 "instructional_analysis": instructional_analysis  # 新增
             }
-            
+
+            # 保存到缓存
+            if self.cache:
+                result_urls = [r.get('url', '') for r in search_results[:10]]
+                self.cache.set(
+                    'summarize',
+                    summary_result,
+                    topic=topic,
+                    target_audience=target_audience,
+                    search_depth=search_depth,
+                    result_urls=result_urls
+                )
+
+            return summary_result
+
         except json.JSONDecodeError as e:
             logger.error(f"JSON 解析失败: {e}, 响应内容: {response[:500] if response else 'None'}")
         except Exception as e:
             logger.error(f"整理搜索结果失败: {e}")
-        
+
         # 返回简单摘要
         return {
             "background_knowledge": '\n'.join([
@@ -372,5 +454,17 @@ class ResearcherAgent:
         if instructional_analysis:
             logger.info(f"📚 教学设计: 学习目标 {len(state['learning_objectives'])} 个, "
                        f"Verbatim 数据 {len(state['verbatim_data'])} 项")
+        
+        # 输出 researcher 阶段结果（用于测试 mock）
+        import json
+        researcher_output = {
+            'background_knowledge': state.get('background_knowledge', ''),
+            'key_concepts': state.get('key_concepts', []),
+            'reference_links': state.get('reference_links', []),
+            'learning_objectives': state.get('learning_objectives', []),
+            'verbatim_data': state.get('verbatim_data', []),
+            'knowledge_source_stats': state.get('knowledge_source_stats', {}),
+        }
+        logger.info(f"__RESEARCHER_OUTPUT_JSON__{json.dumps(researcher_output, ensure_ascii=False)}__END_JSON__")
         
         return state

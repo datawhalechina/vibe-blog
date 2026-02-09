@@ -1,12 +1,19 @@
 """
-Step 1.1 叙事流验证脚本
+[需求点 70.1.1] Step 1.1 Planner 叙事流设计 — 单元验证脚本
 
-用 3 个主题生成大纲，检查：
+对齐方案文档：vibe-blog-plan-方案/70.1.1. Phase1叙事流验证方案.md
+
+⚠️ 同步警告：
+  - 修改本测试文件时，必须同步更新方案文档 70.1.1 的验证方案部分
+  - 修改方案文档 70.1.1 的检查清单/通过标准时，必须同步更新本文件的验证逻辑
+  - 测试主题矩阵（TEST_CASES）与方案文档中的"测试主题矩阵"表格一一对应
+
+用 3 个主题直接调用 PlannerAgent 生成大纲，检查：
 A. 字段完整性（narrative_mode / narrative_flow / narrative_role）
 B. 模式匹配（主题 → 期望模式）
 
 用法：
-  cd backend && python tests/test_planner_narrative.py
+  cd backend && python tests/test_70_1_1_planner_narrative.py
 """
 
 import sys
