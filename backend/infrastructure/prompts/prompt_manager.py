@@ -328,15 +328,13 @@ class PromptManager:
         search_results: list = None,
         background_knowledge: str = None
     ) -> str:
-        """渲染 Reviewer Prompt"""
+        """渲染 Reviewer Prompt（精简版：仅结构+完整性+verbatim+学习目标）"""
         return self.render(
             'blog/reviewer',
             document=document,
             outline=outline,
-            search_results=search_results or [],
             verbatim_data=verbatim_data or [],
             learning_objectives=learning_objectives or [],
-            background_knowledge=background_knowledge or ""
         )
 
     def render_assembler_header(
