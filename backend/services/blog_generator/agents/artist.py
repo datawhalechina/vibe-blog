@@ -231,7 +231,63 @@ class ArtistAgent:
             logger.info(f"ASCII 流程图预处理完成: 共转换 {total_converted} 个")
         
         return sections
-    
+
+    # ========== Mermaid 语法修复 ==========
+
+    def _sanitize_mermaid(self, code: str) -> str:
+        """静态预处理：修复常见 Mermaid 语法问题"""
+        # 1. 移除 ```mermaid 标记
+        code = re.sub(r'^```(?:mermaid)?\s*\n?', '', code.strip())
+        code = re.sub(r'\n?```\s*$', '', code.strip())
+        # 2. 移除节点文本中的 \n 换行符
+        code = re.sub(r'(?<=\[)([^\]]*?)\\n([^\]]*?)(?=\])', r'\1 \2', code)
+        code = re.sub(r'(?<=\()([^\)]*?)\\n([^\)]*?)(?=\))', r'\1 \2', code)
+        # 3. 修复重复箭头 --> -->  变为 -->
+        code = re.sub(r'(-+>)\s*\1', r'\1', code)
+        return code.strip()
+
+    def _validate_mermaid(self, code: str) -> tuple:
+        """基础语法校验，返回 (is_valid, error_msg)"""
+        errors = []
+        first_line = code.strip().split('\n')[0].strip() if code.strip() else ''
+        if not re.match(r'^(flowchart|graph|sequenceDiagram|classDiagram|stateDiagram|gantt|pie|erDiagram|mindmap|timeline)', first_line):
+            errors.append("缺少图表类型声明")
+        subgraph_count = len(re.findall(r'\bsubgraph\b', code))
+        end_count = len(re.findall(r'^\s*end\s*$', code, re.MULTILINE))
+        if subgraph_count != end_count:
+            errors.append(f"subgraph({subgraph_count}) 与 end({end_count}) 不匹配")
+        if errors:
+            return False, "; ".join(errors)
+        return True, "OK"
+
+    def _repair_mermaid(self, mermaid_code: str, error_msg: str) -> str:
+        """用 LLM 修复 Mermaid 语法错误（最多 2 次重试）"""
+        max_retries = int(os.getenv('MERMAID_REPAIR_MAX_RETRIES', '2'))
+        for attempt in range(max_retries):
+            logger.info(f"[Mermaid] 语法修复 (尝试 {attempt + 1}/{max_retries}): {error_msg}")
+            prompt = f"""以下 Mermaid 代码有语法错误，请修复。只输出修复后的纯 Mermaid 代码，不要包含 ```mermaid 标记。
+
+错误信息：{error_msg}
+
+原始代码：
+{mermaid_code}
+
+修复要求：只修复语法错误，不改变图表内容和结构。节点文本不要用 \\n。含特殊字符的文本用双引号包裹。节点 ID 只用英文字母和数字。确保 subgraph 都有对应的 end。"""
+            try:
+                response = self.llm.chat(messages=[{"role": "user", "content": prompt}])
+                repaired = self._sanitize_mermaid(response.strip())
+                is_valid, new_error = self._validate_mermaid(repaired)
+                if is_valid:
+                    logger.info("[Mermaid] 语法修复成功")
+                    return repaired
+                error_msg = new_error
+                mermaid_code = repaired
+            except Exception as e:
+                logger.error(f"[Mermaid] 修复调用失败: {e}")
+                break
+        logger.warning("[Mermaid] 修复达到最大重试次数，返回最后结果")
+        return mermaid_code
+
     @observe(name="artist.generate_image", as_type="generation")
     def generate_image(
         self,
@@ -279,20 +335,28 @@ class ArtistAgent:
             
             result = json.loads(response)
             content = result.get("content", "")
-            
-            # 清理 content：移除可能的 ```mermaid 标记
-            if content.strip().startswith('```mermaid'):
-                content = content.strip()
-                content = content[len('```mermaid'):].strip()
-                if content.endswith('```'):
-                    content = content[:-3].strip()
-            elif content.strip().startswith('```'):
-                content = content.strip()[3:].strip()
-                if content.endswith('```'):
-                    content = content[:-3].strip()
-            
+            render_method = result.get("render_method", "mermaid")
+
+            # Mermaid 语法修复链
+            if render_method == "mermaid":
+                content = self._sanitize_mermaid(content)
+                is_valid, error_msg = self._validate_mermaid(content)
+                if not is_valid:
+                    logger.warning(f"[Mermaid] 语法校验失败: {error_msg}")
+                    content = self._repair_mermaid(content, error_msg)
+            else:
+                # 非 mermaid：仅清理 markdown 标记
+                if content.strip().startswith('```'):
+                    content = content.strip()
+                    if content.startswith('```mermaid'):
+                        content = content[len('```mermaid'):].strip()
+                    else:
+                        content = content[3:].strip()
+                    if content.endswith('```'):
+                        content = content[:-3].strip()
+
             return {
-                "render_method": result.get("render_method", "mermaid"),
+                "render_method": render_method,
                 "content": content,
                 "caption": result.get("caption", "")
             }
