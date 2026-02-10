@@ -23,6 +23,38 @@ def _should_use_parallel():
 
 logger = logging.getLogger(__name__)
 
+# 图片预算：根据文章长度限制总图片数
+IMAGE_BUDGET = {
+    'mini': 3,
+    'short': 5,
+    'medium': 8,
+    'long': 12,
+    'custom': 8,
+}
+
+
+def _extract_json(text: str) -> dict:
+    """从 LLM 响应中提取 JSON（处理 markdown 包裹）"""
+    text = text.strip()
+    if '```json' in text:
+        start = text.find('```json') + 7
+        end = text.find('```', start)
+        if end != -1:
+            text = text[start:end].strip()
+        else:
+            text = text[start:].strip()
+    elif '```' in text:
+        start = text.find('```') + 3
+        end = text.find('```', start)
+        if end != -1:
+            text = text[start:end].strip()
+        else:
+            text = text[start:].strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        return json.loads(text, strict=False)
+
 # Langfuse 追踪装饰器（只在 TRACE_ENABLED=true 时启用）
 def _get_langfuse_client():
     """获取 Langfuse client，未启用时返回 None"""
@@ -333,9 +365,14 @@ class ArtistAgent:
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response)
+            result = _extract_json(response)
             content = result.get("content", "")
             render_method = result.get("render_method", "mermaid")
+            caption = result.get("caption", "")
+
+            # 改进 caption：如果 LLM 返回的 caption 是空的或太通用，使用章节标题
+            if not caption or caption == article_title:
+                caption = description[:60] if description else article_title
 
             # Mermaid 语法修复链
             if render_method == "mermaid":
@@ -497,7 +534,7 @@ class ArtistAgent:
                     response_format={"type": "json_object"}
                 )
                 
-                result = json.loads(response)
+                result = _extract_json(response)
                 needs_diagrams = result.get('needs_diagrams', [])
                 
                 # 每个章节最多补充 1 个图表
@@ -662,7 +699,20 @@ class ArtistAgent:
             logger.info("没有配图任务，跳过配图生成")
             state['images'] = []
             return state
-        
+
+        # 图片预算控制：根据文章长度限制总图片数
+        target_length = state.get('target_length', 'medium')
+        budget = IMAGE_BUDGET.get(target_length, IMAGE_BUDGET['medium'])
+        if len(tasks) > budget:
+            logger.info(f"图片预算控制: {len(tasks)} 张 → {budget} 张 (target_length={target_length})")
+            # 优先保留 outline 来源，其次 placeholder，最后 missing_diagram
+            priority = {'outline': 0, 'placeholder': 1, 'missing_diagram': 2}
+            tasks.sort(key=lambda t: (priority.get(t['source'], 9), t['order_idx']))
+            tasks = tasks[:budget]
+            # 重新编号 order_idx
+            for i, task in enumerate(tasks):
+                task['order_idx'] = i
+
         total_image_count = len(tasks)
         
         # 使用环境变量配置或传入的参数
