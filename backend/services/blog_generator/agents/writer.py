@@ -259,7 +259,58 @@ class WriterAgent:
         except Exception as e:
             logger.error(f"章节更正失败: {e}")
             return original_content
-    
+
+    @observe(name="writer.improve_section", as_type="generation")
+    def improve_section(
+        self,
+        original_content: str,
+        critique: Dict[str, Any],
+        section_title: str = "",
+        **kwargs
+    ) -> str:
+        """
+        基于结构化批评精准修改段落（Generator-Critic Loop 的 Generator 角色）
+
+        Args:
+            original_content: 原始章节内容
+            critique: 评估结果，包含 scores/specific_issues/improvement_suggestions
+            section_title: 章节标题
+
+        Returns:
+            修改后的章节内容
+        """
+        issues = critique.get("specific_issues", [])
+        suggestions = critique.get("improvement_suggestions", [])
+        if not issues and not suggestions:
+            return original_content
+
+        logger.info(
+            f"[Writer] 精准修改章节 [{section_title}]: "
+            f"{len(issues)} 个问题, {len(suggestions)} 条建议"
+        )
+
+        pm = get_prompt_manager()
+        prompt = pm.render_writer_improve(
+            original_content=original_content,
+            scores=critique.get("scores", {}),
+            specific_issues=issues,
+            improvement_suggestions=suggestions,
+        )
+
+        try:
+            response = self.llm.chat(
+                messages=[{"role": "user", "content": prompt}]
+            )
+            if response and response.strip():
+                logger.info(
+                    f"精准修改完成: {len(original_content)} → {len(response)} 字"
+                )
+                return response.strip()
+            return original_content
+        except Exception as e:
+            logger.error(f"精准修改失败: {e}")
+            return original_content
+
     @observe(name="writer.run")
     def run(self, state: Dict[str, Any], max_workers: int = None) -> Dict[str, Any]:
         """

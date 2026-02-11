@@ -581,6 +581,38 @@ class PromptManager:
             section_content=section_content,
         )
 
+    def render_section_evaluator(
+        self,
+        section_content: str,
+        section_title: str = "",
+        prev_summary: str = "",
+        next_preview: str = "",
+    ) -> str:
+        """渲染段落多维度评估 Prompt（Generator-Critic Loop）"""
+        return self.render(
+            'blog/section_evaluator',
+            section_content=section_content,
+            section_title=section_title,
+            prev_summary=prev_summary,
+            next_preview=next_preview,
+        )
+
+    def render_writer_improve(
+        self,
+        original_content: str,
+        scores: dict,
+        specific_issues: list,
+        improvement_suggestions: list,
+    ) -> str:
+        """渲染段落精准修改 Prompt（基于结构化批评）"""
+        return self.render(
+            'blog/writer_improve',
+            original_content=original_content,
+            scores=scores,
+            specific_issues=specific_issues,
+            improvement_suggestions=improvement_suggestions,
+        )
+
     def render_humanizer(
         self,
         section_content: str,
@@ -645,6 +677,40 @@ class PromptManager:
             title=title,
             full_article=full_article,
             learning_objectives=learning_objectives or [],
+        )
+
+    # ========== 段落级评估与改进 (69.04) ==========
+
+    def render_section_evaluator(
+        self,
+        section_content: str,
+        section_title: str = "",
+        prev_summary: str = "",
+        next_preview: str = "",
+    ) -> str:
+        """渲染段落多维度评估 Prompt"""
+        return self.render(
+            'blog/section_evaluator',
+            section_content=section_content,
+            section_title=section_title,
+            prev_summary=prev_summary,
+            next_preview=next_preview,
+        )
+
+    def render_writer_improve(
+        self,
+        original_content: str,
+        scores: dict = None,
+        specific_issues: list = None,
+        improvement_suggestions: list = None,
+    ) -> str:
+        """渲染精准修改 Prompt"""
+        return self.render(
+            'blog/writer_improve',
+            original_content=original_content,
+            scores=scores or {},
+            specific_issues=specific_issues or [],
+            improvement_suggestions=improvement_suggestions or [],
         )
 
     # ========== 小红书相关 Prompt ==========

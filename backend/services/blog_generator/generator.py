@@ -143,6 +143,8 @@ class BlogGenerator:
         workflow.add_node("questioner", self._questioner_node)
         workflow.add_node("deepen_content", self._deepen_content_node)
         workflow.add_node("coder_and_artist", self._coder_and_artist_node)  # 并行节点
+        workflow.add_node("section_evaluate", self._section_evaluate_node)  # 段落评估
+        workflow.add_node("section_improve", self._section_improve_node)  # 段落改进
         workflow.add_node("consistency_check", self._consistency_check_node)  # 一致性检查
         workflow.add_node("reviewer", self._reviewer_node)
         workflow.add_node("revision", self._revision_node)
@@ -180,10 +182,21 @@ class BlogGenerator:
             self._should_deepen,
             {
                 "deepen": "deepen_content",
-                "continue": "coder_and_artist"  # 进入并行节点
+                "continue": "section_evaluate"  # 进入段落评估
             }
         )
         workflow.add_edge("deepen_content", "questioner")  # 深化后重新追问
+
+        # 段落评估 → 条件边：需要改进则进入改进节点，否则跳过
+        workflow.add_conditional_edges(
+            "section_evaluate",
+            self._should_improve_sections,
+            {
+                "improve": "section_improve",
+                "continue": "coder_and_artist",
+            }
+        )
+        workflow.add_edge("section_improve", "section_evaluate")  # 改进后重新评估
         
         # Coder 和 Artist 并行执行（通过单个节点内部并行实现）
         workflow.add_edge("coder_and_artist", "consistency_check")
@@ -459,6 +472,100 @@ class BlogGenerator:
         
         after_count = _get_content_word_count(state)
         _log_word_count_diff("内容深化", before_count, after_count)
+        return state
+
+    # ========== 段落级 Generator-Critic Loop (#69.04) ==========
+
+    def _section_evaluate_node(self, state: SharedState) -> SharedState:
+        """段落多维度评估节点（Critic 角色）"""
+        # 双开关：环境变量 + StyleProfile
+        style = self._get_style(state)
+        if not self._is_enabled("SECTION_EVAL_ENABLED", getattr(style, "enable_thread_check", True)):
+            logger.info("段落评估已禁用，跳过")
+            state["section_evaluations"] = []
+            state["needs_section_improvement"] = False
+            return state
+
+        logger.info("=== Step 4.2: 段落多维度评估 ===")
+        sections = state.get("sections", [])
+        evaluations = []
+        needs_improvement = False
+
+        for i, section in enumerate(sections):
+            prev_summary = sections[i - 1].get("title", "") if i > 0 else ""
+            next_preview = sections[i + 1].get("title", "") if i < len(sections) - 1 else ""
+
+            evaluation = self.questioner.evaluate_section(
+                section_content=section.get("content", ""),
+                section_title=section.get("title", ""),
+                prev_summary=prev_summary,
+                next_preview=next_preview,
+            )
+            evaluation["section_idx"] = i
+            evaluations.append(evaluation)
+
+            if evaluation["overall_quality"] < 7.0:
+                needs_improvement = True
+                logger.info(
+                    f"  段落 [{section.get('title', '')}] 需改进: "
+                    f"overall={evaluation['overall_quality']}"
+                )
+
+        state["section_evaluations"] = evaluations
+        state["needs_section_improvement"] = needs_improvement
+
+        avg_score = (
+            sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
+        )
+        logger.info(f"段落评估完成: 平均分 {avg_score:.1f}, 需改进={needs_improvement}")
+        return state
+
+    def _should_improve_sections(self, state: SharedState) -> str:
+        """判断是否需要段落级改进"""
+        if not state.get("needs_section_improvement", False):
+            return "continue"
+
+        improve_count = state.get("section_improve_count", 0)
+        if improve_count >= 2:
+            logger.info("段落改进达到最大轮数(2)，跳过")
+            return "continue"
+
+        # 收敛检测：改进幅度 < 0.3 则停止
+        evaluations = state.get("section_evaluations", [])
+        curr_avg = (
+            sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
+        )
+        prev_avg = state.get("prev_section_avg_score", 0)
+        if prev_avg > 0 and (curr_avg - prev_avg) < 0.3:
+            logger.info(f"段落改进收敛 ({prev_avg:.1f} → {curr_avg:.1f})，跳过")
+            return "continue"
+
+        state["prev_section_avg_score"] = curr_avg
+        return "improve"
+
+    def _section_improve_node(self, state: SharedState) -> SharedState:
+        """段落精准改进节点（Generator 角色）"""
+        logger.info("=== Step 4.3: 段落精准改进 ===")
+        evaluations = state.get("section_evaluations", [])
+        sections = state.get("sections", [])
+        improved_count = 0
+
+        for evaluation in evaluations:
+            idx = evaluation.get("section_idx", -1)
+            if evaluation["overall_quality"] >= 7.0 or idx < 0 or idx >= len(sections):
+                continue
+
+            section = sections[idx]
+            improved_content = self.writer.improve_section(
+                original_content=section.get("content", ""),
+                critique=evaluation,
+                section_title=section.get("title", ""),
+            )
+            section["content"] = improved_content
+            improved_count += 1
+
+        state["section_improve_count"] = state.get("section_improve_count", 0) + 1
+        logger.info(f"段落改进完成: 改进了 {improved_count} 个段落 (第 {state['section_improve_count']} 轮)")
         return state
     
     def _coder_and_artist_node(self, state: SharedState) -> SharedState:

@@ -1,0 +1,27 @@
+你是一个专业的内容编辑。请根据以下评估反馈，精准修改章节内容。
+
+## 原始内容
+{{ original_content }}
+
+## 评估分数
+{% for dim, score in scores.items() %}
+- {{ dim }}: {{ score }}/10
+{% endfor %}
+
+## 具体问题
+{% for issue in specific_issues %}
+{{ loop.index }}. {{ issue }}
+{% endfor %}
+
+## 改进建议
+{% for suggestion in improvement_suggestions %}
+{{ loop.index }}. {{ suggestion }}
+{% endfor %}
+
+## 修改要求
+1. 必须逐一解决上述"具体问题"
+2. 必须实施上述"改进建议"
+3. 保留原文中好的部分，只修改有问题的部分
+4. 不要大幅增加篇幅，重点是提升质量而非数量
+5. 保持原文的 Markdown 格式
+6. 直接输出修改后的完整章节内容，不要添加任何解释或说明
