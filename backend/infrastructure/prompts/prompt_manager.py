@@ -550,6 +550,27 @@ class PromptManager:
             content=content
         )
 
+    def render_code2prompt(
+        self,
+        code: str,
+        render_method: str,
+        caption: str,
+        style: str = "扁平化信息图"
+    ) -> str:
+        """渲染 code2prompt Prompt — 将 Mermaid/SVG 代码翻译为图片生成描述"""
+        format_names = {
+            "mermaid": "Mermaid 图表",
+            "svg": "SVG 矢量图",
+        }
+        return self.render(
+            'blog/code2prompt',
+            code=code,
+            render_method=render_method,
+            caption=caption,
+            style=style,
+            format_name=format_names.get(render_method, "图表"),
+        )
+
     def render_humanizer_score(
         self,
         section_content: str,

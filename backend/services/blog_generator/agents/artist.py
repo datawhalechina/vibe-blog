@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..prompts import get_prompt_manager
 from ...image_service import get_image_service, AspectRatio, ImageSize
+from ..image_enhancement import ImageEnhancementPipeline
 
 # 从环境变量读取并行配置，默认为 3
 MAX_WORKERS = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
@@ -729,6 +730,13 @@ class ArtistAgent:
         
         # 第二步：生成图片
         results = [None] * len(tasks)
+
+        # code2prompt 增强开关：环境变量 IMAGE_ENHANCEMENT_ENABLED 或 state.image_enhancement
+        enable_enhancement = (
+            os.getenv('IMAGE_ENHANCEMENT_ENABLED', 'false').lower() == 'true'
+            or state.get('image_enhancement', False)
+        )
+        enhancement_style = state.get('enhancement_style', '扁平化信息图')
         
         def generate_single_task(task):
             """单个图片生成任务"""
@@ -776,6 +784,26 @@ class ArtistAgent:
                         # 如果是 OSS URL，直接使用；否则转为相对路径
                         if not rendered_path.startswith('http'):
                             rendered_path = f"./images/{rendered_path.split('/')[-1]}"
+
+                # code2prompt 增强：将 Mermaid 骨架图转为精美信息图
+                elif render_method == 'mermaid' and enable_enhancement:
+                    try:
+                        pipeline = ImageEnhancementPipeline(self.llm)
+                        enhanced_path = pipeline.enhance(
+                            code=image.get('content', ''),
+                            render_method='mermaid',
+                            caption=image.get('caption', ''),
+                            style=enhancement_style,
+                            image_style=state.get('image_style', ''),
+                        )
+                        if enhanced_path:
+                            if not enhanced_path.startswith('http'):
+                                enhanced_path = f"./images/{enhanced_path.split('/')[-1]}"
+                            rendered_path = enhanced_path
+                            render_method = 'enhanced_mermaid'
+                            logger.info(f"code2prompt 增强成功: {task['image_id']}")
+                    except Exception as e:
+                        logger.warning(f"code2prompt 增强失败，回退到原始 Mermaid: {e}")
                 
                 return {
                     'success': True,
@@ -846,6 +874,26 @@ class ArtistAgent:
                         )
                         if rendered_path and not rendered_path.startswith('http'):
                             rendered_path = f"./images/{rendered_path.split('/')[-1]}"
+
+                    # code2prompt 增强（串行模式）
+                    elif render_method == 'mermaid' and enable_enhancement:
+                        try:
+                            pipeline = ImageEnhancementPipeline(self.llm)
+                            enhanced_path = pipeline.enhance(
+                                code=image.get('content', ''),
+                                render_method='mermaid',
+                                caption=image.get('caption', ''),
+                                style=enhancement_style,
+                                image_style=state.get('image_style', ''),
+                            )
+                            if enhanced_path:
+                                if not enhanced_path.startswith('http'):
+                                    enhanced_path = f"./images/{enhanced_path.split('/')[-1]}"
+                                rendered_path = enhanced_path
+                                render_method = 'enhanced_mermaid'
+                                logger.info(f"code2prompt 增强成功: {task['image_id']}")
+                        except Exception as e:
+                            logger.warning(f"code2prompt 增强失败，回退到原始 Mermaid: {e}")
                     
                     results[task['order_idx']] = {
                         'success': True,
