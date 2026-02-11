@@ -21,19 +21,6 @@ def _should_use_parallel():
 
 logger = logging.getLogger(__name__)
 
-# Langfuse 追踪装饰器（只在 TRACE_ENABLED=true 时启用）
-def _get_langfuse_client():
-    """获取 Langfuse client，未启用时返回 None"""
-    if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
-        try:
-            from langfuse import get_client
-            return get_client()
-        except ImportError:
-            pass
-        except Exception:
-            pass
-    return None
-
 def _get_observe_decorator():
     """获取 Langfuse observe 装饰器，未启用时返回空装饰器"""
     if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
@@ -50,7 +37,6 @@ def _get_observe_decorator():
     return noop_decorator
 
 observe = _get_observe_decorator()
-langfuse_client = _get_langfuse_client()
 
 
 class QuestionerAgent:
@@ -193,12 +179,14 @@ class QuestionerAgent:
                 round(sum(score_values) / max(len(score_values), 1), 1),
             )
 
-            return {
+            eval_result = {
                 "scores": scores,
                 "overall_quality": overall,
                 "specific_issues": result.get("specific_issues", []),
                 "improvement_suggestions": result.get("improvement_suggestions", []),
             }
+
+            return eval_result
 
         except json.JSONDecodeError as e:
             logger.warning(f"段落评估 JSON 解析失败: {e}")

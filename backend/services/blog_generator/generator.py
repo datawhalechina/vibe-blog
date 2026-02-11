@@ -28,6 +28,7 @@ from .agents.reviewer import ReviewerAgent
 from .agents.assembler import AssemblerAgent
 from .agents.search_coordinator import SearchCoordinator
 from .agents.humanizer import HumanizerAgent
+from utils.session_tracker import SessionTracker
 from .agents.thread_checker import ThreadCheckerAgent
 from .agents.voice_checker import VoiceCheckerAgent
 from .agents.factcheck import FactCheckAgent
@@ -116,6 +117,9 @@ class BlogGenerator:
         self.thread_checker = ThreadCheckerAgent(llm_client) if self._env_thread_check else None
         self.voice_checker = VoiceCheckerAgent(llm_client) if self._env_voice_check else None
         self.factcheck = FactCheckAgent(llm_client) if self._env_factcheck else None
+
+        # 业务级状态追踪（69.05）
+        self.tracker = SessionTracker()
         self.summary_generator = SummaryGeneratorAgent(llm_client) if self._env_summary else None
 
         # 构建工作流
@@ -472,6 +476,14 @@ class BlogGenerator:
         
         after_count = _get_content_word_count(state)
         _log_word_count_diff("内容深化", before_count, after_count)
+
+        # 69.05: 记录深化迭代快照
+        self.tracker.log_deepen_snapshot(
+            round_num=state.get('questioning_count', 0),
+            sections_deepened=total_to_deepen,
+            chars_added=after_count - before_count,
+        )
+
         return state
 
     # ========== 段落级 Generator-Critic Loop (#69.04) ==========
@@ -518,6 +530,15 @@ class BlogGenerator:
             sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
         )
         logger.info(f"段落评估完成: 平均分 {avg_score:.1f}, 需改进={needs_improvement}")
+
+        # 69.05: 记录段落评估分数
+        for evaluation in evaluations:
+            self.tracker.log_section_evaluation(
+                section_title=sections[evaluation.get("section_idx", 0)].get("title", ""),
+                scores=evaluation.get("scores", {}),
+                overall=evaluation["overall_quality"],
+            )
+
         return state
 
     def _should_improve_sections(self, state: SharedState) -> str:
@@ -566,6 +587,18 @@ class BlogGenerator:
 
         state["section_improve_count"] = state.get("section_improve_count", 0) + 1
         logger.info(f"段落改进完成: 改进了 {improved_count} 个段落 (第 {state['section_improve_count']} 轮)")
+
+        # 69.05: 记录段落改进快照
+        new_avg = (
+            sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
+        )
+        self.tracker.log_section_improve_snapshot(
+            round_num=state["section_improve_count"],
+            improved_count=improved_count,
+            avg_score_before=state.get("prev_section_avg_score", 0),
+            avg_score_after=new_avg,
+        )
+
         return state
     
     def _coder_and_artist_node(self, state: SharedState) -> SharedState:
@@ -606,7 +639,15 @@ class BlogGenerator:
         code_count = len(state.get('code_blocks', []))
         image_count = len(state.get('images', []))
         logger.info(f"=== 代码和配图并行生成完成: {code_count} 个代码块, {image_count} 张图片 ===")
-        
+
+        # 69.05: 记录配图生成结果
+        for img in state.get('images', []):
+            self.tracker.log_image_generation(
+                image_id=img.get('id', ''),
+                image_type=img.get('render_method', ''),
+                success=True,
+            )
+
         return state
     
     def _reviewer_node(self, state: SharedState) -> SharedState:
@@ -620,6 +661,13 @@ class BlogGenerator:
             existing = state.get('review_issues', [])
             state['review_issues'] = existing + consistency_issues
             logger.info(f"[Reviewer] 合并一致性检查问题: {len(consistency_issues)} 条")
+
+        # 69.05: 记录审核分数到 Langfuse
+        self.tracker.log_review_score(
+            score=state.get('review_score', 0),
+            round_num=state.get('revision_count', 0),
+            summary=f"issues={len(state.get('review_issues', []))} approved={state.get('review_approved', False)}",
+        )
 
         return state
     

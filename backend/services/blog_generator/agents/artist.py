@@ -56,19 +56,6 @@ def _extract_json(text: str) -> dict:
     except json.JSONDecodeError:
         return json.loads(text, strict=False)
 
-# Langfuse 追踪装饰器（只在 TRACE_ENABLED=true 时启用）
-def _get_langfuse_client():
-    """获取 Langfuse client，未启用时返回 None"""
-    if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
-        try:
-            from langfuse import get_client
-            return get_client()
-        except ImportError:
-            pass
-        except Exception:
-            pass
-    return None
-
 def _get_observe_decorator():
     """获取 Langfuse observe 装饰器，未启用时返回空装饰器"""
     if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
@@ -85,7 +72,6 @@ def _get_observe_decorator():
     return noop_decorator
 
 observe = _get_observe_decorator()
-langfuse_client = _get_langfuse_client()
 
 # ASCII 流程图特征模式（强特征 - 必须出现）
 ASCII_FLOWCHART_STRONG_PATTERNS = [
@@ -947,7 +933,7 @@ class ArtistAgent:
         
         state['images'] = images
         logger.info(f"配图生成完成: 共 {len(images)} 张图片")
-        
+
         return state
     
     def _generate_mini_section_images(
