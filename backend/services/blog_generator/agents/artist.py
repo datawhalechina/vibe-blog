@@ -109,11 +109,12 @@ class ArtistAgent:
     def __init__(self, llm_client):
         """
         初始化 Artist Agent
-        
+
         Args:
             llm_client: LLM 客户端
         """
         self.llm = llm_client
+        self.style_anchor = None  # 风格锚点（#69.06）
     
     def detect_ascii_flowcharts(self, content: str) -> List[Dict[str, Any]]:
         """
@@ -333,13 +334,16 @@ class ArtistAgent:
             图片资源字典
         """
         pm = get_prompt_manager()
+        is_first_image = self.style_anchor is None
         prompt = pm.render_artist(
             image_type=image_type,
             description=description,
             context=context,
             audience_adaptation=audience_adaptation,
             article_title=article_title,
-            illustration_type=illustration_type
+            illustration_type=illustration_type,
+            style_anchor=self.style_anchor or "",
+            is_first_image=is_first_image,
         )
         
         # 调试日志：记录传入的上下文摘要
@@ -356,6 +360,11 @@ class ArtistAgent:
             content = result.get("content", "")
             render_method = result.get("render_method", "mermaid")
             caption = result.get("caption", "")
+
+            # 风格锚点提取（#69.06）：从第一张图的响应中提取风格描述
+            if is_first_image and result.get("style_description"):
+                self.style_anchor = result["style_description"]
+                logger.info(f"[Artist] 风格锚点已提取: {self.style_anchor[:80]}...")
 
             # 改进 caption：如果 LLM 返回的 caption 是空的或太通用，使用章节标题
             if not caption or caption == article_title:
@@ -379,12 +388,19 @@ class ArtistAgent:
                     if content.endswith('```'):
                         content = content[:-3].strip()
 
+            # 69.06: 从第一张图提取风格锚点
+            if is_first_image:
+                style_desc = result.get("style_description", "")
+                if style_desc:
+                    self.style_anchor = style_desc
+                    logger.info(f"[StyleAnchor] 风格锚点已设定: {style_desc[:80]}")
+
             return {
                 "render_method": render_method,
                 "content": content,
                 "caption": result.get("caption", "")
             }
-            
+
         except Exception as e:
             logger.error(f"配图生成失败: {e}")
             raise
