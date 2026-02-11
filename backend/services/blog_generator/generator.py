@@ -17,6 +17,7 @@ from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
 
 from .schemas.state import SharedState, create_initial_state
+from .style_profile import StyleProfile
 from .agents.researcher import ResearcherAgent
 from .agents.planner import PlannerAgent
 from .agents.writer import WriterAgent
@@ -68,24 +69,29 @@ class BlogGenerator:
         search_service=None,
         knowledge_service=None,
         max_questioning_rounds: int = 2,
-        max_revision_rounds: int = 3
+        max_revision_rounds: int = 3,
+        style: StyleProfile = None
     ):
         """
         初始化博客生成器
-        
+
         Args:
             llm_client: LLM 客户端
             search_service: 搜索服务 (可选)
             knowledge_service: 知识服务 (可选，用于文档知识融合)
             max_questioning_rounds: 最大追问轮数
             max_revision_rounds: 最大修订轮数
+            style: 风格配置（可选，不传则从环境变量构建默认值）
         """
         self.llm = llm_client
         self.search_service = search_service
         self.knowledge_service = knowledge_service
         self.max_questioning_rounds = max_questioning_rounds
+        self.style = style  # 延迟初始化：generate() 时根据 target_length 确定
+
+        # max_revision_rounds 向后兼容：优先用 StyleProfile，否则用参数
         self.max_revision_rounds = max_revision_rounds
-        
+
         # 初始化各 Agent
         self.researcher = ResearcherAgent(llm_client, search_service, knowledge_service)
         self.planner = PlannerAgent(llm_client)
@@ -97,26 +103,20 @@ class BlogGenerator:
         self.assembler = AssemblerAgent()
         self.search_coordinator = SearchCoordinator(llm_client, search_service)
 
-        # Humanizer（可通过环境变量禁用）
-        self._humanizer_enabled = os.getenv('HUMANIZER_ENABLED', 'true').lower() == 'true'
-        self.humanizer = HumanizerAgent(llm_client) if self._humanizer_enabled else None
+        # 增强 Agent：环境变量作为全局开关（StyleProfile 作为运行时开关）
+        self._env_humanizer = os.getenv('HUMANIZER_ENABLED', 'true').lower() == 'true'
+        self._env_thread_check = os.getenv('THREAD_CHECK_ENABLED', 'true').lower() == 'true'
+        self._env_voice_check = os.getenv('VOICE_CHECK_ENABLED', 'true').lower() == 'true'
+        self._env_factcheck = os.getenv('FACTCHECK_ENABLED', 'true').lower() == 'true'
+        self._env_text_cleanup = os.getenv('TEXT_CLEANUP_ENABLED', 'true').lower() == 'true'
+        self._env_summary = os.getenv('SUMMARY_GENERATOR_ENABLED', 'true').lower() == 'true'
 
-        # 一致性检查（ThreadChecker + VoiceChecker，可通过环境变量禁用）
-        self._thread_check_enabled = os.getenv('THREAD_CHECK_ENABLED', 'true').lower() == 'true'
-        self._voice_check_enabled = os.getenv('VOICE_CHECK_ENABLED', 'true').lower() == 'true'
-        self.thread_checker = ThreadCheckerAgent(llm_client) if self._thread_check_enabled else None
-        self.voice_checker = VoiceCheckerAgent(llm_client) if self._voice_check_enabled else None
-
-        # FactCheck（可通过环境变量禁用）
-        self._factcheck_enabled = os.getenv('FACTCHECK_ENABLED', 'true').lower() == 'true'
-        self.factcheck = FactCheckAgent(llm_client) if self._factcheck_enabled else None
-
-        # TextCleanup（可通过环境变量禁用）
-        self._text_cleanup_enabled = os.getenv('TEXT_CLEANUP_ENABLED', 'true').lower() == 'true'
-
-        # SummaryGenerator（可通过环境变量禁用）
-        self._summary_enabled = os.getenv('SUMMARY_GENERATOR_ENABLED', 'true').lower() == 'true'
-        self.summary_generator = SummaryGeneratorAgent(llm_client) if self._summary_enabled else None
+        # 初始化增强 Agent（只要环境变量没禁用就创建实例）
+        self.humanizer = HumanizerAgent(llm_client) if self._env_humanizer else None
+        self.thread_checker = ThreadCheckerAgent(llm_client) if self._env_thread_check else None
+        self.voice_checker = VoiceCheckerAgent(llm_client) if self._env_voice_check else None
+        self.factcheck = FactCheckAgent(llm_client) if self._env_factcheck else None
+        self.summary_generator = SummaryGeneratorAgent(llm_client) if self._env_summary else None
 
         # 构建工作流
         self.workflow = self._build_workflow()
@@ -528,8 +528,8 @@ class BlogGenerator:
         # 根据审核问题修订内容
         review_issues = state.get('review_issues', [])
         total_issues = len(review_issues)
-        target_length = state.get('target_length', 'medium')
-        
+        style = self._get_style(state)
+
         if total_issues == 0:
             logger.info("没有需要修订的问题")
             return state
@@ -537,8 +537,8 @@ class BlogGenerator:
         max_workers = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
         use_parallel = _should_use_parallel()
         
-        # Mini/Short 模式：按章节分组问题，使用 correct_section（只更正不扩展）
-        if target_length in ('mini', 'short'):
+        # correct_only 模式：按章节分组问题，使用 correct_section（只更正不扩展）
+        if style.revision_strategy == "correct_only":
             # 按章节分组问题
             section_issues = {}
             for issue in review_issues:
@@ -722,37 +722,45 @@ class BlogGenerator:
             state['voice_issues'] = []
             return state
 
+        style = self._get_style(state)
+        thread_enabled = self._is_enabled(self._env_thread_check, style.enable_thread_check)
+        voice_enabled = self._is_enabled(self._env_voice_check, style.enable_voice_check)
+
+        if not thread_enabled and not voice_enabled:
+            state['thread_issues'] = []
+            state['voice_issues'] = []
+            return state
+
         logger.info("=== Step 6.5: 一致性检查（叙事 + 语气）===")
 
-        # 并行执行两个检查器（输入相同、输出写不同 state key，无竞争）
-        futures = []
         use_parallel = _should_use_parallel()
 
-        if use_parallel and self._thread_check_enabled and self._voice_check_enabled:
+        if use_parallel and thread_enabled and voice_enabled:
             with ThreadPoolExecutor(max_workers=2) as executor:
-                if self._thread_check_enabled:
+                futures = []
+                if thread_enabled:
                     futures.append(executor.submit(self.thread_checker.run, state))
-                if self._voice_check_enabled:
+                if voice_enabled:
                     futures.append(executor.submit(self.voice_checker.run, state))
                 for f in futures:
                     f.result()
         else:
-            if self._thread_check_enabled:
+            if thread_enabled:
                 try:
                     self.thread_checker.run(state)
                 except Exception as e:
                     logger.error(f"[ThreadChecker] 异常: {e}")
                     state['thread_issues'] = []
-            if self._voice_check_enabled:
+            if voice_enabled:
                 try:
                     self.voice_checker.run(state)
                 except Exception as e:
                     logger.error(f"[VoiceChecker] 异常: {e}")
                     state['voice_issues'] = []
 
-        if not self._thread_check_enabled:
+        if not thread_enabled:
             state['thread_issues'] = []
-        if not self._voice_check_enabled:
+        if not voice_enabled:
             state['voice_issues'] = []
 
         thread_count = len(state.get('thread_issues', []))
@@ -760,9 +768,21 @@ class BlogGenerator:
         logger.info(f"[ConsistencyCheck] 完成: 叙事问题 {thread_count}, 语气问题 {voice_count}")
         return state
 
+    def _get_style(self, state: SharedState) -> StyleProfile:
+        """获取当前运行的 StyleProfile（实例级 > state 级 > target_length 推断）"""
+        if self.style:
+            return self.style
+        target_length = state.get('target_length', 'medium')
+        return StyleProfile.from_target_length(target_length)
+
+    def _is_enabled(self, env_flag: bool, style_flag: bool) -> bool:
+        """环境变量 AND StyleProfile 双重开关"""
+        return env_flag and style_flag
+
     def _factcheck_node(self, state: SharedState) -> SharedState:
         """事实核查节点"""
-        if not self._factcheck_enabled:
+        style = self._get_style(state)
+        if not self._is_enabled(self._env_factcheck, style.enable_fact_check):
             logger.info("=== Step 7.3: 事实核查（已禁用，跳过）===")
             return state
         logger.info("=== Step 7.3: 事实核查 ===")
@@ -774,7 +794,8 @@ class BlogGenerator:
 
     def _text_cleanup_node(self, state: SharedState) -> SharedState:
         """确定性文本清理节点（纯正则，零 LLM）"""
-        if not self._text_cleanup_enabled:
+        style = self._get_style(state)
+        if not self._is_enabled(self._env_text_cleanup, style.enable_text_cleanup):
             logger.info("=== Step 7.4: 文本清理（已禁用，跳过）===")
             return state
         logger.info("=== Step 7.4: 确定性文本清理 ===")
@@ -795,7 +816,8 @@ class BlogGenerator:
 
     def _humanizer_node(self, state: SharedState) -> SharedState:
         """去 AI 味节点"""
-        if not self._humanizer_enabled:
+        style = self._get_style(state)
+        if not self._is_enabled(self._env_humanizer, style.enable_humanizer):
             logger.info("=== Step 7.5: 去 AI 味（已禁用，跳过）===")
             return state
         logger.info("=== Step 7.5: 去 AI 味 ===")
@@ -807,7 +829,8 @@ class BlogGenerator:
 
     def _summary_generator_node(self, state: SharedState) -> SharedState:
         """博客导读 + SEO 关键词生成节点"""
-        if not self._summary_enabled:
+        style = self._get_style(state)
+        if not self._is_enabled(self._env_summary, style.enable_summary_gen):
             logger.info("=== Step 9: 导读+SEO（已禁用，跳过）===")
             return state
         logger.info("=== Step 9: 导读 + SEO 关键词生成 ===")
@@ -830,54 +853,51 @@ class BlogGenerator:
         return "continue"
     
     def _should_revise(self, state: SharedState) -> Literal["revision", "assemble"]:
-        """判断是否需要修订"""
-        target_length = state.get('target_length', 'medium')
-        
-        # Mini/Short 模式只处理 high 级别问题，且最多修订 1 轮
-        if target_length in ('mini', 'short'):
-            revision_count = state.get('revision_count', 0)
-            # Mini 模式最多修订 1 轮
-            if revision_count >= 1:
-                logger.info(f"[{target_length}] 模式：已达到最大修订轮数 (1)，跳过修订")
-                return "assemble"
-            
-            review_issues = state.get('review_issues', [])
+        """判断是否需要修订 — 由 StyleProfile 控制"""
+        style = self._get_style(state)
+        revision_count = state.get('revision_count', 0)
+
+        # 达到最大修订轮数
+        if revision_count >= style.max_revision_rounds:
+            logger.info(f"已达到最大修订轮数 ({style.max_revision_rounds})，跳过修订")
+            return "assemble"
+
+        review_issues = state.get('review_issues', [])
+
+        # 修订问题过滤（high_only 模式）
+        if style.revision_severity_filter == "high_only":
             high_issues = [i for i in review_issues if i.get('severity') == 'high']
             if high_issues:
-                logger.info(f"[{target_length}] 模式：只处理 {len(high_issues)} 个 high 级别问题")
-                # 只保留 high 级别问题
+                logger.info(f"[{style.revision_severity_filter}] 只处理 {len(high_issues)} 个 high 级别问题")
                 state['review_issues'] = high_issues
                 return "revision"
-            logger.info(f"[{target_length}] 模式：无 high 级别问题，跳过修订")
+            logger.info(f"[{style.revision_severity_filter}] 无 high 级别问题，跳过修订")
             return "assemble"
-        
+
+        # 完整修订模式
         if not state.get('review_approved', True):
-            if state.get('revision_count', 0) < self.max_revision_rounds:
-                return "revision"
-        
+            return "revision"
+
         logger.info("审核通过或修订完成，进入组装")
         return "assemble"
 
     def _should_refine_search(self, state: SharedState) -> Literal["search", "continue"]:
-        """判断是否需要细化搜索"""
-        # Mini/Short 模式跳过知识增强，直接进入追问阶段
-        target_length = state.get('target_length', 'medium')
-        if target_length in ('mini', 'short'):
-            logger.info(f"[{target_length}] 模式跳过知识增强")
+        """判断是否需要细化搜索 — 由 StyleProfile 控制"""
+        style = self._get_style(state)
+        if not style.enable_knowledge_refinement:
+            logger.info("知识增强已禁用，跳过")
             return "continue"
-        
+
         gaps = state.get('knowledge_gaps', [])
         search_count = state.get('search_count', 0)
         max_count = state.get('max_search_count', 5)
-        
-        # 有知识空白且未达到搜索上限
+
         if gaps and search_count < max_count:
-            # 检查是否有重要的空白（missing_data 或 vague_concept）
             important_gaps = [g for g in gaps if g.get('gap_type') in ['missing_data', 'vague_concept']]
             if important_gaps:
                 logger.info(f"检测到 {len(important_gaps)} 个重要知识空白，触发细化搜索")
                 return "search"
-        
+
         logger.info("无需细化搜索，继续到追问阶段")
         return "continue"
     
