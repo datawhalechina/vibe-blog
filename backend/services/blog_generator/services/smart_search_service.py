@@ -70,7 +70,57 @@ PROFESSIONAL_BLOGS = {
         'name': 'Microsoft DevBlogs',
         'keywords': ['azure', 'microsoft', 'copilot', '.net', 'typescript', 'vscode']
     },
+    # ===== 71 号方案新增 AI 权威博客源 =====
+    'deepmind': {
+        'site': 'deepmind.google',
+        'name': 'Google DeepMind',
+        'keywords': ['deepmind', 'alphafold', 'alphacode', 'gemma', 'deepmind research']
+    },
+    'meta_ai': {
+        'site': 'ai.meta.com',
+        'name': 'Meta AI',
+        'keywords': ['meta ai', 'llama', 'llama3', 'codellama', 'meta research', 'fair']
+    },
+    'mistral': {
+        'site': 'mistral.ai',
+        'name': 'Mistral AI',
+        'keywords': ['mistral', 'mixtral', 'mistral ai', 'pixtral', 'codestral']
+    },
+    'xai': {
+        'site': 'x.ai',
+        'name': 'xAI',
+        'keywords': ['xai', 'grok', 'x.ai']
+    },
+    'ms_research': {
+        'site': 'microsoft.com/research',
+        'name': 'Microsoft Research',
+        'keywords': ['microsoft research', 'phi', 'orca', 'autogen', 'semantic kernel']
+    },
 }
+
+# ===== 71 号方案 Phase C: AI 话题自动增强 =====
+
+# AI 话题关键词（触发自动增强搜索）
+AI_TOPIC_KEYWORDS = [
+    # 通用 AI 术语
+    'ai', '人工智能', 'artificial intelligence', 'machine learning', '机器学习',
+    'deep learning', '深度学习', 'neural network', '神经网络',
+    # LLM 相关
+    'llm', '大模型', '大语言模型', 'large language model', 'foundation model',
+    'prompt', 'rag', 'agent', 'fine-tuning', '微调', 'embedding',
+    # 具体模型/产品
+    'gpt', 'claude', 'gemini', 'llama', 'mistral', 'grok',
+    'chatgpt', 'copilot', 'cursor', 'midjourney', 'stable diffusion',
+    # AI 应用
+    'ai agent', 'ai coding', 'vibe coding', 'ai 编程', 'ai 写作',
+    'mcp', 'model context protocol',
+]
+
+# AI 话题自动增强的搜索源
+AI_BOOST_SOURCES = [
+    'anthropic', 'openai', 'google_ai', 'deepmind',
+    'meta_ai', 'mistral', 'huggingface',
+]
 
 # 全局服务实例
 _smart_search_service: Optional['SmartSearchService'] = None
@@ -111,7 +161,11 @@ class SmartSearchService:
         sources = routing_result.get('sources', ['general'])
         arxiv_query = routing_result.get('arxiv_query', topic)
         blog_query = routing_result.get('blog_query', topic)
-        
+
+        # 71 号方案 Phase C：AI 话题自动增强
+        if os.environ.get('AI_BOOST_ENABLED', 'true').lower() == 'true':
+            sources = self._boost_ai_sources(sources, topic)
+
         logger.info(f"🧠 搜索源路由结果: {sources}")
         
         # 第二步：并行执行搜索
@@ -238,7 +292,36 @@ class SmartSearchService:
             'arxiv_query': topic,
             'blog_query': topic
         }
-    
+
+    # ===== 71 号方案 Phase C: AI 话题自动增强 =====
+
+    @staticmethod
+    def _is_ai_topic(topic: str) -> bool:
+        """检测是否为 AI 相关话题"""
+        topic_lower = topic.lower()
+        return any(kw in topic_lower for kw in AI_TOPIC_KEYWORDS)
+
+    def _boost_ai_sources(self, sources: List[str], topic: str) -> List[str]:
+        """AI 话题自动增强：确保覆盖所有 AI 权威博客源"""
+        if not self._is_ai_topic(topic):
+            return sources
+
+        boosted = list(sources)
+        added = 0
+        for src in AI_BOOST_SOURCES:
+            if src not in boosted:
+                boosted.append(src)
+                added += 1
+
+        # AI 话题也加入 arXiv
+        if 'arxiv' not in boosted:
+            boosted.append('arxiv')
+            added += 1
+
+        if added:
+            logger.info(f"🚀 AI 话题增强: +{added} 个额外源")
+        return boosted
+
     def _search_arxiv(self, query: str, max_results: int) -> Dict[str, Any]:
         """搜索 arXiv"""
         arxiv_service = get_arxiv_service()

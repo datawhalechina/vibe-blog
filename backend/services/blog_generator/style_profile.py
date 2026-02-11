@@ -55,6 +55,11 @@ class StyleProfile:
     enable_text_cleanup: bool = True
     enable_summary_gen: bool = True
 
+    # === 搜索增强参数（71 号方案）===
+
+    enable_ai_boost: bool = True
+    """AI 话题自动增强搜索（自动扩展到所有 AI 权威博客源）"""
+
     # === 预设套餐 ===
 
     @classmethod
@@ -70,6 +75,7 @@ class StyleProfile:
             enable_fact_check=False, enable_thread_check=False,
             enable_voice_check=False, enable_humanizer=False,
             enable_text_cleanup=True, enable_summary_gen=False,
+            enable_ai_boost=False,
         )
 
     @classmethod
