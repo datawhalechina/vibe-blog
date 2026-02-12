@@ -176,30 +176,36 @@ class TestPriority:
     """Q13-Q14: 优先级排序"""
 
     @pytest.mark.asyncio
-    async def test_q13_high_priority_first(self, queue_manager):
+    async def test_q13_high_priority_first(self, tmp_db_path):
         """Q13: 高优先级任务优先执行"""
+        from tests.test_task_queue.conftest import FakeBlogGenerator
+        # 用 max_concurrent=1 确保串行执行，验证优先级顺序
+        mgr = TaskQueueManager(db_path=tmp_db_path, max_concurrent=1)
+        await mgr.init()
+        mgr.set_blog_generator(FakeBlogGenerator(delay=0.05))
+
         completed_order = []
 
         def on_complete(task):
             completed_order.append(task.name)
 
-        queue_manager.on('task_completed', on_complete)
+        mgr.on('task_completed', on_complete)
 
         low = _make_task(name="low", priority=TaskPriority.LOW)
         high = _make_task(name="high", priority=TaskPriority.HIGH)
         normal = _make_task(name="normal")
 
         # 先入队低优先级，再入队高优先级
-        await queue_manager.enqueue(low)
-        await queue_manager.enqueue(normal)
-        await queue_manager.enqueue(high)
+        await mgr.enqueue(low)
+        await mgr.enqueue(normal)
+        await mgr.enqueue(high)
 
-        await queue_manager.start_worker()
+        await mgr.start_worker()
         for _ in range(100):
             if len(completed_order) >= 3:
                 break
             await asyncio.sleep(0.05)
-        await queue_manager.stop_worker()
+        await mgr.stop_worker()
         # 高优先级应该最先完成
         assert completed_order[0] == "high"
 
