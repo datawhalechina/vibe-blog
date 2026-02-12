@@ -143,6 +143,7 @@ class LLMService:
             模型响应文本，失败返回 None
         """
         from utils.resilient_llm_caller import resilient_chat, ContextLengthExceeded
+        from utils.context_guard import ContextGuard
 
         model = self.get_text_model()
         if not model:
@@ -150,6 +151,14 @@ class LLMService:
             return None
 
         try:
+            # 上下文长度预警（不阻断调用）
+            guard = ContextGuard(self.text_model, max_output_tokens=self.max_tokens)
+            check = guard.check(messages)
+            if not check["is_safe"]:
+                logger.warning(
+                    f"[{caller}] prompt 超限 {check['overflow_tokens']:,} tokens，"
+                    f"建议调用方裁剪内容"
+                )
             # 如果指定了 JSON 格式，尝试绑定到模型（部分 provider 可能不支持）
             if response_format and response_format.get("type") == "json_object":
                 try:

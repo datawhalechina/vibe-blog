@@ -84,6 +84,11 @@ class Config:
     LLM_RETRY_MAX_WAIT = float(os.getenv('LLM_RETRY_MAX_WAIT', '60'))
     LLM_TRUNCATION_EXPAND_RATIO = float(os.getenv('LLM_TRUNCATION_EXPAND_RATIO', '1.1'))
 
+    # 上下文长度守卫配置（37.33 上下文动态估算与自动回退）
+    CONTEXT_GUARD_ENABLED = os.getenv('CONTEXT_GUARD_ENABLED', 'true').lower() == 'true'
+    CONTEXT_SAFETY_MARGIN = float(os.getenv('CONTEXT_SAFETY_MARGIN', '0.85'))
+    CONTEXT_ESTIMATION_METHOD = os.getenv('CONTEXT_ESTIMATION_METHOD', 'auto')
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
