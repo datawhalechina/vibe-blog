@@ -101,6 +101,10 @@ class Config:
     SSE_LLM_EVENTS_ENABLED = os.getenv('SSE_LLM_EVENTS_ENABLED', 'true').lower() == 'true'
     SSE_TOKEN_SUMMARY_ENABLED = os.getenv('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() == 'true'
 
+    # 统一 ToolManager（37.09）
+    TOOL_BLACKLIST = os.getenv('TOOL_BLACKLIST', '')
+    TOOL_DEFAULT_TIMEOUT = int(os.getenv('TOOL_DEFAULT_TIMEOUT', '300'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""

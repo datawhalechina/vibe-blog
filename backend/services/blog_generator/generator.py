@@ -1121,6 +1121,19 @@ class BlogGenerator:
         except Exception:
             pass
 
+        # 创建 ToolManager 并注册现有工具（37.09）
+        try:
+            from utils.tool_manager import BlogToolManager
+            tool_manager = BlogToolManager(task_log=task_log)
+            if self.search_service:
+                tool_manager.register(
+                    "web_search", self.search_service.search,
+                    description="搜索互联网获取背景知识", timeout=30,
+                )
+            self.tool_manager = tool_manager
+        except Exception:
+            pass
+
         # 创建初始状态
         initial_state = create_initial_state(
             topic=topic,
