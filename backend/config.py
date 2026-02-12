@@ -105,6 +105,11 @@ class Config:
     TOOL_BLACKLIST = os.getenv('TOOL_BLACKLIST', '')
     TOOL_DEFAULT_TIMEOUT = int(os.getenv('TOOL_DEFAULT_TIMEOUT', '300'))
 
+    # Serper Google 搜索配置（75.02）
+    SERPER_API_KEY = os.getenv('SERPER_API_KEY', '')
+    SERPER_TIMEOUT = int(os.getenv('SERPER_TIMEOUT', '10'))
+    SERPER_MAX_RESULTS = int(os.getenv('SERPER_MAX_RESULTS', '10'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""

@@ -184,6 +184,10 @@ class SmartSearchService:
         # 通用搜索（始终包含）
         if 'general' in sources or not search_tasks:
             search_tasks.append(('general', blog_query))
+
+        # Google 搜索（75.02 Serper）
+        if 'google' in sources:
+            search_tasks.append(('google', blog_query))
         
         # 并行执行
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -199,6 +203,9 @@ class SmartSearchService:
                 elif task[0] == 'general':
                     future = executor.submit(self._search_general, task[1], max_results_per_source)
                     futures[future] = 'general'
+                elif task[0] == 'google':
+                    future = executor.submit(self._search_google, task[1], max_results_per_source)
+                    futures[future] = 'google'
             
             for future in as_completed(futures):
                 source_name = futures[future]
@@ -286,6 +293,15 @@ class SmartSearchService:
         for blog_id, config in PROFESSIONAL_BLOGS.items():
             if any(kw in topic_lower for kw in config['keywords']):
                 sources.append(blog_id)
+
+        # 75.02: 如果 Serper 可用，自动加入 Google 搜索
+        try:
+            from .serper_search_service import get_serper_service
+            serper = get_serper_service()
+            if serper and serper.is_available():
+                sources.append('google')
+        except Exception:
+            pass
         
         return {
             'sources': sources,
@@ -365,6 +381,14 @@ class SmartSearchService:
             return result
         return {'success': False, 'results': [], 'error': '搜索服务不可用'}
     
+    def _search_google(self, query: str, max_results: int) -> Dict[str, Any]:
+        """Google 搜索（通过 Serper API，75.02）"""
+        from .serper_search_service import get_serper_service
+        serper = get_serper_service()
+        if not serper or not serper.is_available():
+            return {'success': False, 'results': [], 'error': 'Serper 服务不可用'}
+        return serper.search(query, max_results)
+
     def _merge_and_dedupe(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """合并去重搜索结果"""
         seen_urls = set()
