@@ -1106,6 +1106,21 @@ class BlogGenerator:
         except Exception:
             pass
 
+        # 创建结构化任务日志
+        task_log = None
+        try:
+            import os as _os
+            if _os.environ.get('BLOG_TASK_LOG_ENABLED', 'true').lower() == 'true':
+                from .utils.task_log import BlogTaskLog
+                task_log = BlogTaskLog(
+                    topic=topic,
+                    article_type=article_type,
+                    target_length=target_length,
+                )
+                self.task_log = task_log
+        except Exception:
+            pass
+
         # 创建初始状态
         initial_state = create_initial_state(
             topic=topic,
@@ -1132,6 +1147,21 @@ class BlogGenerator:
                 logger.info(token_tracker.format_summary())
                 token_summary = token_tracker.get_summary()
 
+            # 完成任务日志
+            if task_log:
+                task_log.complete(
+                    score=final_state.get('review_score', 0),
+                    word_count=len(final_state.get('final_markdown', '')),
+                    revision_rounds=final_state.get('revision_count', 0),
+                )
+                if token_summary:
+                    task_log.token_summary = token_summary
+                try:
+                    task_log.save()
+                except Exception as save_err:
+                    logger.warning(f"任务日志保存失败: {save_err}")
+                logger.info(task_log.get_summary())
+
             result = {
                 "success": True,
                 "markdown": final_state.get('final_markdown', ''),
@@ -1151,6 +1181,12 @@ class BlogGenerator:
             
         except Exception as e:
             logger.error(f"博客生成失败: {e}", exc_info=True)
+            if task_log:
+                task_log.fail(str(e))
+                try:
+                    task_log.save()
+                except Exception:
+                    pass
             return {
                 "success": False,
                 "markdown": "",
