@@ -5,52 +5,93 @@
     <!-- 导航栏 -->
     <AppNavbar :app-config="appConfig" />
 
-    <!-- 首屏：Hero + 输入框，占满视口 -->
-    <div class="first-screen">
-      <!-- Hero 区域 -->
-      <HeroSection />
+    <!-- Fullpage 滑动容器 -->
+    <div
+      class="fullpage-container"
+      @wheel="onWheel"
+      @touchstart="onTouchStart"
+      @touchend="onTouchEnd"
+    >
+      <div class="fullpage-track" :style="{ transform: `translateY(-${currentSection * 100}vh)` }">
+        <!-- 第一屏：Hero + 输入框 -->
+        <section ref="sectionRefs" class="fullpage-section">
+          <div class="first-screen">
+            <HeroSection />
+            <div class="main-content-wrapper">
+              <div class="content-container">
+                <BlogInputCard
+                  v-model:topic="topic"
+                  v-model:show-advanced-options="showAdvancedOptions"
+                  :uploaded-documents="uploadedDocuments"
+                  :is-loading="isLoading"
+                  @generate="handleGenerate"
+                  @file-upload="handleFileUpload"
+                  @remove-document="removeDocument"
+                />
+                <div class="advanced-options-anchor">
+                  <Transition name="slide-down">
+                    <AdvancedOptionsPanel
+                      v-if="showAdvancedOptions"
+                      v-model:article-type="articleType"
+                      v-model:target-length="targetLength"
+                      v-model:audience-adaptation="audienceAdaptation"
+                      v-model:image-style="imageStyle"
+                      v-model:generate-cover-video="generateCoverVideo"
+                      v-model:video-aspect-ratio="videoAspectRatio"
+                      v-model:custom-config="customConfig"
+                      :image-styles="imageStyles"
+                      :app-config="appConfig"
+                    />
+                  </Transition>
+                </div>
+              </div>
+            </div>
+            <div class="scroll-hint" @click="goToSection(1)">
+              <span class="scroll-hint-text">scroll</span>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scroll-hint-arrow">
+                <path d="M12 5v14M5 12l7 7 7-7"/>
+              </svg>
+            </div>
+            <Footer class="first-screen-footer" />
+          </div>
+        </section>
 
-      <!-- 主内容区 - 统一容器宽度 -->
-      <div class="main-content-wrapper">
-        <div class="content-container">
-        <!-- 主输入框 - 终端风格搜索栏 -->
-        <BlogInputCard
-          v-model:topic="topic"
-          v-model:show-advanced-options="showAdvancedOptions"
-          :uploaded-documents="uploadedDocuments"
-          :is-loading="isLoading"
-          @generate="handleGenerate"
-          @file-upload="handleFileUpload"
-          @remove-document="removeDocument"
-        />
-
-        <!-- 高级选项面板 - 绝对定位浮层，不影响下方布局 -->
-        <div class="advanced-options-anchor">
-          <Transition name="slide-down">
-            <AdvancedOptionsPanel
-              v-if="showAdvancedOptions"
-              v-model:article-type="articleType"
-              v-model:target-length="targetLength"
-              v-model:audience-adaptation="audienceAdaptation"
-              v-model:image-style="imageStyle"
-              v-model:generate-cover-video="generateCoverVideo"
-              v-model:video-aspect-ratio="videoAspectRatio"
-              v-model:custom-config="customConfig"
-              :image-styles="imageStyles"
-              :app-config="appConfig"
-            />
-          </Transition>
-        </div>
-
-        </div>
+        <!-- 第二屏：历史记录（保持原布局） -->
+        <section ref="secondSectionRef" class="fullpage-section">
+          <div class="history-section history-visible">
+            <div class="content-container">
+              <BlogHistoryList
+                :show-list="showBlogList"
+                :current-tab="currentHistoryTab"
+                :content-type="historyContentType"
+                v-model:show-cover-preview="showCoverPreview"
+                :records="historyRecords"
+                :total="historyTotal"
+                :current-page="historyCurrentPage"
+                :total-pages="historyTotalPages"
+                :content-type-filters="contentTypeFilters"
+                :animated="currentSection >= 1"
+                @toggle-list="showBlogList = !showBlogList"
+                @switch-tab="switchHistoryTab"
+                @filter-content-type="filterByContentType"
+                @load-detail="loadHistoryDetail"
+                @load-more="loadMoreHistory"
+              />
+            </div>
+          </div>
+          <Footer />
+        </section>
       </div>
 
-      <!-- 下滑提示 -->
-      <div class="scroll-hint">
-        <span class="scroll-hint-text">scroll</span>
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="scroll-hint-arrow">
-          <path d="M12 5v14M5 12l7 7 7-7"/>
-        </svg>
+      <!-- 侧边指示器 -->
+      <div class="section-indicators">
+        <div
+          v-for="i in totalSections"
+          :key="i"
+          class="section-dot"
+          :class="{ active: currentSection === i - 1 }"
+          @click="goToSection(i - 1)"
+        />
       </div>
     </div>
 
@@ -82,32 +123,6 @@
       @publish="doPublish"
     />
 
-    <!-- 历史记录区域 - 滚动到视口时淡入 -->
-    <div ref="historySectionRef" class="history-section" :class="{ 'history-visible': historyVisible }">
-      <div class="content-container">
-        <!-- 博客历史列表 -->
-        <BlogHistoryList
-          :show-list="showBlogList"
-          :current-tab="currentHistoryTab"
-          :content-type="historyContentType"
-          v-model:show-cover-preview="showCoverPreview"
-          :records="historyRecords"
-          :total="historyTotal"
-          :current-page="historyCurrentPage"
-          :total-pages="historyTotalPages"
-          :content-type-filters="contentTypeFilters"
-          :animated="historyVisible"
-          @toggle-list="showBlogList = !showBlogList"
-          @switch-tab="switchHistoryTab"
-          @filter-content-type="filterByContentType"
-          @load-detail="loadHistoryDetail"
-          @load-more="loadMoreHistory"
-        />
-      </div>
-    </div>
-
-    <!-- 底部备案信息 -->
-    <Footer />
   </div>
 </template>
 
@@ -138,9 +153,62 @@ const isDarkMode = computed(() => themeStore.isDark)
 // ========== 输入状态 ==========
 const topic = ref('')
 const showAdvancedOptions = ref(false)
-const historyVisible = ref(false)
-const historySectionRef = ref<HTMLElement | null>(null)
-let historyObserver: IntersectionObserver | null = null
+
+// ========== Fullpage 滑动 ==========
+const currentSection = ref(0)
+const totalSections = 2
+const secondSectionRef = ref<HTMLElement | null>(null)
+let isAnimating = false
+let wheelAccum = 0
+
+const goToSection = (index: number) => {
+  if (isAnimating || index < 0 || index >= totalSections || index === currentSection.value) return
+  isAnimating = true
+  currentSection.value = index
+  setTimeout(() => { isAnimating = false }, 700)
+}
+
+const onWheel = (e: WheelEvent) => {
+  // 第二屏：检查是否在滚动边界
+  if (currentSection.value === 1 && secondSectionRef.value) {
+    const el = secondSectionRef.value
+    const atTop = el.scrollTop <= 0
+    const atBottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 1
+
+    // 在顶部往上滑 → 回到第一屏
+    if (atTop && e.deltaY < 0) {
+      e.preventDefault()
+      goToSection(0)
+      return
+    }
+    // 没到边界 → 让内容正常滚动，不拦截
+    if (!atBottom || e.deltaY <= 0) return
+  }
+
+  // 第一屏：拦截滚动，触发翻页
+  if (currentSection.value === 0) {
+    e.preventDefault()
+    wheelAccum += e.deltaY
+    if (Math.abs(wheelAccum) > 50) {
+      if (wheelAccum > 0) goToSection(1)
+      wheelAccum = 0
+    }
+  }
+}
+
+let touchStartY = 0
+const onTouchStart = (e: TouchEvent) => { touchStartY = e.touches[0].clientY }
+const onTouchEnd = (e: TouchEvent) => {
+  const diff = touchStartY - e.changedTouches[0].clientY
+  if (currentSection.value === 1 && secondSectionRef.value) {
+    const atTop = secondSectionRef.value.scrollTop <= 0
+    if (diff < -50 && atTop) { goToSection(0); return }
+    return // 第二屏内让触摸滚动正常工作
+  }
+  if (Math.abs(diff) > 50) {
+    if (diff > 0) goToSection(1)
+  }
+}
 
 // ========== 高级选项 ==========
 const articleType = ref('tutorial')
@@ -612,17 +680,12 @@ onMounted(async () => {
   // Load history
   loadHistory(1)
 
-  // 监听滚动，检测 history 区域是否进入视口
-  const checkHistoryVisible = () => {
-    if (historyVisible.value || !historySectionRef.value) return
-    const rect = historySectionRef.value.getBoundingClientRect()
-    // 元素顶部进入视口下方 200px 内就触发
-    if (rect.top < window.innerHeight + 200) {
-      historyVisible.value = true
-      window.removeEventListener('scroll', checkHistoryVisible)
-    }
+  // 键盘支持
+  const onKeydown = (e: KeyboardEvent) => {
+    if (e.key === 'ArrowDown') goToSection(currentSection.value + 1)
+    if (e.key === 'ArrowUp') goToSection(currentSection.value - 1)
   }
-  window.addEventListener('scroll', checkHistoryVisible, { passive: true })
+  window.addEventListener('keydown', onKeydown)
 })
 
 onUnmounted(() => {
@@ -631,10 +694,10 @@ onUnmounted(() => {
 
 <style scoped>
 .home-container {
-  min-height: 100vh;
+  height: 100vh;
   background: var(--color-bg-base);
   position: relative;
-  padding-top: 60px;
+  overflow: hidden;
   transition: var(--transition-colors);
 }
 
@@ -663,22 +726,92 @@ onUnmounted(() => {
 }
 
 @keyframes bg-scroll {
-  0% {
-    transform: translate(0, 0);
-  }
-  100% {
-    transform: translate(50px, 50px);
-  }
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(50px, 50px); }
 }
 
-/* 首屏占满视口（减去导航栏高度） */
+/* ===== Fullpage 滑动系统 ===== */
+.fullpage-container {
+  position: relative;
+  height: calc(100vh - 60px);
+  margin-top: 60px;
+  overflow: hidden;
+}
+
+.fullpage-track {
+  transition: transform 0.7s cubic-bezier(0.65, 0, 0.35, 1);
+  will-change: transform;
+}
+
+.fullpage-section {
+  height: calc(100vh - 60px);
+  overflow-y: auto;
+}
+
+/* 侧边指示器 */
+.section-indicators {
+  position: fixed;
+  right: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 50;
+}
+
+.section-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.section-dot.active {
+  background: var(--color-primary, #3b82f6);
+  transform: scale(1.4);
+}
+
+.dark-mode .section-dot {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.dark-mode .section-dot.active {
+  background: var(--color-primary, #60a5fa);
+}
+
+/* 首屏 */
 .first-screen {
   position: relative;
-  min-height: calc(100vh - 60px);
+  height: 100%;
   display: flex;
   flex-direction: column;
   justify-content: center;
   align-items: center;
+}
+
+/* 第二屏 - 历史记录（保持原布局） */
+.history-section {
+  position: relative;
+  z-index: 1;
+  margin-top: 0;
+  padding: 1.5rem 0;
+  background: linear-gradient(to bottom, transparent, var(--color-muted) 50%, transparent);
+}
+
+.history-section.history-visible {
+  opacity: 1;
+  transform: none;
+}
+
+/* 首屏底部备案 */
+.first-screen-footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
 }
 
 /* 下滑提示 */
@@ -696,6 +829,7 @@ onUnmounted(() => {
   font-size: var(--font-size-xs);
   opacity: 0.5;
   animation: scroll-bounce 2s ease-in-out infinite;
+  cursor: pointer;
 }
 
 .scroll-hint-arrow {
@@ -707,7 +841,7 @@ onUnmounted(() => {
   50% { transform: translateY(6px); }
 }
 
-/* 统一容器宽度 - 所有内容使用相同宽度 */
+/* 统一容器宽度 */
 .main-content-wrapper {
   position: relative;
   z-index: 1;
@@ -745,85 +879,53 @@ onUnmounted(() => {
   transform: translateY(-8px);
 }
 
-/* 历史记录区域 - 终端风格转场效果 */
-.history-section {
-  position: relative;
-  z-index: 1;
-  margin-top: 0;
-  padding: 1.5rem 0;
-  background: linear-gradient(to bottom, transparent, var(--color-muted) 50%, transparent);
-  opacity: 0;
-  transform: translateY(40px);
-}
-
-/* 激活状态 - 淡入上滑 */
-.history-section.history-visible {
-  animation: terminal-boot 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-}
-
-@keyframes terminal-boot {
-  0% {
-    opacity: 0;
-    transform: translateY(40px);
-  }
-  30% {
-    opacity: 0.6;
-    transform: translateY(20px);
-  }
-  60% {
-    opacity: 0.9;
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 /* Dark Mode */
 .dark-mode {
   background: var(--color-bg-base);
 }
 
-/* Mobile Responsive - 最小 8px 间距 */
+/* Mobile */
 @media (max-width: 767px) {
-  .home-container {
-    padding-top: 56px;
+  .fullpage-container {
+    height: calc(100vh - 56px);
+    margin-top: 56px;
+  }
+
+  .fullpage-section {
+    height: calc(100vh - 56px);
   }
 
   .content-container {
     padding: 1.5rem 1rem;
   }
 
-  .history-section {
-    margin-top: 0;
-    padding: 1rem 0;
+  .section-indicators {
+    right: 12px;
   }
 }
 
-/* Tablet - 中等间距 */
+/* Tablet */
 @media (min-width: 768px) and (max-width: 1023px) {
   .content-container {
     padding: 2rem 1.5rem;
   }
 }
 
-/* Large Desktop - 更大容器 */
+/* Large Desktop */
 @media (min-width: 1440px) {
   .content-container {
     max-width: 1400px;
     padding: 3rem 2rem;
   }
-
-  .history-section {
-    margin-top: 0;
-    padding: 2rem 0;
-  }
 }
 
-/* Reduce motion - 可访问性 */
+/* Reduce motion */
 @media (prefers-reduced-motion: reduce) {
   .bg-animation::before {
     animation: none;
+  }
+  .fullpage-track {
+    transition: none;
   }
 }
 </style>

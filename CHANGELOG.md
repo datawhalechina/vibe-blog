@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-02-12
 
 ### Added
+- ✨ **首页 Fullpage 卡片滑动** — Hero 首屏与历史记录区域之间整屏滑动切换，支持鼠标滚轮、触摸滑动、键盘方向键、侧边圆点指示器；第二屏内容可正常滚动，滚到顶部上滑回首屏
 - ✨ **Searcher 智能搜索改造** (#71) — 新增 5 个 AI 博客源（DeepMind/Meta AI/Mistral/xAI/MS Research），AI 话题自动增强，StyleProfile.enable_ai_boost 控制
 - ✨ **Planner 章节编号体系** — 中文数字主章节编号（一、二、三...）+ 阿拉伯数字子标题（1.1/1.2）+ 子子标题（1.1.1），subsections 结构化规划
 - ✨ **Assembler 多级目录** — extract_subheadings 支持 ###/#### 多级标题提取，assembler_header.j2 渲染嵌套可点击目录
