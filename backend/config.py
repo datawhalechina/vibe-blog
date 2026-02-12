@@ -89,6 +89,10 @@ class Config:
     CONTEXT_SAFETY_MARGIN = float(os.getenv('CONTEXT_SAFETY_MARGIN', '0.85'))
     CONTEXT_ESTIMATION_METHOD = os.getenv('CONTEXT_ESTIMATION_METHOD', 'auto')
 
+    # Token 追踪与成本分析
+    TOKEN_TRACKING_ENABLED = os.getenv('TOKEN_TRACKING_ENABLED', 'true').lower() == 'true'
+    TOKEN_COST_ESTIMATION = os.getenv('TOKEN_COST_ESTIMATION', 'false').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""

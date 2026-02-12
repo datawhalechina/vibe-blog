@@ -1094,7 +1094,18 @@ class BlogGenerator:
         """
         if self.app is None:
             self.compile()
-        
+
+        # 创建 Token 追踪器并注入 LLMService
+        token_tracker = None
+        try:
+            import os
+            if os.environ.get('TOKEN_TRACKING_ENABLED', 'true').lower() == 'true':
+                from utils.token_tracker import TokenTracker
+                token_tracker = TokenTracker()
+                self.llm.token_tracker = token_tracker
+        except Exception:
+            pass
+
         # 创建初始状态
         initial_state = create_initial_state(
             topic=topic,
@@ -1114,8 +1125,14 @@ class BlogGenerator:
             final_state = self.app.invoke(initial_state, config)
             
             logger.info("博客生成完成!")
-            
-            return {
+
+            # 输出 Token 用量摘要
+            token_summary = None
+            if token_tracker:
+                logger.info(token_tracker.format_summary())
+                token_summary = token_tracker.get_summary()
+
+            result = {
                 "success": True,
                 "markdown": final_state.get('final_markdown', ''),
                 "outline": final_state.get('outline', {}),
@@ -1128,6 +1145,9 @@ class BlogGenerator:
                 "meta_description": final_state.get('meta_description', ''),
                 "error": None
             }
+            if token_summary:
+                result["token_summary"] = token_summary
+            return result
             
         except Exception as e:
             logger.error(f"博客生成失败: {e}", exc_info=True)

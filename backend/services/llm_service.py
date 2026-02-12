@@ -66,6 +66,9 @@ class LLMService:
 
         # 懒加载的模型实例
         self._text_chat_model = None
+
+        # Token 追踪器（由 BlogGenerator 注入，默认 None）
+        self.token_tracker = None
     
     def _create_chat_model(self, model_name: str):
         """创建 LangChain ChatModel 实例"""
@@ -179,6 +182,13 @@ class LLMService:
             if metadata.get("truncated"):
                 logger.warning(f"[{caller}] 响应被截断，内容可能不完整")
 
+            # 记录 token 用量
+            if self.token_tracker and metadata.get("token_usage"):
+                token_usage = metadata["token_usage"]
+                token_usage.model = self.text_model
+                token_usage.provider = self.provider_format
+                self.token_tracker.record(token_usage, agent=caller or "unknown")
+
             return content
 
         except ContextLengthExceeded as e:
@@ -235,12 +245,27 @@ class LLMService:
                 try:
                     _rate_limit()
                     full_content = ""
+                    last_chunk = None
                     with timeout_guard(DEFAULT_LLM_TIMEOUT):
                         for chunk in model.stream(langchain_messages):
                             delta = chunk.content if hasattr(chunk, 'content') else str(chunk)
                             full_content += delta
+                            last_chunk = chunk
                             if on_chunk:
                                 on_chunk(delta, full_content)
+
+                    # 流式完成后提取 token 用量
+                    if self.token_tracker and last_chunk:
+                        try:
+                            from utils.token_tracker import extract_token_usage_from_langchain
+                            token_usage = extract_token_usage_from_langchain(
+                                last_chunk, model=self.text_model, provider=self.provider_format
+                            )
+                            if token_usage.input_tokens or token_usage.output_tokens:
+                                self.token_tracker.record(token_usage, agent=caller or "unknown")
+                        except Exception:
+                            pass
+
                     return full_content.strip()
 
                 except LLMCallTimeout:

@@ -130,6 +130,15 @@ def _set_max_tokens(model, new_max: int):
         return model
 
 
+def _extract_token_usage(response):
+    """从 LangChain 响应中提取 token 用量，失败返回 None"""
+    try:
+        from utils.token_tracker import extract_token_usage_from_langchain
+        return extract_token_usage_from_langchain(response)
+    except Exception:
+        return None
+
+
 def resilient_chat(
     model,
     messages: list,
@@ -145,7 +154,7 @@ def resilient_chat(
 
     Returns:
         (content, metadata) 元组
-        metadata: {"finish_reason": str, "truncated": bool, "attempts": int}
+        metadata: {"finish_reason": str, "truncated": bool, "attempts": int, "token_usage": TokenUsage|None}
     """
     label = f"[{caller}] " if caller else ""
     current_model = model
@@ -159,6 +168,9 @@ def resilient_chat(
                 response = current_model.invoke(messages)
 
             content = response.content.strip() if response.content else ""
+
+            # --- 提取 token 用量 ---
+            token_usage = _extract_token_usage(response)
 
             # --- 截断检测 ---
             if is_truncated(response):
@@ -174,7 +186,7 @@ def resilient_chat(
                     continue
                 else:
                     logger.warning(f"{label}响应仍被截断 (已重试 {max_retries} 次)，返回截断结果")
-                    return content, {"finish_reason": "length", "truncated": True, "attempts": attempts}
+                    return content, {"finish_reason": "length", "truncated": True, "attempts": attempts, "token_usage": token_usage}
 
             # --- 重复检测 ---
             if is_repeated(content):
@@ -186,7 +198,7 @@ def resilient_chat(
                     logger.warning(f"{label}重复输出仍存在 (已重试 {max_retries} 次)，返回当前结果")
 
             # --- 正常完成 ---
-            return content, {"finish_reason": "stop", "truncated": False, "attempts": attempts}
+            return content, {"finish_reason": "stop", "truncated": False, "attempts": attempts, "token_usage": token_usage}
 
         except LLMCallTimeout:
             if attempt < max_retries - 1:
