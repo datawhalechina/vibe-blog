@@ -134,6 +134,105 @@ class LLMService:
         return bool(self._openai_api_key)
 
     @staticmethod
+    def _supports_thinking(model_name: str) -> bool:
+        """检查模型是否支持 Extended Thinking（仅 Claude 系列）"""
+        if not model_name:
+            return False
+        return "claude" in model_name.lower()
+
+    def _chat_with_thinking(
+        self,
+        langchain_messages: list,
+        budget_tokens: int = 19000,
+        caller: str = "",
+    ) -> Optional[str]:
+        """使用 Anthropic Extended Thinking 模式调用
+
+        通过 anthropic SDK 直接调用（LangChain 尚未完整支持 thinking 参数）。
+        如果 anthropic SDK 不可用，降级为普通调用。
+        """
+        try:
+            import anthropic
+        except ImportError:
+            logger.warning(f"[{caller}] anthropic SDK 未安装，降级为普通调用")
+            return self._chat_with_thinking_fallback(langchain_messages, caller)
+
+        try:
+            # 将 LangChain 消息转为 Anthropic API 格式
+            api_messages = []
+            system_text = ""
+            for msg in langchain_messages:
+                role = msg.type  # "human" / "system" / "ai"
+                content = msg.content
+                if role == "system":
+                    system_text = content
+                elif role == "ai":
+                    api_messages.append({"role": "assistant", "content": content})
+                else:
+                    api_messages.append({"role": "user", "content": content})
+
+            client = anthropic.Anthropic(
+                api_key=self._openai_api_key,
+                base_url=self._openai_api_base or None,
+            )
+
+            kwargs = {
+                "model": self.text_model,
+                "max_tokens": self.max_tokens + budget_tokens,
+                "thinking": {
+                    "type": "enabled",
+                    "budget_tokens": budget_tokens,
+                },
+                "messages": api_messages,
+            }
+            if system_text:
+                kwargs["system"] = system_text
+
+            _rate_limit()
+            response = client.messages.create(**kwargs)
+
+            # 提取最终文本（跳过 thinking blocks）
+            text_parts = []
+            for block in response.content:
+                if getattr(block, "type", None) == "text":
+                    text_parts.append(block.text)
+
+            # 记录 thinking token 用量
+            if self.token_tracker and response.usage:
+                try:
+                    from utils.token_tracker import TokenUsage
+                    usage = TokenUsage(
+                        input_tokens=response.usage.input_tokens,
+                        output_tokens=response.usage.output_tokens,
+                        model=self.text_model,
+                        provider="anthropic",
+                    )
+                    # 记录 thinking tokens（如果 API 返回）
+                    thinking_tokens = getattr(response.usage, "cache_creation_input_tokens", 0)
+                    if hasattr(response.usage, "thinking_tokens"):
+                        thinking_tokens = response.usage.thinking_tokens
+                    if thinking_tokens:
+                        usage.extra = {"thinking_tokens": thinking_tokens}
+                    self.token_tracker.record(usage, agent=caller or "unknown")
+                except Exception:
+                    pass
+
+            return "\n".join(text_parts).strip() if text_parts else None
+
+        except Exception as e:
+            logger.warning(f"[{caller}] Thinking 模式调用失败: {e}，降级为普通调用")
+            return self._chat_with_thinking_fallback(langchain_messages, caller)
+
+    def _chat_with_thinking_fallback(self, langchain_messages: list, caller: str) -> Optional[str]:
+        """Thinking 模式降级：使用普通 resilient_chat"""
+        from utils.resilient_llm_caller import resilient_chat
+        model = self.get_text_model()
+        if not model:
+            return None
+        content, _ = resilient_chat(model=model, messages=langchain_messages, caller=caller)
+        return content
+
+    @staticmethod
     def _convert_messages(messages: List[Dict[str, Any]]) -> list:
         """将 dict 格式消息转换为 LangChain 消息对象"""
         from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
@@ -155,6 +254,8 @@ class LLMService:
         temperature: float = 0.7,
         response_format: Dict[str, Any] = None,
         caller: str = "",
+        thinking: bool = False,
+        thinking_budget: int = 19000,
     ) -> Optional[str]:
         """
         发送聊天请求（带截断扩容、智能重试、超时保护）
@@ -164,6 +265,8 @@ class LLMService:
             temperature: 温度参数
             response_format: 响应格式，如 {"type": "json_object"}
             caller: 调用方标识（用于日志追踪）
+            thinking: 是否启用 Extended Thinking 模式（仅 Claude 模型支持）
+            thinking_budget: Thinking 模式的 budget_tokens（默认 19000）
 
         Returns:
             模型响应文本，失败返回 None
@@ -205,14 +308,24 @@ class LLMService:
                 self.task_manager.send_event(self.task_id, 'llm_start', {
                     'agent': caller,
                     'model': self.text_model,
+                    'thinking': thinking,
                 })
 
-            # 使用 resilient_chat 替代原来的简单调用
-            content, metadata = resilient_chat(
-                model=model,
-                messages=langchain_messages,
-                caller=caller,
-            )
+            # Thinking 模式分支
+            if thinking and self._supports_thinking(self.text_model):
+                content = self._chat_with_thinking(
+                    langchain_messages, thinking_budget, caller=caller,
+                )
+                metadata = {"attempts": 1}
+            else:
+                if thinking:
+                    logger.info(f"[{caller}] 模型 {self.text_model} 不支持 Thinking，降级为普通调用")
+                # 使用 resilient_chat 替代原来的简单调用
+                content, metadata = resilient_chat(
+                    model=model,
+                    messages=langchain_messages,
+                    caller=caller,
+                )
 
             # SSE: 发送 llm_end 事件
             if _send_llm:
@@ -223,6 +336,7 @@ class LLMService:
                     'duration_ms': duration_ms,
                     'truncated': metadata.get('truncated', False),
                     'attempts': metadata.get('attempts', 1),
+                    'thinking': thinking,
                 })
 
             if metadata.get("truncated"):

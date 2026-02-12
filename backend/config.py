@@ -125,6 +125,10 @@ class Config:
     CONTEXT_SEARCH_MAX_RESULTS = int(os.getenv('CONTEXT_SEARCH_MAX_RESULTS', '10'))
     CONTEXT_REVISION_KEEP_LAST = int(os.getenv('CONTEXT_REVISION_KEEP_LAST', '2'))
 
+    # 推理引擎 Extended Thinking（37.03）
+    THINKING_ENABLED = os.getenv('THINKING_ENABLED', 'false').lower() == 'true'
+    THINKING_BUDGET_TOKENS = int(os.getenv('THINKING_BUDGET_TOKENS', '19000'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
