@@ -120,6 +120,11 @@ class Config:
     DEFAULT_LLM_PROVIDER = os.getenv('DEFAULT_LLM_PROVIDER', 'openai')
     DEFAULT_LLM_MODEL = os.getenv('DEFAULT_LLM_MODEL', '')
 
+    # 上下文压缩策略（37.06）
+    CONTEXT_COMPRESSION_ENABLED = os.getenv('CONTEXT_COMPRESSION_ENABLED', 'true').lower() == 'true'
+    CONTEXT_SEARCH_MAX_RESULTS = int(os.getenv('CONTEXT_SEARCH_MAX_RESULTS', '10'))
+    CONTEXT_REVISION_KEEP_LAST = int(os.getenv('CONTEXT_REVISION_KEEP_LAST', '2'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
