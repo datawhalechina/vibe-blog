@@ -266,13 +266,13 @@ class TestMiniModeCorrectSection:
         # 验证 generator.py 中的修订逻辑
         import inspect
         from services.blog_generator.generator import BlogGenerator
-        
+
         generator = BlogGenerator.__new__(BlogGenerator)
         source = inspect.getsource(generator._revision_node)
-        
-        # 验证 Mini 模式使用 correct_section
+
+        # 验证 correct_only 策略使用 correct_section（mini/short 通过 StyleProfile 映射）
         assert "correct_section" in source
-        assert "target_length in ('mini', 'short')" in source
+        assert "revision_strategy" in source
 
 
 class TestInitialState:
