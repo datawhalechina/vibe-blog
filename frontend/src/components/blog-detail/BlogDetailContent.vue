@@ -176,6 +176,39 @@ defineProps<Props>()
   text-decoration: underline;
 }
 
+/* 表格样式 */
+.blog-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 20px 0;
+  font-size: 0.95rem;
+  background: var(--surface);
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.blog-content :deep(th),
+.blog-content :deep(td) {
+  padding: 10px 14px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.blog-content :deep(th) {
+  background: var(--bg);
+  font-weight: 600;
+  color: var(--heading);
+}
+
+.blog-content :deep(tr:last-child td) {
+  border-bottom: none;
+}
+
+.blog-content :deep(tr:hover td) {
+  background: var(--bg);
+}
+
 /* Mermaid 图表样式 */
 .blog-content :deep(.mermaid-container) {
   background: var(--surface);

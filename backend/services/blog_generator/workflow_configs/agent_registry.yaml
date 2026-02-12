@@ -1,0 +1,81 @@
+# Agent 注册表 — 声明所有可用 Agent 的元数据
+# type: critical = 失败则终止, enhancement = 失败则跳过
+
+agents:
+  # ========== 核心 Agent ==========
+  researcher:
+    class: "agents.researcher.ResearcherAgent"
+    type: "critical"
+    phase: "plan"
+
+  planner:
+    class: "agents.planner.PlannerAgent"
+    type: "critical"
+    phase: "plan"
+
+  writer:
+    class: "agents.writer.WriterAgent"
+    type: "critical"
+    phase: "write"
+
+  reviewer:
+    class: "agents.reviewer.ReviewerAgent"
+    type: "critical"
+    phase: "review"
+
+  assembler:
+    class: "agents.assembler.AssemblerAgent"
+    type: "critical"
+    phase: "assemble"
+
+  # ========== 增强 Agent ==========
+  coder:
+    class: "agents.coder.CoderAgent"
+    type: "enhancement"
+    phase: "write"
+
+  artist:
+    class: "agents.artist.ArtistAgent"
+    type: "enhancement"
+    phase: "write"
+
+  questioner:
+    class: "agents.questioner.QuestionerAgent"
+    type: "enhancement"
+    phase: "write"
+
+  thread_checker:
+    class: "agents.thread_checker.ThreadCheckerAgent"
+    type: "enhancement"
+    phase: "validate"
+    style_switch: "enable_thread_check"
+
+  voice_checker:
+    class: "agents.voice_checker.VoiceCheckerAgent"
+    type: "enhancement"
+    phase: "validate"
+    style_switch: "enable_voice_check"
+
+  factcheck:
+    class: "agents.factcheck.FactCheckAgent"
+    type: "enhancement"
+    phase: "validate"
+    style_switch: "enable_fact_check"
+
+  text_cleanup:
+    class: "utils.text_cleanup"
+    type: "enhancement"
+    phase: "polish"
+    style_switch: "enable_text_cleanup"
+
+  humanizer:
+    class: "agents.humanizer.HumanizerAgent"
+    type: "enhancement"
+    phase: "polish"
+    style_switch: "enable_humanizer"
+
+  summary_generator:
+    class: "agents.summary_generator.SummaryGeneratorAgent"
+    type: "enhancement"
+    phase: "assemble"
+    style_switch: "enable_summary_gen"

@@ -72,8 +72,8 @@ class SummaryGeneratorAgent:
             logger.info("[SummaryGenerator] 无文章内容，跳过")
             return state
 
-        title = state.get('outline', {}).get('title', '')
-        learning_objectives = state.get('outline', {}).get(
+        title = (state.get('outline') or {}).get('title', '')
+        learning_objectives = (state.get('outline') or {}).get(
             'learning_objectives', []
         )
 

@@ -3,9 +3,27 @@ LLM 服务模块 - 统一管理大模型客户端
 
 """
 import logging
+import threading
+import time
 from typing import Optional, List, Dict, Any
 
 logger = logging.getLogger(__name__)
+
+# 全局请求限流器：防止并发请求触发 API 速率限制
+_request_lock = threading.Lock()
+_last_request_time = 0.0
+_MIN_REQUEST_INTERVAL = float(__import__('os').environ.get('LLM_MIN_REQUEST_INTERVAL', '1.0'))  # 秒
+
+
+def _rate_limit():
+    """简单的全局限流：确保两次请求之间至少间隔 _MIN_REQUEST_INTERVAL 秒"""
+    global _last_request_time
+    with _request_lock:
+        now = time.monotonic()
+        elapsed = now - _last_request_time
+        if elapsed < _MIN_REQUEST_INTERVAL:
+            time.sleep(_MIN_REQUEST_INTERVAL - elapsed)
+        _last_request_time = time.monotonic()
 
 
 class LLMService:
@@ -24,23 +42,28 @@ class LLMService:
         openai_api_base: str = "",
         google_api_key: str = "",
         text_model: str = "gpt-4o",
+        max_tokens: int = None,
     ):
         """
         初始化 LLM 服务
-        
+
         Args:
             provider_format: AI Provider 格式 ('openai' 或 'gemini')
             openai_api_key: OpenAI 兼容 API Key
             openai_api_base: OpenAI 兼容 API 基础 URL
             google_api_key: Google API Key
             text_model: 文本生成模型名称
+            max_tokens: 最大输出 token 数 (默认 None 使用环境变量或 8192)
         """
         self.provider_format = provider_format.lower()
         self._openai_api_key = openai_api_key
         self._openai_api_base = openai_api_base
         self._google_api_key = google_api_key
         self.text_model = text_model
-        
+
+        import os
+        self.max_tokens = max_tokens or int(os.environ.get('LLM_MAX_TOKENS', '8192'))
+
         # 懒加载的模型实例
         self._text_chat_model = None
     
@@ -52,7 +75,8 @@ class LLMService:
                 return ChatGoogleGenerativeAI(
                     model=model_name,
                     google_api_key=self._google_api_key,
-                    temperature=0.7
+                    temperature=0.7,
+                    max_output_tokens=self.max_tokens
                 )
             elif self._openai_api_key:
                 from langchain_openai import ChatOpenAI
@@ -60,7 +84,9 @@ class LLMService:
                     model=model_name,
                     api_key=self._openai_api_key,
                     base_url=self._openai_api_base if self._openai_api_base else None,
-                    temperature=0.7
+                    temperature=0.7,
+                    max_tokens=self.max_tokens,
+                    max_retries=6,
                 )
             else:
                 logger.warning(f"未配置有效的 API Key，无法创建模型: {model_name}")
@@ -106,25 +132,40 @@ class LLMService:
             return None
         
         try:
-            # 如果指定了 JSON 格式，绑定到模型
+            # 如果指定了 JSON 格式，尝试绑定到模型（部分 provider 可能不支持）
             if response_format and response_format.get("type") == "json_object":
-                model = model.bind(response_format={"type": "json_object"})
-            
+                try:
+                    model = model.bind(response_format={"type": "json_object"})
+                except Exception as bind_err:
+                    logger.warning(f"模型不支持 response_format 绑定: {bind_err}")
+
             # 转换消息格式
             langchain_messages = []
             for msg in messages:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
-                
+
                 if role == "system":
                     langchain_messages.append(SystemMessage(content=content))
                 elif role == "assistant":
                     langchain_messages.append(AIMessage(content=content))
                 else:
                     langchain_messages.append(HumanMessage(content=content))
-            
-            response = model.invoke(langchain_messages)
-            return response.content.strip()
+
+            # 带应用层重试的调用（处理 429 速率限制）
+            max_app_retries = 3
+            for attempt in range(max_app_retries):
+                try:
+                    _rate_limit()
+                    response = model.invoke(langchain_messages)
+                    return response.content.strip()
+                except Exception as invoke_err:
+                    if '429' in str(invoke_err) and attempt < max_app_retries - 1:
+                        wait = (attempt + 1) * 5  # 5s, 10s
+                        logger.warning(f"LLM 429 速率限制，等待 {wait}s 后重试 (attempt {attempt + 1}/{max_app_retries})")
+                        time.sleep(wait)
+                    else:
+                        raise invoke_err
         except Exception as e:
             logger.error(f"LLM 调用失败: {e}")
             return None
@@ -133,49 +174,67 @@ class LLMService:
         self,
         messages: List[Dict[str, Any]],
         temperature: float = 0.7,
-        on_chunk: callable = None
+        on_chunk: callable = None,
+        response_format: Dict[str, Any] = None
     ) -> Optional[str]:
         """
         发送流式聊天请求
-        
+
         Args:
             messages: 消息列表
             temperature: 温度参数
             on_chunk: 每收到一个 chunk 时的回调函数 (delta, accumulated)
-            
+            response_format: 响应格式，如 {"type": "json_object"}
+
         Returns:
             完整的模型响应文本，失败返回 None
         """
         from langchain_core.messages import HumanMessage, SystemMessage, AIMessage
-        
+
         model = self.get_text_model()
         if not model:
             logger.error("模型不可用")
             return None
-        
+
         try:
+            # 如果指定了 JSON 格式，尝试绑定到模型（部分 provider 可能不支持）
+            if response_format and response_format.get("type") == "json_object":
+                try:
+                    model = model.bind(response_format={"type": "json_object"})
+                except Exception as bind_err:
+                    logger.warning(f"模型不支持 response_format 绑定: {bind_err}")
             # 转换消息格式
             langchain_messages = []
             for msg in messages:
                 role = msg.get("role", "user")
                 content = msg.get("content", "")
-                
+
                 if role == "system":
                     langchain_messages.append(SystemMessage(content=content))
                 elif role == "assistant":
                     langchain_messages.append(AIMessage(content=content))
                 else:
                     langchain_messages.append(HumanMessage(content=content))
-            
-            # 使用流式调用
-            full_content = ""
-            for chunk in model.stream(langchain_messages):
-                delta = chunk.content if hasattr(chunk, 'content') else str(chunk)
-                full_content += delta
-                if on_chunk:
-                    on_chunk(delta, full_content)
-            
-            return full_content.strip()
+
+            # 带应用层重试的流式调用
+            max_app_retries = 3
+            for attempt in range(max_app_retries):
+                try:
+                    _rate_limit()
+                    full_content = ""
+                    for chunk in model.stream(langchain_messages):
+                        delta = chunk.content if hasattr(chunk, 'content') else str(chunk)
+                        full_content += delta
+                        if on_chunk:
+                            on_chunk(delta, full_content)
+                    return full_content.strip()
+                except Exception as stream_err:
+                    if '429' in str(stream_err) and attempt < max_app_retries - 1:
+                        wait = (attempt + 1) * 5
+                        logger.warning(f"LLM 流式 429 速率限制，等待 {wait}s 后重试 (attempt {attempt + 1}/{max_app_retries})")
+                        time.sleep(wait)
+                    else:
+                        raise stream_err
         except Exception as e:
             logger.error(f"LLM 流式调用失败: {e}")
             return None
@@ -218,6 +277,7 @@ class LLMService:
                 ]
             )
             
+            _rate_limit()
             response = model.invoke([message])
             return response.content.strip() if response else None
             

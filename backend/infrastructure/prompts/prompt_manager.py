@@ -292,7 +292,9 @@ class PromptManager:
         context: str,
         audience_adaptation: str = "technical-beginner",
         article_title: str = "",
-        illustration_type: str = ""
+        illustration_type: str = "",
+        style_anchor: str = "",
+        is_first_image: bool = False,
     ) -> str:
         """渲染 Artist Prompt"""
         return self.render(
@@ -302,7 +304,9 @@ class PromptManager:
             context=context,
             audience_adaptation=audience_adaptation,
             article_title=article_title,
-            illustration_type=illustration_type
+            illustration_type=illustration_type,
+            style_anchor=style_anchor,
+            is_first_image=is_first_image,
         )
 
     def render_questioner(
@@ -550,6 +554,55 @@ class PromptManager:
             content=content
         )
 
+    def render_code2prompt(
+        self,
+        code: str,
+        render_method: str,
+        caption: str,
+        style: str = "扁平化信息图"
+    ) -> str:
+        """渲染 code2prompt Prompt — 将 Mermaid/SVG 代码翻译为图片生成描述"""
+        format_names = {
+            "mermaid": "Mermaid 图表",
+            "svg": "SVG 矢量图",
+        }
+        return self.render(
+            'blog/code2prompt',
+            code=code,
+            render_method=render_method,
+            caption=caption,
+            style=style,
+            format_name=format_names.get(render_method, "图表"),
+        )
+
+    def render_image_evaluator(
+        self,
+        code: str,
+        description: str = "",
+    ) -> str:
+        """渲染图表代码评估 Prompt（Generator-Critic Loop 的 Critic）"""
+        return self.render(
+            'blog/image_evaluator',
+            code=code,
+            description=description,
+        )
+
+    def render_image_improve(
+        self,
+        original_code: str,
+        scores: dict = None,
+        specific_issues: list = None,
+        improvement_suggestions: list = None,
+    ) -> str:
+        """渲染图表代码改进 Prompt（Generator-Critic Loop 的 Generator）"""
+        return self.render(
+            'blog/image_improve',
+            original_code=original_code,
+            scores=scores or {},
+            specific_issues=specific_issues or [],
+            improvement_suggestions=improvement_suggestions or [],
+        )
+
     def render_humanizer_score(
         self,
         section_content: str,
@@ -558,6 +611,38 @@ class PromptManager:
         return self.render(
             'blog/humanizer_score',
             section_content=section_content,
+        )
+
+    def render_section_evaluator(
+        self,
+        section_content: str,
+        section_title: str = "",
+        prev_summary: str = "",
+        next_preview: str = "",
+    ) -> str:
+        """渲染段落多维度评估 Prompt（Generator-Critic Loop）"""
+        return self.render(
+            'blog/section_evaluator',
+            section_content=section_content,
+            section_title=section_title,
+            prev_summary=prev_summary,
+            next_preview=next_preview,
+        )
+
+    def render_writer_improve(
+        self,
+        original_content: str,
+        scores: dict,
+        specific_issues: list,
+        improvement_suggestions: list,
+    ) -> str:
+        """渲染段落精准修改 Prompt（基于结构化批评）"""
+        return self.render(
+            'blog/writer_improve',
+            original_content=original_content,
+            scores=scores,
+            specific_issues=specific_issues,
+            improvement_suggestions=improvement_suggestions,
         )
 
     def render_humanizer(
@@ -624,6 +709,40 @@ class PromptManager:
             title=title,
             full_article=full_article,
             learning_objectives=learning_objectives or [],
+        )
+
+    # ========== 段落级评估与改进 (69.04) ==========
+
+    def render_section_evaluator(
+        self,
+        section_content: str,
+        section_title: str = "",
+        prev_summary: str = "",
+        next_preview: str = "",
+    ) -> str:
+        """渲染段落多维度评估 Prompt"""
+        return self.render(
+            'blog/section_evaluator',
+            section_content=section_content,
+            section_title=section_title,
+            prev_summary=prev_summary,
+            next_preview=next_preview,
+        )
+
+    def render_writer_improve(
+        self,
+        original_content: str,
+        scores: dict = None,
+        specific_issues: list = None,
+        improvement_suggestions: list = None,
+    ) -> str:
+        """渲染精准修改 Prompt"""
+        return self.render(
+            'blog/writer_improve',
+            original_content=original_content,
+            scores=scores or {},
+            specific_issues=specific_issues or [],
+            improvement_suggestions=improvement_suggestions or [],
         )
 
     # ========== 小红书相关 Prompt ==========

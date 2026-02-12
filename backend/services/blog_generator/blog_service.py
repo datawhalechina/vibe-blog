@@ -510,7 +510,7 @@ class BlogService:
             final_state = self.generator.app.get_state(config).values
             
             # 生成封面架构图（基于全文内容）
-            outline = final_state.get('outline', {})
+            outline = final_state.get('outline') or {}
             markdown_content = final_state.get('final_markdown', '')
             # 从 final_state 获取图片风格参数
             image_style = final_state.get('image_style', '')
@@ -592,7 +592,7 @@ class BlogService:
                     article_type=article_type,
                     target_length=target_length,
                     markdown_content=markdown_with_cover,
-                    outline=json.dumps(final_state.get('outline', {}), ensure_ascii=False),
+                    outline=json.dumps(final_state.get('outline') or {}, ensure_ascii=False),
                     sections_count=len(final_state.get('sections', [])),
                     code_blocks_count=len(final_state.get('code_blocks', [])),
                     images_count=len(final_state.get('images', [])),
@@ -635,7 +635,7 @@ class BlogService:
                     'success': True,
                     'id': task_id,
                     'markdown': markdown_with_cover,
-                    'outline': final_state.get('outline', {}),
+                    'outline': final_state.get('outline') or {},
                     'sections_count': len(final_state.get('sections', [])),
                     'images_count': len(final_state.get('images', [])),
                     'code_blocks_count': len(final_state.get('code_blocks', [])),
@@ -1243,26 +1243,27 @@ class LLMClientAdapter:
         else:
             raise Exception('LLM 调用失败')
     
-    def chat_stream(self, messages, on_chunk=None):
+    def chat_stream(self, messages, on_chunk=None, response_format=None):
         """
         流式调用 LLM 进行对话
-        
+
         Args:
             messages: 消息列表
             on_chunk: 每收到一个 chunk 时的回调函数 (delta, accumulated)
-            
+            response_format: 响应格式 (可选)，如 {"type": "json_object"}
+
         Returns:
             完整的 LLM 响应文本
         """
         if hasattr(self.llm_service, 'chat_stream'):
-            result = self.llm_service.chat_stream(messages, on_chunk=on_chunk)
+            result = self.llm_service.chat_stream(messages, on_chunk=on_chunk, response_format=response_format)
             if result:
                 return result
             else:
                 raise Exception('LLM 流式调用失败')
         else:
             # 降级为普通调用
-            return self.chat(messages)
+            return self.chat(messages, response_format=response_format)
 
 
 def get_blog_service() -> Optional[BlogService]:

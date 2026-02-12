@@ -1,0 +1,39 @@
+# Short 短文工作流
+# 1500字，2章节，1轮修订
+
+name: "short"
+description: "短文（1500字，2章节，1轮修订）"
+
+default_style:
+  max_revision_rounds: 1
+  revision_strategy: "correct_only"
+  revision_severity_filter: "high_only"
+  depth_requirement: "shallow"
+  enable_knowledge_refinement: false
+  image_generation_mode: "mini_section"
+  tone: "professional"
+  complexity: "intermediate"
+  verbosity: "concise"
+  enable_humanizer: true
+  enable_text_cleanup: true
+  enable_summary_gen: true
+
+phases:
+  plan:
+    - researcher
+    - planner
+
+  write:
+    - writer
+
+  review:
+    - reviewer
+
+  polish:
+    - text_cleanup
+    - humanizer
+
+  assemble:
+    - artist
+    - assembler
+    - summary_generator

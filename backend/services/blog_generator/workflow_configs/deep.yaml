@@ -1,0 +1,49 @@
+# Deep 深度分析工作流
+# 6000字，全部增强Agent + FactCheck，学术风格
+
+name: "deep"
+description: "深度分析（6000字，全部增强Agent + FactCheck）"
+
+default_style:
+  max_revision_rounds: 5
+  revision_strategy: "full_revise"
+  revision_severity_filter: "all"
+  depth_requirement: "deep"
+  enable_knowledge_refinement: true
+  image_generation_mode: "full"
+  tone: "academic"
+  complexity: "advanced"
+  verbosity: "detailed"
+  enable_fact_check: true
+  enable_thread_check: true
+  enable_voice_check: true
+  enable_humanizer: true
+  enable_text_cleanup: true
+  enable_summary_gen: true
+
+phases:
+  plan:
+    - researcher
+    - planner
+
+  write:
+    - writer
+    - questioner
+    - coder
+
+  review:
+    - reviewer
+
+  validate:
+    - thread_checker
+    - voice_checker
+    - factcheck
+
+  polish:
+    - text_cleanup
+    - humanizer
+
+  assemble:
+    - artist
+    - assembler
+    - summary_generator

@@ -261,18 +261,26 @@ class ResearcherAgent:
 
         try:
             response = self.llm.chat(
-                messages=[{"role": "user", "content": prompt}]
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"}
             )
 
             # 提取 JSON（处理 markdown 代码块）
-            json_str = response
-            if '```json' in response:
-                json_str = response.split('```json')[1].split('```')[0].strip()
-            elif '```' in response:
-                json_str = response.split('```')[1].split('```')[0].strip()
+            json_str = response.strip()
+            if '```json' in json_str:
+                start = json_str.find('```json') + 7
+                end = json_str.find('```', start)
+                json_str = json_str[start:end].strip() if end != -1 else json_str[start:].strip()
+            elif '```' in json_str:
+                start = json_str.find('```') + 3
+                end = json_str.find('```', start)
+                json_str = json_str[start:end].strip() if end != -1 else json_str[start:].strip()
 
             # 尝试解析 JSON
-            result = json.loads(json_str)
+            try:
+                result = json.loads(json_str)
+            except json.JSONDecodeError:
+                result = json.loads(json_str, strict=False)
             key_concepts = result.get("key_concepts", [])
 
             # 调试：打印实际返回内容

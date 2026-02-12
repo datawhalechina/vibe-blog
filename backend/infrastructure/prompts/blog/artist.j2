@@ -121,7 +121,9 @@ JSON 格式:
 {
   "render_method": "mermaid | ai_image | matplotlib",
   "content": "纯 Mermaid 代码（不要包含 ```mermaid 标记）或 AI Prompt 或 Python 代码",
-  "caption": "{{ article_title }}"
+  "caption": "{{ article_title }}"{% if is_first_image %},
+  "style_description": "描述你使用的配色方案、节点样式、连线样式、整体布局风格"{% endif %}
+
 }
 
 ## ❗ Mermaid 语法禁忌（极其重要！）
@@ -157,3 +159,26 @@ A --> B : 调用方法
 4. 使用中文标签
 5. 根据受众适配调整图表复杂度和视觉风格
 6. 生成前请自检语法是否合法
+
+{% if style_anchor %}
+## 风格一致性要求（必须遵守）
+
+本文已有配图，风格已确定为：
+{{ style_anchor }}
+
+你必须严格遵循以上风格，确保：
+- 配色方案完全一致（使用相同的主色和辅色）
+- 节点/元素样式一致（相同的圆角、阴影、边框）
+- 文字标签风格一致（相同的字号比例和位置）
+- 布局密度和留白相似
+{% endif %}
+
+{% if is_first_image %}
+## 额外要求
+
+在 JSON 输出中增加一个 "style_description" 字段，描述你使用的风格特征：
+- 主色调和辅色调
+- 节点样式（形状、圆角、阴影）
+- 连线样式（颜色、粗细、箭头）
+- 整体布局风格（紧凑/宽松、对称/自由）
+{% endif %}

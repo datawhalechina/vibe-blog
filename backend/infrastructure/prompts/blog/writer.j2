@@ -272,7 +272,29 @@
 
 ## 📐 输出格式
 
-直接输出 Markdown 格式的章节内容：章节标题 (##) → 引入段落 → 正文 → 配图/代码占位符 → 关键结论引用块。
+直接输出 Markdown 格式的章节内容：章节标题 (##) → 子标题 (###) → 正文 → 配图/代码占位符 → 关键结论引用块。
+
+### 标题编号规则（必须遵守）
+
+章节标题和子标题必须严格使用大纲中规划的编号：
+
+- **主标题（##）**：使用大纲中的完整编号标题，如 `## 一、项目概览：核心能力解析`
+- **子标题（###）**：使用大纲 subsections 中的编号，如 `### 1.1 安装与配置`
+- **子子标题（####）**：如大纲有更深层级，如 `#### 1.1.1 环境准备`
+
+{% if section_outline.get('subsections') %}
+### 本章节规划的子标题
+
+请按以下子标题结构组织内容：
+{% for sub in section_outline.get('subsections', []) %}
+- {{ sub.title }}{% if sub.get('subsections') %}
+{% for subsub in sub.subsections %}
+  - {{ subsub.title }}
+{% endfor %}{% endif %}
+{% endfor %}
+
+**每个子标题必须作为 ### 级别标题出现在正文中，子子标题使用 #### 级别。**
+{% endif %}
 
 {% if section_outline.get('target_words') %}
 字数目标：**{{ section_outline.get('target_words') }} 字**，根据章节重要性可上下浮动 20%。

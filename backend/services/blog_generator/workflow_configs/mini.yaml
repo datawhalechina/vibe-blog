@@ -1,0 +1,40 @@
+# Mini 精品短文工作流
+# 800字，4章节，1轮修订，最少增强Agent
+
+name: "mini"
+description: "Mini 精品短文（800字，4章节，1轮修订）"
+
+default_style:
+  max_revision_rounds: 1
+  revision_strategy: "correct_only"
+  revision_severity_filter: "high_only"
+  depth_requirement: "minimal"
+  enable_knowledge_refinement: false
+  image_generation_mode: "mini_section"
+  tone: "casual"
+  complexity: "beginner"
+  verbosity: "concise"
+  enable_fact_check: false
+  enable_thread_check: false
+  enable_voice_check: false
+  enable_humanizer: false
+  enable_text_cleanup: true
+  enable_summary_gen: false
+
+phases:
+  plan:
+    - researcher
+    - planner
+
+  write:
+    - writer
+
+  review:
+    - reviewer
+
+  polish:
+    - text_cleanup
+
+  assemble:
+    - artist
+    - assembler

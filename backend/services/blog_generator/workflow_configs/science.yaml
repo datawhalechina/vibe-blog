@@ -1,0 +1,39 @@
+# Science 科普工作流
+# 3500字，友好文风，多配图，水彩风格
+
+name: "science"
+description: "科普内容（3500字，友好文风，多配图）"
+
+default_style:
+  max_revision_rounds: 3
+  depth_requirement: "medium"
+  enable_knowledge_refinement: true
+  tone: "casual"
+  complexity: "beginner"
+  verbosity: "balanced"
+  image_style: "watercolor"
+  enable_humanizer: true
+
+phases:
+  plan:
+    - researcher
+    - planner
+
+  write:
+    - writer
+    - questioner
+
+  review:
+    - reviewer
+
+  validate:
+    - thread_checker
+
+  polish:
+    - text_cleanup
+    - humanizer
+
+  assemble:
+    - artist
+    - assembler
+    - summary_generator

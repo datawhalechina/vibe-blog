@@ -216,6 +216,12 @@ class SharedState(TypedDict):
     question_results: List[dict]
     all_sections_detailed: bool
     questioning_count: int  # 追问次数，防止无限循环
+
+    # 段落评估结果 (Generator-Critic Loop #69.04)
+    section_evaluations: List[dict]  # 每段的多维度评估结果
+    needs_section_improvement: bool  # 是否有段落需要改进
+    section_improve_count: int  # 段落改进轮数
+    prev_section_avg_score: float  # 上一轮平均分（收敛检测用）
     
     # 审核结果 (Reviewer 输出)
     review_score: int
@@ -341,6 +347,10 @@ def create_initial_state(
         question_results=[],
         all_sections_detailed=False,
         questioning_count=0,
+        section_evaluations=[],
+        needs_section_improvement=False,
+        section_improve_count=0,
+        prev_section_avg_score=0.0,
         review_score=0,
         review_issues=[],
         review_approved=False,

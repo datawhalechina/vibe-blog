@@ -1,5 +1,5 @@
 # 环境变量和敏感信息
-.env
+# .env
 .env.local
 .env.*.local
 *.pem

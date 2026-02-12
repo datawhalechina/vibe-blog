@@ -21,19 +21,6 @@ def _should_use_parallel():
 
 logger = logging.getLogger(__name__)
 
-# Langfuse 追踪装饰器（只在 TRACE_ENABLED=true 时启用）
-def _get_langfuse_client():
-    """获取 Langfuse client，未启用时返回 None"""
-    if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
-        try:
-            from langfuse import get_client
-            return get_client()
-        except ImportError:
-            pass
-        except Exception:
-            pass
-    return None
-
 def _get_observe_decorator():
     """获取 Langfuse observe 装饰器，未启用时返回空装饰器"""
     if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
@@ -50,7 +37,6 @@ def _get_observe_decorator():
     return noop_decorator
 
 observe = _get_observe_decorator()
-langfuse_client = _get_langfuse_client()
 
 
 class QuestionerAgent:
@@ -129,7 +115,86 @@ class QuestionerAgent:
                 "depth_score": 80,
                 "vague_points": []
             }
-    
+
+    @observe(name="questioner.evaluate_section", as_type="generation")
+    def evaluate_section(
+        self,
+        section_content: str,
+        section_title: str = "",
+        prev_summary: str = "",
+        next_preview: str = "",
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        多维度段落评估（Generator-Critic Loop 的 Critic 角色）
+
+        对章节内容进行 4 维度评估：信息密度、逻辑连贯、专业深度、表达质量。
+        输出结构化 JSON 包含分数、具体问题和可执行的改进建议。
+
+        Args:
+            section_content: 章节内容
+            section_title: 章节标题
+            prev_summary: 上一章节摘要（用于评估衔接）
+            next_preview: 下一章节预览（用于评估衔接）
+
+        Returns:
+            评估结果字典
+        """
+        pm = get_prompt_manager()
+        prompt = pm.render_section_evaluator(
+            section_content=section_content,
+            section_title=section_title,
+            prev_summary=prev_summary,
+            next_preview=next_preview,
+        )
+
+        default_result = {
+            "scores": {
+                "information_density": 7,
+                "logical_coherence": 7,
+                "professional_depth": 7,
+                "expression_quality": 7,
+            },
+            "overall_quality": 7.0,
+            "specific_issues": [],
+            "improvement_suggestions": [],
+        }
+
+        try:
+            response = self.llm.chat(
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+
+            if not response or not response.strip():
+                logger.warning("段落评估返回空响应，使用默认分数")
+                return default_result
+
+            result = json.loads(response)
+            scores = result.get("scores", default_result["scores"])
+            # 计算 overall_quality（如果 LLM 没返回）
+            score_values = [v for v in scores.values() if isinstance(v, (int, float))]
+            overall = result.get(
+                "overall_quality",
+                round(sum(score_values) / max(len(score_values), 1), 1),
+            )
+
+            eval_result = {
+                "scores": scores,
+                "overall_quality": overall,
+                "specific_issues": result.get("specific_issues", []),
+                "improvement_suggestions": result.get("improvement_suggestions", []),
+            }
+
+            return eval_result
+
+        except json.JSONDecodeError as e:
+            logger.warning(f"段落评估 JSON 解析失败: {e}")
+            return default_result
+        except Exception as e:
+            logger.error(f"段落评估失败: {e}")
+            return default_result
+
     @observe(name="questioner.run")
     def run(self, state: Dict[str, Any], max_workers: int = None) -> Dict[str, Any]:
         """
@@ -156,16 +221,11 @@ class QuestionerAgent:
         outline = state.get('outline', {})
         sections_outline = outline.get('sections', [])
         
-        # 根据目标长度确定深度要求
+        # 根据 StyleProfile 或 target_length 确定深度要求
+        from ..style_profile import StyleProfile
         target_length = state.get('target_length', 'medium')
-        depth_map = {
-            'mini': 'minimal',    # mini 模式使用最低深度要求
-            'short': 'shallow',
-            'medium': 'medium',
-            'long': 'deep',
-            'custom': 'medium'    # 自定义模式使用中等深度
-        }
-        depth_requirement = depth_map.get(target_length, 'medium')
+        style = StyleProfile.from_target_length(target_length)
+        depth_requirement = style.depth_requirement
         
         # 使用环境变量配置或传入的参数
         if max_workers is None:

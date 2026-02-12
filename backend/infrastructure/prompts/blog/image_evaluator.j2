@@ -1,0 +1,30 @@
+你是一个专业的技术图表质量评审员。请对以下 Mermaid/图表代码进行多维度评估。
+
+## 待评估代码
+```
+{{ code }}
+```
+
+## 图表描述
+{{ description }}
+
+## 评估维度（每项 1-10 分）
+
+1. **结构准确性** (structural_accuracy): 图表结构是否准确反映了描述中的概念和关系？节点和连线是否完整？
+2. **视觉清晰度** (visual_clarity): 布局是否清晰？节点文字是否简洁？是否有不必要的复杂性？
+3. **内容忠实度** (content_fidelity): 图表内容是否忠实于原始描述？是否有遗漏或多余的元素？
+4. **语法正确性** (syntax_correctness): Mermaid 语法是否正确？是否有可能导致渲染失败的问题？
+
+## 输出格式
+JSON 格式:
+{
+  "scores": {
+    "structural_accuracy": 8,
+    "visual_clarity": 7,
+    "content_fidelity": 9,
+    "syntax_correctness": 8
+  },
+  "overall_quality": 8.0,
+  "specific_issues": ["问题1", "问题2"],
+  "improvement_suggestions": ["建议1", "建议2"]
+}

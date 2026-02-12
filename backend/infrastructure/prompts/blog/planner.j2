@@ -327,6 +327,39 @@
 ```
 {% endif %}
 
+## 章节编号规则（必须遵守）
+
+章节标题必须使用中文数字编号，子标题使用阿拉伯数字编号，形成清晰的层级结构：
+
+| 层级 | 格式 | 示例 |
+|------|------|------|
+| 主章节（## 级） | 中文数字 + 顿号 | 一、项目概览：核心能力解析 |
+| 子标题（### 级） | 章节序号.子序号 | 1.1 安装与配置 |
+| 子子标题（#### 级） | 章节序号.子序号.子子序号 | 1.1.1 环境准备 |
+
+**编号规则：**
+1. 主章节按顺序使用中文数字：一、二、三、四、五、六、七、八、九、十
+2. 子标题编号与主章节序号对应：第一章的子标题为 1.1、1.2，第二章为 2.1、2.2
+3. 子子标题在子标题基础上递增：1.1.1、1.1.2、2.1.1
+4. 每个主章节至少规划 2-3 个子标题（subsections）
+5. 内容较多的子标题可以进一步规划子子标题
+
+**示例：**
+```
+一、项目概览：一个「非官方」但很能打的 SDK
+  1.1 项目是什么
+  1.2 核心定位与设计理念
+二、核心能力：把所有按钮都变成 API
+  2.1 全流程打通
+  2.2 内容生成能力
+  2.3 超出网页端的「隐藏技能」
+三、三种使用方式
+  3.1 CLI：用命令行走完整流程
+    3.1.1 安装和登录
+    3.1.2 一条龙操作
+  3.2 Python API
+```
+
 ## 输出要求
 请输出完整的文章大纲，JSON 格式:
 
@@ -343,7 +376,7 @@
   },
   "introduction": "引言段落 (1-2段，说明问题背景和文章目标)",
   "core_value": "核心价值主张 (一句话总结文章价值，用于引用块)",
-  "table_of_contents": ["章节1标题", "章节2标题", ...],
+  "table_of_contents": ["一、章节1标题", "二、章节2标题", ...],
   "information_architecture": {
     "structure_type": "linear-progression | hierarchical | comparison | problem-solving",
     "learning_objectives_mapping": [
@@ -353,13 +386,20 @@
   "sections": [
     {
       "id": "section_1",
-      "title": "章节标题",
+      "title": "一、章节标题（必须带中文数字编号）",
       "narrative_role": "本章叙事角色 (hook | what | why | how | compare | deep_dive | verify | summary | catalog_item)",
       "core_question": "本章核心问题（具体、可回答、暗示写作方向）",
       "target_words": 整数（本章节目标字数，必须 > 200，且所有章节总和等于总目标字数）,
       "key_concept": "本章核心概念",
       "learning_objective": "本章节支撑的学习目标（可选）",
       "content_outline": ["要点1", "要点2", "要点3"],
+      "subsections": [
+        {"id": "1.1", "title": "1.1 子标题名称"},
+        {"id": "1.2", "title": "1.2 子标题名称", "subsections": [
+          {"id": "1.2.1", "title": "1.2.1 子子标题名称"},
+          {"id": "1.2.2", "title": "1.2.2 子子标题名称"}
+        ]}
+      ],
       "assigned_materials": [{"source_index": 1, "use_as": "data_support", "priority": "must_use", "instruction": "使用指导"}],
       "verbatim_data_refs": ["需要在本章节使用的关键数据（原样引用）"],
       "image_type": "flowchart | architecture | sequence | comparison | chart | none",
@@ -424,4 +464,5 @@
 7. image_type 优先选择 flowchart、architecture、sequence 等 mermaid 类型，便于可视化展示概念
 8. **Verbatim Data 必须原样保留**：统计数据不得四舍五入，引用不得意译
 9. **精确分配字数**：每个章节必须有 `target_words` 字段，所有章节字数总和必须等于总目标字数。例如 medium（6000字）= hook(720) + what(1080) + how(1800) + summary(420) = 6000
+10. **章节编号必须遵守**：主章节标题必须以中文数字编号开头（一、二、三...），每个章节必须包含 `subsections` 数组规划子标题（1.1、1.2...），子标题可进一步嵌套子子标题（1.1.1、1.1.2...）
 

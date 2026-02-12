@@ -20,10 +20,42 @@ def _fix_markdown_separators(text: str) -> str:
     修复 Markdown 分隔线 (---) 的格式问题：
     1. 确保 --- 前后都有空行，避免 Setext 标题解析（文本紧挨 --- 会被渲染为加粗标题）
     2. 确保 --- 和 ## 标题之间有空行，避免 ---## 连写
+    3. 跳过代码块内部的 ---，避免破坏 ASCII 拓扑图等内容
     """
-    # 将 --- 统一规范化：确保 --- 独占一行且前后各有一个空行
-    # 匹配 --- 前后可能缺少空行的情况
-    text = re.sub(r'\n*---\n*', '\n\n---\n\n', text)
+    lines = text.split('\n')
+    result = []
+    in_code_block = False
+
+    for line in lines:
+        stripped = line.strip()
+        # 跟踪代码块边界
+        if stripped.startswith('```'):
+            in_code_block = not in_code_block
+            result.append(line)
+            continue
+
+        if not in_code_block:
+            # 情况1: 独立的 --- 行
+            if stripped == '---':
+                if result and result[-1].strip() != '':
+                    result.append('')
+                result.append('---')
+                result.append('')
+            # 情况2: ---## 连写（--- 紧跟标题或其他内容）
+            elif stripped.startswith('---') and len(stripped) > 3 and stripped[3] != '-':
+                separator = '---'
+                rest = stripped[3:].lstrip()
+                if result and result[-1].strip() != '':
+                    result.append('')
+                result.append(separator)
+                result.append('')
+                result.append(rest)
+            else:
+                result.append(line)
+        else:
+            result.append(line)
+
+    text = '\n'.join(result)
     # 清理可能产生的多余空行（超过2个连续空行压缩为2个）
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text
@@ -40,20 +72,36 @@ class AssemblerAgent:
         """
         pass
     
-    def extract_subheadings(self, content: str) -> List[str]:
+    def extract_subheadings(self, content: str) -> List[Dict[str, Any]]:
         """
-        从章节内容中提取二级标题（### 标题）
+        从章节内容中提取多级子标题（### 和 #### 标题）
 
         Args:
             content: 章节内容
 
         Returns:
-            二级标题列表
+            子标题列表，每项包含 title 和 level，以及可选的 children
+            示例: [
+                {"title": "1.1 安装", "level": 3, "children": [
+                    {"title": "1.1.1 环境准备", "level": 4}
+                ]},
+                {"title": "1.2 配置", "level": 3, "children": []}
+            ]
         """
-        # 匹配 ### 开头的标题（不匹配 #### 及更多）
-        pattern = r'^###\s+(.+?)$'
+        # 匹配 ### 和 #### 标题
+        pattern = r'^(#{3,4})\s+(.+?)$'
         matches = re.findall(pattern, content, re.MULTILINE)
-        return matches[:3]  # 最多返回 3 个二级标题
+
+        result = []
+        for hashes, title in matches:
+            level = len(hashes)
+            if level == 3:
+                result.append({"title": title.strip(), "level": 3, "children": []})
+            elif level == 4 and result:
+                # 挂到最近的 ### 下面
+                result[-1]["children"].append({"title": title.strip(), "level": 4})
+
+        return result
 
     def replace_source_references(self, content: str, search_results: List[Dict]) -> str:
         """
@@ -106,7 +154,7 @@ class AssemblerAgent:
         """
         pm = get_prompt_manager()
         
-        # 1. 从章节内容中提取二级标题，构建目录数据
+        # 1. 从章节内容中提取多级子标题，构建目录数据
         toc_sections = []
         for section in sections:
             section_title = section.get('title', '')

@@ -1,0 +1,31 @@
+你是一个专业的技术图表优化师。请根据评审反馈精准修改以下图表代码。
+
+## 原始代码
+```
+{{ original_code }}
+```
+
+## 评估分数
+{% for dim, score in scores.items() %}
+- {{ dim }}: {{ score }}/10
+{% endfor %}
+
+## 具体问题
+{% for issue in specific_issues %}
+- {{ issue }}
+{% endfor %}
+
+## 改进建议
+{% for suggestion in improvement_suggestions %}
+- {{ suggestion }}
+{% endfor %}
+
+## 修改要求
+1. 只修改评审指出的问题，不要大幅重构
+2. 保持原有的图表类型和整体结构
+3. 确保 Mermaid 语法正确
+4. 节点文字保持简洁（不超过15字）
+5. 使用中文标签
+
+## 输出
+只输出修改后的纯 Mermaid 代码，不要包含 ```mermaid 标记或任何解释文字。

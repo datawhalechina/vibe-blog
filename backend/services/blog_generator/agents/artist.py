@@ -11,6 +11,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..prompts import get_prompt_manager
 from ...image_service import get_image_service, AspectRatio, ImageSize
+from ..image_enhancement import ImageEnhancementPipeline
 
 # 从环境变量读取并行配置，默认为 3
 MAX_WORKERS = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
@@ -55,19 +56,6 @@ def _extract_json(text: str) -> dict:
     except json.JSONDecodeError:
         return json.loads(text, strict=False)
 
-# Langfuse 追踪装饰器（只在 TRACE_ENABLED=true 时启用）
-def _get_langfuse_client():
-    """获取 Langfuse client，未启用时返回 None"""
-    if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
-        try:
-            from langfuse import get_client
-            return get_client()
-        except ImportError:
-            pass
-        except Exception:
-            pass
-    return None
-
 def _get_observe_decorator():
     """获取 Langfuse observe 装饰器，未启用时返回空装饰器"""
     if os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
@@ -84,7 +72,6 @@ def _get_observe_decorator():
     return noop_decorator
 
 observe = _get_observe_decorator()
-langfuse_client = _get_langfuse_client()
 
 # ASCII 流程图特征模式（强特征 - 必须出现）
 ASCII_FLOWCHART_STRONG_PATTERNS = [
@@ -122,11 +109,12 @@ class ArtistAgent:
     def __init__(self, llm_client):
         """
         初始化 Artist Agent
-        
+
         Args:
             llm_client: LLM 客户端
         """
         self.llm = llm_client
+        self.style_anchor = None  # 风格锚点（#69.06）
     
     def detect_ascii_flowcharts(self, content: str) -> List[Dict[str, Any]]:
         """
@@ -346,13 +334,16 @@ class ArtistAgent:
             图片资源字典
         """
         pm = get_prompt_manager()
+        is_first_image = self.style_anchor is None
         prompt = pm.render_artist(
             image_type=image_type,
             description=description,
             context=context,
             audience_adaptation=audience_adaptation,
             article_title=article_title,
-            illustration_type=illustration_type
+            illustration_type=illustration_type,
+            style_anchor=self.style_anchor or "",
+            is_first_image=is_first_image,
         )
         
         # 调试日志：记录传入的上下文摘要
@@ -370,6 +361,11 @@ class ArtistAgent:
             render_method = result.get("render_method", "mermaid")
             caption = result.get("caption", "")
 
+            # 风格锚点提取（#69.06）：从第一张图的响应中提取风格描述
+            if is_first_image and result.get("style_description"):
+                self.style_anchor = result["style_description"]
+                logger.info(f"[Artist] 风格锚点已提取: {self.style_anchor[:80]}...")
+
             # 改进 caption：如果 LLM 返回的 caption 是空的或太通用，使用章节标题
             if not caption or caption == article_title:
                 caption = description[:60] if description else article_title
@@ -381,6 +377,15 @@ class ArtistAgent:
                 if not is_valid:
                     logger.warning(f"[Mermaid] 语法校验失败: {error_msg}")
                     content = self._repair_mermaid(content, error_msg)
+
+                # Generator-Critic Loop (#69): 迭代优化 Mermaid 代码
+                if os.getenv("IMAGE_REFINE_ENABLED", "false").lower() == "true":
+                    content = self.refine_image(
+                        code=content,
+                        description=description,
+                        max_rounds=int(os.getenv("IMAGE_REFINE_MAX_ROUNDS", "2")),
+                        quality_threshold=float(os.getenv("IMAGE_REFINE_THRESHOLD", "8.0")),
+                    )
             else:
                 # 非 mermaid：仅清理 markdown 标记
                 if content.strip().startswith('```'):
@@ -392,15 +397,122 @@ class ArtistAgent:
                     if content.endswith('```'):
                         content = content[:-3].strip()
 
+            # 69.06: 从第一张图提取风格锚点
+            if is_first_image:
+                style_desc = result.get("style_description", "")
+                if style_desc:
+                    self.style_anchor = style_desc
+                    logger.info(f"[StyleAnchor] 风格锚点已设定: {style_desc[:80]}")
+
             return {
                 "render_method": render_method,
                 "content": content,
                 "caption": result.get("caption", "")
             }
-            
+
         except Exception as e:
             logger.error(f"配图生成失败: {e}")
             raise
+
+    # ========== Generator-Critic Loop for Images (#69) ==========
+
+    def evaluate_image(self, code: str, description: str = "") -> Dict[str, Any]:
+        """评估图表代码质量（Critic 角色）"""
+        pm = get_prompt_manager()
+        prompt = pm.render_image_evaluator(code=code, description=description)
+
+        default_result = {
+            "scores": {
+                "structural_accuracy": 7,
+                "visual_clarity": 7,
+                "content_fidelity": 7,
+                "syntax_correctness": 7,
+            },
+            "overall_quality": 7.0,
+            "specific_issues": [],
+            "improvement_suggestions": [],
+        }
+
+        try:
+            response = self.llm.chat(
+                messages=[{"role": "user", "content": prompt}],
+                response_format={"type": "json_object"},
+            )
+            if not response or not response.strip():
+                return default_result
+
+            result = _extract_json(response)
+            scores = result.get("scores", default_result["scores"])
+            score_values = [v for v in scores.values() if isinstance(v, (int, float))]
+            overall = result.get(
+                "overall_quality",
+                round(sum(score_values) / max(len(score_values), 1), 1),
+            )
+            return {
+                "scores": scores,
+                "overall_quality": overall,
+                "specific_issues": result.get("specific_issues", []),
+                "improvement_suggestions": result.get("improvement_suggestions", []),
+            }
+        except Exception as e:
+            logger.error(f"图表评估失败: {e}")
+            return default_result
+
+    def improve_image(self, original_code: str, critique: Dict[str, Any]) -> str:
+        """基于评审反馈改进图表代码（Generator 角色）"""
+        issues = critique.get("specific_issues", [])
+        suggestions = critique.get("improvement_suggestions", [])
+        if not issues and not suggestions:
+            return original_code
+
+        pm = get_prompt_manager()
+        prompt = pm.render_image_improve(
+            original_code=original_code,
+            scores=critique.get("scores", {}),
+            specific_issues=issues,
+            improvement_suggestions=suggestions,
+        )
+
+        try:
+            response = self.llm.chat(
+                messages=[{"role": "user", "content": prompt}]
+            )
+            if response and response.strip():
+                improved = self._sanitize_mermaid(response.strip())
+                return improved
+            return original_code
+        except Exception as e:
+            logger.error(f"图表改进失败: {e}")
+            return original_code
+
+    def refine_image(
+        self,
+        code: str,
+        description: str = "",
+        max_rounds: int = 2,
+        quality_threshold: float = 8.0,
+    ) -> str:
+        """Generator-Critic Loop: 迭代优化图表代码"""
+        current_code = code
+        for round_num in range(max_rounds):
+            evaluation = self.evaluate_image(current_code, description)
+            score = evaluation["overall_quality"]
+            logger.info(
+                f"[ImageRefine] Round {round_num + 1}: score={score:.1f}"
+            )
+
+            if score >= quality_threshold:
+                logger.info(f"[ImageRefine] 达到质量阈值 ({quality_threshold})，停止")
+                break
+
+            improved = self.improve_image(current_code, evaluation)
+            if improved == current_code:
+                logger.info("[ImageRefine] 无改进，停止")
+                break
+            current_code = improved
+
+        return current_code
+
     
     def _render_ai_image(
         self,
@@ -578,8 +690,10 @@ class ArtistAgent:
             return state
         
         # ========== Mini 模式：使用专用的章节配图生成 ==========
+        # 通过 StyleProfile.image_generation_mode 或 target_length 判断
         target_length = state.get('target_length', 'medium')
-        if target_length in ('mini', 'short'):
+        image_mode = "mini_section" if target_length in ('mini', 'short') else "full"
+        if image_mode == "mini_section":
             logger.info(f"[{target_length}] 模式：使用章节配图生成")
             return self._generate_mini_section_images(state, sections)
         
@@ -727,6 +841,13 @@ class ArtistAgent:
         
         # 第二步：生成图片
         results = [None] * len(tasks)
+
+        # code2prompt 增强开关：环境变量 IMAGE_ENHANCEMENT_ENABLED 或 state.image_enhancement
+        enable_enhancement = (
+            os.getenv('IMAGE_ENHANCEMENT_ENABLED', 'false').lower() == 'true'
+            or state.get('image_enhancement', False)
+        )
+        enhancement_style = state.get('enhancement_style', '扁平化信息图')
         
         def generate_single_task(task):
             """单个图片生成任务"""
@@ -774,6 +895,26 @@ class ArtistAgent:
                         # 如果是 OSS URL，直接使用；否则转为相对路径
                         if not rendered_path.startswith('http'):
                             rendered_path = f"./images/{rendered_path.split('/')[-1]}"
+
+                # code2prompt 增强：将 Mermaid 骨架图转为精美信息图
+                elif render_method == 'mermaid' and enable_enhancement:
+                    try:
+                        pipeline = ImageEnhancementPipeline(self.llm)
+                        enhanced_path = pipeline.enhance(
+                            code=image.get('content', ''),
+                            render_method='mermaid',
+                            caption=image.get('caption', ''),
+                            style=enhancement_style,
+                            image_style=state.get('image_style', ''),
+                        )
+                        if enhanced_path:
+                            if not enhanced_path.startswith('http'):
+                                enhanced_path = f"./images/{enhanced_path.split('/')[-1]}"
+                            rendered_path = enhanced_path
+                            render_method = 'enhanced_mermaid'
+                            logger.info(f"code2prompt 增强成功: {task['image_id']}")
+                    except Exception as e:
+                        logger.warning(f"code2prompt 增强失败，回退到原始 Mermaid: {e}")
                 
                 return {
                     'success': True,
@@ -844,6 +985,26 @@ class ArtistAgent:
                         )
                         if rendered_path and not rendered_path.startswith('http'):
                             rendered_path = f"./images/{rendered_path.split('/')[-1]}"
+
+                    # code2prompt 增强（串行模式）
+                    elif render_method == 'mermaid' and enable_enhancement:
+                        try:
+                            pipeline = ImageEnhancementPipeline(self.llm)
+                            enhanced_path = pipeline.enhance(
+                                code=image.get('content', ''),
+                                render_method='mermaid',
+                                caption=image.get('caption', ''),
+                                style=enhancement_style,
+                                image_style=state.get('image_style', ''),
+                            )
+                            if enhanced_path:
+                                if not enhanced_path.startswith('http'):
+                                    enhanced_path = f"./images/{enhanced_path.split('/')[-1]}"
+                                rendered_path = enhanced_path
+                                render_method = 'enhanced_mermaid'
+                                logger.info(f"code2prompt 增强成功: {task['image_id']}")
+                        except Exception as e:
+                            logger.warning(f"code2prompt 增强失败，回退到原始 Mermaid: {e}")
                     
                     results[task['order_idx']] = {
                         'success': True,
@@ -884,8 +1045,8 @@ class ArtistAgent:
                 # 更新章节关联
                 if section_idx is not None and section_idx < len(sections):
                     # 大纲来源的图片始终关联
-                    # 占位符来源的图片只有 rendered_path 时才关联
-                    if source == 'outline' or image_resource.get('rendered_path'):
+                    # 占位符来源的图片：rendered_path 存在 或 mermaid 类型（无需 rendered_path）
+                    if source == 'outline' or image_resource.get('rendered_path') or image_resource.get('render_method') == 'mermaid':
                         section_image_ids[section_idx].append(image_resource['id'])
         
         # 更新章节的 image_ids
@@ -897,7 +1058,7 @@ class ArtistAgent:
         
         state['images'] = images
         logger.info(f"配图生成完成: 共 {len(images)} 张图片")
-        
+
         return state
     
     def _generate_mini_section_images(

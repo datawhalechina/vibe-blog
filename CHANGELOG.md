@@ -4,6 +4,65 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-12
+
+### Added
+- ✨ **首页 Fullpage 卡片滑动** — Hero 首屏与历史记录区域之间整屏滑动切换，支持鼠标滚轮、触摸滑动、键盘方向键、侧边圆点指示器；第二屏内容可正常滚动，滚到顶部上滑回首屏
+- ✨ **Searcher 智能搜索改造** (#71) — 新增 5 个 AI 博客源（DeepMind/Meta AI/Mistral/xAI/MS Research），AI 话题自动增强，StyleProfile.enable_ai_boost 控制
+- ✨ **Planner 章节编号体系** — 中文数字主章节编号（一、二、三...）+ 阿拉伯数字子标题（1.1/1.2）+ 子子标题（1.1.1），subsections 结构化规划
+- ✨ **Assembler 多级目录** — extract_subheadings 支持 ###/#### 多级标题提取，assembler_header.j2 渲染嵌套可点击目录
+
+### Fixed
+- 🐛 **LLM 429 速率限制防护** — 全局请求限流器 + max_retries=6 + 应用层 429 重试（5s/10s 退避），chat/chat_stream/chat_with_image 全覆盖
+- 🐛 **Planner JSON 截断修复增强** — 3 轮渐进式修复策略（直接补全→回退截断→再补全），处理未闭合字符串和不完整 key-value
+- 🐛 **博客表格不渲染** — BlogDetailContent.vue 添加 table/th/td 完整 CSS 样式
+- 🐛 **[IMAGE:] 占位符未替换** — artist.py Mermaid 图片关联条件修复，render_method=='mermaid' 无需 rendered_path 也关联到章节
+- 🐛 **ASCII 拓扑图被破坏** — _fix_markdown_separators 改为逐行扫描，跳过代码块内 `---`，同时处理 `---##` 连写拆分（前后端同步修复）
+- 🐛 **chat_stream 缺少 response_format 透传** — LLMClientAdapter.chat_stream 新增 response_format 参数
+
+---
+
+## 2026-02-11
+
+### Added
+- ✨ **Humanizer Agent 去AI味** (#63) — 独立后处理 Agent，两步流程（评分→改写），24 条去 AI 味规则，支持环境变量开关
+- ✨ **ThreadChecker + VoiceChecker 一致性检查** (#70.2) — 全文视角检查叙事连贯性（术语/交叉引用/Claim矛盾）和语气统一性（人称/正式度），并行执行
+- ✨ **Mermaid 语法自动修复管线** (#69.01) — `_sanitize_mermaid` → `_validate_mermaid` → `_repair_mermaid` 三步管线，正则预处理 + LLM 修复（最多 2 次重试）
+- ✨ **FactCheck Agent 事实核查** (#65) — 从全文提取可验证 Claim，与 assigned_materials 交叉验证，输出核查报告（overall_score + claims + fix_instructions）
+- ✨ **TextCleanup 确定性清理管道** (#67) — 纯正则预处理 AI 痕迹（填充词/空洞强化词/Meta评论/冗余短语），降低 Humanizer 工作量
+- ✨ **SummaryGenerator 博客导读+SEO** (#67) — TL;DR 导读 + SEO 关键词 + 社交摘要 + Meta Description，集成到工作流 assembler→summary_generator→END
+- ✨ **扩展搜索源** (#50) — 新增 7 个专业搜索源（HuggingFace/GitHub/Google AI/Dev.to/StackOverflow/AWS/Microsoft），LLM 智能路由 + 规则兜底
+- ✨ **Artist 图片预算控制** (#69) — IMAGE_BUDGET 按 target_length 限制总图片数，优先级裁剪（outline > placeholder > missing_diagram），caption 质量改进
+
+### Refactored
+- ♻️ **Reviewer 精简** (#66) — 从 417 行巨型 Prompt 精简为 ~90 行，聚焦结构完整性 + verbatim 数据 + 学习目标覆盖，已被 Thread/FactCheck/Humanizer 覆盖的职责移除
+- ♻️ **SharedState 架构治理** (#68) — 新增 factcheck_report/seo_keywords/social_summary/meta_description/section_images 字段，ReviewIssue.issue_type 更新为 4 种精简类型
+
+### Fixed
+- 🐛 全局 `_extract_json` 修复 — 解决 qwen3-max thinking mode 将 JSON 包裹在 markdown code block 中导致解析失败的问题，涉及 reviewer/artist/search_router/summary_generator 等多个 Agent
+
+---
+
+## 2026-02-10
+
+### Added
+- ✨ **Phase 1 核心骨架实施** (#70.1) — Planner + Writer 全面增强
+  - Step 1.1 叙事流设计：6 种叙事模式 + narrative_flow + narrative_role
+  - Step 1.2 字数分配规则：按 narrative_role 推荐比例分配 target_words
+  - Step 1.4 核心问题指导：core_question 设计规则 + 推荐模板
+  - Step 1.5 扩展输出 JSON Schema：统一定义所有新字段
+  - Step 1.6 planner.py 解析新字段：setdefault() 向后兼容
+  - Step 1.7 writer.j2 完整重构（289行）：核心问题/素材使用/字数目标/叙事策略/散文优先/Claim校准/去AI味黑名单
+  - Step 1.8 writer.py 接收新字段：narrative_mode/narrative_flow 传递 + assigned_materials 富化
+- ✨ **搜索结果提炼与缺口分析** — distill() 结构化提炼 + analyze_gaps() 缺口分析，含语义去重
+- ✨ **素材预分配到章节** — Planner 为每章分配 1-3 条精选素材，引入 {source_NNN} 占位符
+
+### Fixed
+- 🐛 修复 target_words JSON schema 语法错误
+- 🐛 修复 blog_service outline_complete 事件缺少完整 sections 数据
+
+---
+
 ## 2026-02-08
 
 ### Added

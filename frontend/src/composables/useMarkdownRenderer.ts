@@ -13,7 +13,43 @@ import { marked } from 'marked'
  * 防止 Setext 标题误判（文本紧挨 --- 会被渲染为加粗标题）和 ---## 连写
  */
 function fixMarkdownSeparators(text: string): string {
-  text = text.replace(/\n*---\n*/g, '\n\n---\n\n')
+  const lines = text.split('\n')
+  const result: string[] = []
+  let inCodeBlock = false
+
+  for (const line of lines) {
+    const stripped = line.trim()
+    if (stripped.startsWith('```')) {
+      inCodeBlock = !inCodeBlock
+      result.push(line)
+      continue
+    }
+    if (!inCodeBlock) {
+      if (stripped === '---') {
+        // 独立的 --- 行
+        if (result.length > 0 && result[result.length - 1].trim() !== '') {
+          result.push('')
+        }
+        result.push('---')
+        result.push('')
+      } else if (stripped.startsWith('---') && stripped.length > 3 && stripped[3] !== '-') {
+        // ---## 连写：拆分 --- 和后续内容
+        const rest = stripped.slice(3).trimStart()
+        if (result.length > 0 && result[result.length - 1].trim() !== '') {
+          result.push('')
+        }
+        result.push('---')
+        result.push('')
+        result.push(rest)
+      } else {
+        result.push(line)
+      }
+    } else {
+      result.push(line)
+    }
+  }
+
+  text = result.join('\n')
   text = text.replace(/\n{3,}/g, '\n\n')
   return text
 }
