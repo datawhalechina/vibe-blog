@@ -129,6 +129,12 @@ class Config:
     THINKING_ENABLED = os.getenv('THINKING_ENABLED', 'false').lower() == 'true'
     THINKING_BUDGET_TOKENS = int(os.getenv('THINKING_BUDGET_TOKENS', '19000'))
 
+    # Jina 深度抓取（75.03）
+    JINA_API_KEY = os.getenv('JINA_API_KEY', '')
+    DEEP_SCRAPE_ENABLED = os.getenv('DEEP_SCRAPE_ENABLED', 'true').lower() == 'true'
+    DEEP_SCRAPE_TOP_N = int(os.getenv('DEEP_SCRAPE_TOP_N', '3'))
+    DEEP_SCRAPE_TIMEOUT = int(os.getenv('DEEP_SCRAPE_TIMEOUT', '30'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
