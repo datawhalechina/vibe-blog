@@ -188,6 +188,10 @@ class SmartSearchService:
         # Google 搜索（75.02 Serper）
         if 'google' in sources:
             search_tasks.append(('google', blog_query))
+
+        # 搜狗搜索（75.07 腾讯云 SearchPro）
+        if 'sogou' in sources:
+            search_tasks.append(('sogou', blog_query))
         
         # 并行执行
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -206,6 +210,9 @@ class SmartSearchService:
                 elif task[0] == 'google':
                     future = executor.submit(self._search_google, task[1], max_results_per_source)
                     futures[future] = 'google'
+                elif task[0] == 'sogou':
+                    future = executor.submit(self._search_sogou, task[1], max_results_per_source)
+                    futures[future] = 'sogou'
             
             for future in as_completed(futures):
                 source_name = futures[future]
@@ -302,6 +309,17 @@ class SmartSearchService:
                 sources.append('google')
         except Exception:
             pass
+
+        # 75.07: 如果搜狗可用且为中文主题，自动加入搜狗搜索
+        try:
+            from .sogou_search_service import get_sogou_service
+            sogou = get_sogou_service()
+            if sogou and sogou.is_available():
+                has_chinese = any('\u4e00' <= c <= '\u9fff' for c in topic)
+                if has_chinese:
+                    sources.append('sogou')
+        except Exception:
+            pass
         
         return {
             'sources': sources,
@@ -388,6 +406,14 @@ class SmartSearchService:
         if not serper or not serper.is_available():
             return {'success': False, 'results': [], 'error': 'Serper 服务不可用'}
         return serper.search(query, max_results)
+
+    def _search_sogou(self, query: str, max_results: int) -> Dict[str, Any]:
+        """搜狗搜索（通过腾讯云 SearchPro API，75.07）"""
+        from .sogou_search_service import get_sogou_service
+        sogou = get_sogou_service()
+        if not sogou or not sogou.is_available():
+            return {'success': False, 'results': [], 'error': '搜狗搜索服务不可用'}
+        return sogou.search(query, max_results)
 
     def _merge_and_dedupe(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """合并去重搜索结果"""

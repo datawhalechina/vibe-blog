@@ -110,6 +110,12 @@ class Config:
     SERPER_TIMEOUT = int(os.getenv('SERPER_TIMEOUT', '10'))
     SERPER_MAX_RESULTS = int(os.getenv('SERPER_MAX_RESULTS', '10'))
 
+    # 搜狗搜索配置（75.07 腾讯云 SearchPro）
+    TENCENTCLOUD_SECRET_ID = os.getenv('TENCENTCLOUD_SECRET_ID', '')
+    TENCENTCLOUD_SECRET_KEY = os.getenv('TENCENTCLOUD_SECRET_KEY', '')
+    SOGOU_SEARCH_TIMEOUT = int(os.getenv('SOGOU_SEARCH_TIMEOUT', '10'))
+    SOGOU_MAX_RESULTS = int(os.getenv('SOGOU_MAX_RESULTS', '10'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
