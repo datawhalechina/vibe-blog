@@ -138,6 +138,10 @@ class Config:
     # 知识空白检测与多轮搜索（75.04）
     MULTI_ROUND_SEARCH_ENABLED = os.getenv('MULTI_ROUND_SEARCH_ENABLED', 'true').lower() == 'true'
 
+    # Crawl4AI 主动爬取（75.06）
+    CRAWL4AI_ENABLED = os.getenv('CRAWL4AI_ENABLED', 'false').lower() == 'true'
+    MATERIALS_DIR = os.getenv('MATERIALS_DIR', os.path.join(BASE_DIR, 'materials'))
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""
