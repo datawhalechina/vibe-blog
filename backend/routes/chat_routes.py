@@ -233,6 +233,31 @@ def assemble(session_id):
     return jsonify(result)
 
 
+@chat_bp.route('/session/<session_id>/generate', methods=['POST'])
+def generate(session_id):
+    session, err, code = _get_session_or_404(session_id)
+    if err:
+        return err, code
+    from services.task_service import get_task_manager
+    from services.chat.generate_service import run_chat_generate
+    task_manager = get_task_manager()
+    task_id = task_manager.create_task()
+    from flask import current_app
+    run_chat_generate(
+        session_id=session_id,
+        session_mgr=_session_mgr,
+        dispatcher=_dispatcher,
+        task_manager=task_manager,
+        task_id=task_id,
+        app=current_app._get_current_object(),
+    )
+    return jsonify({
+        "task_id": task_id,
+        "session_id": session_id,
+        "message": "一键生成已启动，订阅 /api/tasks/{task_id}/stream 获取进度",
+    }), 202
+
+
 @chat_bp.route('/session/<session_id>/publish', methods=['POST'])
 def publish(session_id):
     session, err, code = _get_session_or_404(session_id)
