@@ -1,0 +1,44 @@
+{
+  "name": "deep_analysis",
+  "display_name": "深度解析型",
+  "description": "先给结论再层层深入，适合源码分析和论文解读",
+  "builtin": true,
+  "structure": {
+    "opening": {
+      "mode": "conclusion",
+      "description": "先给出核心结论，再逐步展开论证"
+    },
+    "body": {
+      "mode": "deep_analysis",
+      "section_template": [
+        {"role": "principle", "description": "原理阐述"},
+        {"role": "source_code", "description": "源码/数据分析"},
+        {"role": "experiment", "description": "实验验证"},
+        {"role": "derivation", "description": "推导过程"}
+      ],
+      "transition": "summary_bridge",
+      "min_sections": 4,
+      "max_sections": 8
+    },
+    "closing": {
+      "mode": "action_call",
+      "description": "总结发现 + 提出开放问题"
+    }
+  },
+  "prompt_patches": {
+    "planner": "大纲应从结论出发，按原理→源码→实验→推导的顺序展开。每章要有明确的论证目标。",
+    "writer": "每个论点都要有数据或代码支撑。使用严谨的逻辑推导，避免主观臆断。引用权威来源。",
+    "reviewer": "审核时重点检查：(1) 论证逻辑是否严密；(2) 数据/代码是否准确；(3) 结论是否有充分支撑。"
+  },
+  "agent_config": {
+    "coder": {"trigger": "every_section", "description": "每章配源码分析或实验代码"},
+    "artist": {"trigger": "key_concepts", "preferred_types": ["architecture", "data_visualization"]}
+  },
+  "outline_schema": {
+    "required_fields": ["thesis"],
+    "section_structure": {
+      "thesis": "本章要论证的观点",
+      "evidence_type": "论据类型（原理/源码/实验/数据）"
+    }
+  }
+}

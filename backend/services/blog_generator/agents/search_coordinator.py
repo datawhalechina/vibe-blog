@@ -5,6 +5,7 @@ SearchCoordinator Agent - 搜索协调器
 
 import json
 import logging
+import os
 from typing import Dict, Any, List, Optional
 
 from ..prompts import get_prompt_manager
@@ -16,24 +17,34 @@ logger = logging.getLogger(__name__)
 class SearchCoordinator:
     """
     搜索协调器 - 管理多轮搜索
-    
+
     职责：
     1. 管理搜索次数和配额
     2. 检测知识空白
     3. 构造细化查询
     4. 整合多轮搜索结果
     """
-    
+
     def __init__(self, llm_client, search_service):
         """
         初始化搜索协调器
-        
+
         Args:
             llm_client: LLM 客户端
             search_service: 搜索服务
         """
         self.llm = llm_client
         self.search_service = search_service
+
+        # 75.04 知识空白检测器（可选增强）
+        self._gap_detector = None
+        if os.environ.get('KNOWLEDGE_GAP_DETECTOR_ENABLED', 'false').lower() == 'true':
+            try:
+                from ..services.knowledge_gap_detector import KnowledgeGapDetector
+                self._gap_detector = KnowledgeGapDetector(llm_service=llm_client)
+                logger.info("🔍 知识空白检测器已启用 (75.04)")
+            except Exception as e:
+                logger.warning(f"知识空白检测器初始化失败: {e}")
     
     def can_search(self, state: Dict[str, Any]) -> bool:
         """判断是否还能继续搜索"""
@@ -254,13 +265,30 @@ class SearchCoordinator:
         
         logger.info(f"开始知识空白检查 (当前搜索次数: {state.get('search_count', 0)}/{state.get('max_search_count', 5)})")
         
-        # 检测知识空白
-        gaps = self.detect_knowledge_gaps(
-            content=all_content,
-            existing_knowledge=existing_knowledge,
-            context=f"文章主题: {topic}",
-            topic=topic
-        )
+        # 检测知识空白（75.04 增强版 or 原有逻辑）
+        if self._gap_detector:
+            outline = state.get('outline')
+            gaps_raw = self._gap_detector.detect(
+                search_results=state.get('search_results', []),
+                topic=topic,
+                outline=outline,
+            )
+            # 转换为 SearchCoordinator 格式
+            gaps = []
+            for g in gaps_raw:
+                gaps.append({
+                    'gap_type': 'missing_data',
+                    'description': g.get('gap', ''),
+                    'suggested_query': g.get('refined_query', ''),
+                })
+            logger.info(f"[75.04] 知识空白检测器发现 {len(gaps)} 个空白")
+        else:
+            gaps = self.detect_knowledge_gaps(
+                content=all_content,
+                existing_knowledge=existing_knowledge,
+                context=f"文章主题: {topic}",
+                topic=topic
+            )
         
         state['knowledge_gaps'] = gaps
         

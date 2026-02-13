@@ -9,6 +9,10 @@ from routes.history_routes import history_bp
 from routes.book_routes import book_bp
 from routes.xhs_routes import xhs_bp
 from routes.publish_routes import publish_bp
+from routes.queue_routes import queue_bp
+from routes.scheduler_routes import scheduler_bp
+from routes.chat_routes import chat_bp
+from routes.feishu_routes import feishu_bp
 
 
 def register_all_blueprints(app):
@@ -21,3 +25,7 @@ def register_all_blueprints(app):
     app.register_blueprint(book_bp)
     app.register_blueprint(xhs_bp)
     app.register_blueprint(publish_bp)
+    app.register_blueprint(queue_bp)
+    app.register_blueprint(scheduler_bp)
+    app.register_blueprint(chat_bp)
+    app.register_blueprint(feishu_bp)

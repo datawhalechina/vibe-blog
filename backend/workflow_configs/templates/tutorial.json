@@ -1,0 +1,44 @@
+{
+  "name": "tutorial",
+  "display_name": "教程型",
+  "description": "从目标声明开始，逐步引导读者完成操作，适合入门教程和操作指南",
+  "builtin": true,
+  "structure": {
+    "opening": {
+      "mode": "scenario",
+      "description": "声明学习目标和前置知识要求"
+    },
+    "body": {
+      "mode": "tutorial",
+      "section_template": [
+        {"role": "prerequisites", "description": "前置知识和环境准备"},
+        {"role": "step", "description": "操作步骤（可重复）"},
+        {"role": "verification", "description": "验证结果"},
+        {"role": "troubleshooting", "description": "常见问题排查", "optional": true}
+      ],
+      "transition": "summary_bridge",
+      "min_sections": 3,
+      "max_sections": 8
+    },
+    "closing": {
+      "mode": "summary",
+      "description": "总结所学 + 延伸阅读推荐"
+    }
+  },
+  "prompt_patches": {
+    "planner": "大纲应从前置知识开始，按操作步骤递进排列。每个步骤标题要明确动作（如'安装依赖'、'配置环境'）。",
+    "writer": "每个步骤先说明目的，再给出具体操作命令或代码，最后说明预期结果。使用编号列表组织步骤。",
+    "reviewer": "审核时重点检查：(1) 步骤是否完整可复现；(2) 是否有遗漏的前置条件；(3) 代码示例是否可运行。"
+  },
+  "agent_config": {
+    "coder": {"trigger": "every_section", "description": "每个步骤都配可运行的代码"},
+    "artist": {"trigger": "key_concepts", "preferred_types": ["screenshot", "diagram"]}
+  },
+  "outline_schema": {
+    "required_fields": ["step_goal"],
+    "section_structure": {
+      "step_goal": "本步骤要完成的目标",
+      "code_needed": "是否需要代码示例"
+    }
+  }
+}

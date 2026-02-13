@@ -81,10 +81,15 @@ class TaskManager:
         return self.queues.get(task_id)
     
     def send_event(self, task_id: str, event: str, data: Dict[str, Any]):
-        """发送 SSE 事件"""
+        """发送 SSE 事件（带唯一 ID 和时间戳）"""
         queue = self.queues.get(task_id)
         if queue:
-            queue.put({'event': event, 'data': data})
+            queue.put({
+                'event': event,
+                'id': uuid.uuid4().hex[:12],
+                'timestamp': time.time(),
+                'data': data,
+            })
             logger.debug(f"SSE 事件已入队 [{task_id}]: {event}")
         else:
             logger.warning(f"SSE 队列不存在 [{task_id}]: {event}")

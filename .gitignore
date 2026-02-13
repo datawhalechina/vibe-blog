@@ -1,9 +1,15 @@
 # 环境变量和敏感信息
-# .env
+.env
 .env.local
 .env.*.local
 *.pem
 *.key
+
+# 缓存数据库（可能含敏感信息）
+backend/cache/
+backend/.coverage
+backend/coverage.json
+backend/coverage.lcov
 
 # Python
 __pycache__/

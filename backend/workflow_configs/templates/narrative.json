@@ -1,0 +1,44 @@
+{
+  "name": "narrative",
+  "display_name": "故事驱动型",
+  "description": "以故事或经历引入，适合科普和经验分享",
+  "builtin": true,
+  "structure": {
+    "opening": {
+      "mode": "story",
+      "description": "讲一个引人入胜的故事或亲身经历"
+    },
+    "body": {
+      "mode": "narrative",
+      "section_template": [
+        {"role": "background", "description": "故事背景"},
+        {"role": "conflict", "description": "遇到的问题或冲突"},
+        {"role": "exploration", "description": "探索和尝试过程"},
+        {"role": "discovery", "description": "关键发现"},
+        {"role": "application", "description": "实际应用"}
+      ],
+      "transition": "none",
+      "min_sections": 3,
+      "max_sections": 6
+    },
+    "closing": {
+      "mode": "inspiration",
+      "description": "启发思考，留下回味"
+    }
+  },
+  "prompt_patches": {
+    "planner": "大纲应按故事线展开：背景→冲突→探索→发现→应用。每章标题可以用叙事性语言。",
+    "writer": "用第一人称或第三人称讲述。注重场景描写和情感共鸣。技术内容融入故事情节中，避免生硬的知识灌输。",
+    "reviewer": "审核时重点检查：(1) 故事线是否连贯；(2) 技术内容是否自然融入；(3) 是否有情感共鸣点。"
+  },
+  "agent_config": {
+    "coder": {"trigger": "none", "description": "故事型文章不强制配代码"},
+    "artist": {"trigger": "every_section", "preferred_types": ["scene", "illustration"]}
+  },
+  "outline_schema": {
+    "required_fields": ["narrative_role"],
+    "section_structure": {
+      "narrative_role": "本章在故事中的角色（背景/冲突/发现等）"
+    }
+  }
+}

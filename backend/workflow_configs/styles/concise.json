@@ -1,0 +1,21 @@
+{
+  "name": "concise",
+  "display_name": "精炼",
+  "description": "极简精炼风格，适合速查手册和清单",
+  "builtin": true,
+  "tone": "concise",
+  "complexity": "intermediate",
+  "verbosity": "concise",
+  "language_rules": {
+    "person": "impersonal",
+    "sentence_style": "极短句，一句一个意思",
+    "paragraph_length": "1-3 句",
+    "rhetoric": ["列表", "表格", "代码块"],
+    "avoid": ["冗余修饰", "重复说明", "过长的引言", "感叹号"]
+  },
+  "style_guide": "直接陈述事实，不加修饰。善用列表和表格组织信息。每段不超过 3 句。代码示例优先于文字描述。省略不必要的过渡语。",
+  "profile_overrides": {
+    "max_revision_rounds": 1,
+    "enable_humanizer": false
+  }
+}

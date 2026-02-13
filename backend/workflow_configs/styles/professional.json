@@ -1,0 +1,23 @@
+{
+  "name": "professional",
+  "display_name": "专业",
+  "description": "专业严谨风格，适合技术博客",
+  "builtin": true,
+  "tone": "professional",
+  "complexity": "intermediate",
+  "verbosity": "balanced",
+  "language_rules": {
+    "person": "first_plural",
+    "sentence_style": "均衡，长短句交替",
+    "paragraph_length": "4-6 句",
+    "rhetoric": ["举例", "数据引用", "对比"],
+    "avoid": ["口语化表达", "网络用语", "过度简化"]
+  },
+  "style_guide": "用'我们'称呼。保持专业但不晦涩，每个技术概念都给出准确定义。善用数据和引用支撑观点。段落结构清晰，每段一个主题。",
+  "profile_overrides": {
+    "max_revision_rounds": 3,
+    "enable_humanizer": true,
+    "enable_thread_check": true,
+    "enable_voice_check": true
+  }
+}

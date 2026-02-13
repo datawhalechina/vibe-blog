@@ -23,6 +23,35 @@ logger = logging.getLogger(__name__)
 blog_bp = Blueprint('blog', __name__)
 
 
+def _record_task_to_queue(task_id: str, topic: str, article_type: str,
+                          target_length: str, image_style: str = ""):
+    """将任务记录到 TaskQueueManager（Dashboard 统计用）"""
+    try:
+        app = current_app._get_current_object()
+        queue_manager = getattr(app, 'queue_manager', None)
+        if not queue_manager:
+            return
+        import asyncio
+        from services.task_queue.models import (
+            BlogTask, BlogGenerationConfig, QueueStatus,
+        )
+        task = BlogTask(
+            id=task_id,
+            name=f"博客: {topic[:30]}",
+            generation=BlogGenerationConfig(
+                topic=topic,
+                article_type=article_type,
+                target_length=target_length,
+                image_style=image_style or None,
+            ),
+            status=QueueStatus.RUNNING,
+        )
+        task.started_at = task.created_at
+        asyncio.run(queue_manager.db.save_task(task))
+    except Exception as e:
+        logger.debug(f"记录任务到排队系统失败 (非关键): {e}")
+
+
 def init_blog_services(app_config):
     """初始化搜索服务和博客生成服务（在 create_app 中调用）"""
     try:
@@ -268,6 +297,8 @@ def generate_blog():
         task_manager = get_task_manager()
         task_id = task_manager.create_task()
 
+        _record_task_to_queue(task_id, topic, article_type, target_length, image_style)
+
         blog_service.generate_async(
             task_id=task_id,
             topic=topic,
@@ -325,6 +356,8 @@ def generate_blog_mini():
 
         task_manager = get_task_manager()
         task_id = task_manager.create_task()
+
+        _record_task_to_queue(task_id, topic, article_type, 'mini', image_style)
 
         blog_service.generate_async(
             task_id=task_id,

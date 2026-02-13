@@ -18,83 +18,112 @@ PROFESSIONAL_BLOGS = {
     'langchain': {
         'site': 'blog.langchain.dev',
         'name': 'LangChain Blog',
-        'keywords': ['langchain', 'langgraph', 'lcel', 'langsmith']
+        'keywords': ['langchain', 'langgraph', 'lcel', 'langsmith'],
+        'quality_weight': 0.85,
     },
     'anthropic': {
         'site': 'anthropic.com',
         'name': 'Anthropic Research',
-        'keywords': ['claude', 'anthropic', 'constitutional ai', 'rlhf']
+        'keywords': ['claude', 'anthropic', 'constitutional ai', 'rlhf'],
+        'quality_weight': 0.95,
     },
     'openai': {
         'site': 'openai.com',
         'name': 'OpenAI Blog',
-        'keywords': ['gpt', 'chatgpt', 'openai', 'dall-e', 'whisper', 'sora']
+        'keywords': ['gpt', 'chatgpt', 'openai', 'dall-e', 'whisper', 'sora'],
+        'quality_weight': 0.95,
     },
     'huggingface': {
         'site': 'huggingface.co',
         'name': 'Hugging Face',
-        'keywords': ['huggingface', 'transformers', 'diffusers', '开源模型', 'llama', 'mistral']
+        'keywords': ['huggingface', 'transformers', 'diffusers', '开源模型', 'llama', 'mistral'],
+        'quality_weight': 0.85,
     },
     'jiqizhixin': {
         'site': 'jiqizhixin.com',
         'name': '机器之心',
-        'keywords': ['机器之心', '中文', 'ai资讯']
+        'keywords': ['机器之心', '中文', 'ai资讯'],
+        'quality_weight': 0.70,
     },
     'github': {
         'site': 'github.com',
         'name': 'GitHub',
-        'keywords': ['github', '开源', 'repo', '仓库', '源码']
+        'keywords': ['github', '开源', 'repo', '仓库', '源码'],
+        'quality_weight': 0.75,
     },
     'google_ai': {
         'site': 'blog.google/technology/ai',
         'name': 'Google AI Blog',
-        'keywords': ['google', 'gemini', 'bard', 'deepmind', 'tensorflow', 'jax']
+        'keywords': ['google', 'gemini', 'bard', 'deepmind', 'tensorflow', 'jax'],
+        'quality_weight': 0.90,
     },
     'devto': {
         'site': 'dev.to',
         'name': 'Dev.to',
-        'keywords': ['dev.to', '社区', 'tutorial']
+        'keywords': ['dev.to', '社区', 'tutorial'],
+        'quality_weight': 0.70,
     },
     'stackoverflow': {
         'site': 'stackoverflow.com',
         'name': 'Stack Overflow',
-        'keywords': ['stackoverflow', '问答', 'debug', '报错', 'error']
+        'keywords': ['stackoverflow', '问答', 'debug', '报错', 'error'],
+        'quality_weight': 0.75,
     },
     'aws': {
         'site': 'aws.amazon.com/blogs',
         'name': 'AWS Blog',
-        'keywords': ['aws', 'lambda', 'sagemaker', 'bedrock', 's3', 'ec2']
+        'keywords': ['aws', 'lambda', 'sagemaker', 'bedrock', 's3', 'ec2'],
+        'quality_weight': 0.80,
     },
     'microsoft': {
         'site': 'devblogs.microsoft.com',
         'name': 'Microsoft DevBlogs',
-        'keywords': ['azure', 'microsoft', 'copilot', '.net', 'typescript', 'vscode']
+        'keywords': ['azure', 'microsoft', 'copilot', '.net', 'typescript', 'vscode'],
+        'quality_weight': 0.80,
     },
     # ===== 71 号方案新增 AI 权威博客源 =====
     'deepmind': {
         'site': 'deepmind.google',
         'name': 'Google DeepMind',
-        'keywords': ['deepmind', 'alphafold', 'alphacode', 'gemma', 'deepmind research']
+        'keywords': ['deepmind', 'alphafold', 'alphacode', 'gemma', 'deepmind research'],
+        'quality_weight': 0.95,
     },
     'meta_ai': {
         'site': 'ai.meta.com',
         'name': 'Meta AI',
-        'keywords': ['meta ai', 'llama', 'llama3', 'codellama', 'meta research', 'fair']
+        'keywords': ['meta ai', 'llama', 'llama3', 'codellama', 'meta research', 'fair'],
+        'quality_weight': 0.95,
     },
     'mistral': {
         'site': 'mistral.ai',
         'name': 'Mistral AI',
-        'keywords': ['mistral', 'mixtral', 'mistral ai', 'pixtral', 'codestral']
+        'keywords': ['mistral', 'mixtral', 'mistral ai', 'pixtral', 'codestral'],
+        'quality_weight': 0.90,
     },
     'xai': {
         'site': 'x.ai',
         'name': 'xAI',
-        'keywords': ['xai', 'grok', 'x.ai']
+        'keywords': ['xai', 'grok', 'x.ai'],
+        'quality_weight': 0.85,
     },
     'ms_research': {
         'site': 'microsoft.com/research',
         'name': 'Microsoft Research',
-        'keywords': ['microsoft research', 'phi', 'orca', 'autogen', 'semantic kernel']
+        'keywords': ['microsoft research', 'phi', 'orca', 'autogen', 'semantic kernel'],
+        'quality_weight': 0.90,
+    },
+    # ===== 71 号方案 Phase B: 社区搜索源 =====
+    'reddit_ai': {
+        'site': 'reddit.com',
+        'name': 'Reddit AI',
+        'keywords': ['reddit', '社区讨论', 'r/machinelearning', 'r/localllama'],
+        'quality_weight': 0.70,
+    },
+    'hackernews': {
+        'site': 'news.ycombinator.com',
+        'name': 'Hacker News',
+        'keywords': ['hacker news', 'hn', 'ycombinator', 'hackernews'],
+        'quality_weight': 0.75,
     },
 }
 
@@ -134,12 +163,18 @@ class SmartSearchService:
     def __init__(self, llm_client=None):
         """
         初始化智能搜索服务
-        
+
         Args:
             llm_client: LLM 客户端，用于智能路由
         """
         self.llm = llm_client
         self.max_workers = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
+        # 37.04: 查询重复检测
+        from utils.query_deduplicator import QueryDeduplicator
+        self.deduplicator = QueryDeduplicator()
+        # 71: SourceCurator 源质量评估与健康检查
+        from .source_curator import SourceCurator
+        self.curator = SourceCurator()
     
     def search(self, topic: str, article_type: str = '', max_results_per_source: int = 5) -> Dict[str, Any]:
         """
@@ -154,7 +189,23 @@ class SmartSearchService:
             合并后的搜索结果
         """
         logger.info(f"🧠 智能搜索开始: {topic}")
-        
+
+        # 37.04: 查询重复检测
+        if self.deduplicator.is_duplicate(topic, agent="smart_search"):
+            logger.warning(f"🔁 重复查询跳过: {topic}")
+            allowed = self.deduplicator.rollback()
+            return {
+                'success': True,
+                'results': [],
+                'summary': '',
+                'sources_used': [],
+                'error': None,
+                'skipped_duplicate': True,
+                'rollback_allowed': allowed,
+            }
+        self.deduplicator.record(topic, agent="smart_search")
+        self.deduplicator.reset_rollback_count()
+
         # 第一步：LLM 判断需要哪些搜索源
         routing_result = self._route_search_sources(topic)
         
@@ -167,7 +218,10 @@ class SmartSearchService:
             sources = self._boost_ai_sources(sources, topic)
 
         logger.info(f"🧠 搜索源路由结果: {sources}")
-        
+
+        # 71: 健康检查 — 过滤不健康的源
+        sources = self.curator.get_healthy_sources(sources)
+
         # 第二步：并行执行搜索
         all_results = []
         search_tasks = []
@@ -184,6 +238,14 @@ class SmartSearchService:
         # 通用搜索（始终包含）
         if 'general' in sources or not search_tasks:
             search_tasks.append(('general', blog_query))
+
+        # Google 搜索（75.02 Serper）
+        if 'google' in sources:
+            search_tasks.append(('google', blog_query))
+
+        # 搜狗搜索（75.07 腾讯云 SearchPro）
+        if 'sogou' in sources:
+            search_tasks.append(('sogou', blog_query))
         
         # 并行执行
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -199,6 +261,12 @@ class SmartSearchService:
                 elif task[0] == 'general':
                     future = executor.submit(self._search_general, task[1], max_results_per_source)
                     futures[future] = 'general'
+                elif task[0] == 'google':
+                    future = executor.submit(self._search_google, task[1], max_results_per_source)
+                    futures[future] = 'google'
+                elif task[0] == 'sogou':
+                    future = executor.submit(self._search_sogou, task[1], max_results_per_source)
+                    futures[future] = 'sogou'
             
             for future in as_completed(futures):
                 source_name = futures[future]
@@ -207,8 +275,15 @@ class SmartSearchService:
                     if result.get('success') and result.get('results'):
                         all_results.extend(result['results'])
                         logger.info(f"✅ {source_name} 搜索完成: {len(result['results'])} 条结果")
+                        # 71: 记录成功
+                        self.curator.record_success(source_name.replace('blog:', ''))
+                    elif not result.get('success'):
+                        # 71: 记录失败
+                        self.curator.record_failure(source_name.replace('blog:', ''))
                 except Exception as e:
                     logger.error(f"❌ {source_name} 搜索失败: {e}")
+                    # 71: 记录失败
+                    self.curator.record_failure(source_name.replace('blog:', ''))
         
         # 第三步：合并去重
         merged_results = self._merge_and_dedupe(all_results)
@@ -286,6 +361,26 @@ class SmartSearchService:
         for blog_id, config in PROFESSIONAL_BLOGS.items():
             if any(kw in topic_lower for kw in config['keywords']):
                 sources.append(blog_id)
+
+        # 75.02: 如果 Serper 可用，自动加入 Google 搜索
+        try:
+            from .serper_search_service import get_serper_service
+            serper = get_serper_service()
+            if serper and serper.is_available():
+                sources.append('google')
+        except Exception:
+            pass
+
+        # 75.07: 如果搜狗可用且为中文主题，自动加入搜狗搜索
+        try:
+            from .sogou_search_service import get_sogou_service
+            sogou = get_sogou_service()
+            if sogou and sogou.is_available():
+                has_chinese = any('\u4e00' <= c <= '\u9fff' for c in topic)
+                if has_chinese:
+                    sources.append('sogou')
+        except Exception:
+            pass
         
         return {
             'sources': sources,
@@ -365,11 +460,27 @@ class SmartSearchService:
             return result
         return {'success': False, 'results': [], 'error': '搜索服务不可用'}
     
+    def _search_google(self, query: str, max_results: int) -> Dict[str, Any]:
+        """Google 搜索（通过 Serper API，75.02）"""
+        from .serper_search_service import get_serper_service
+        serper = get_serper_service()
+        if not serper or not serper.is_available():
+            return {'success': False, 'results': [], 'error': 'Serper 服务不可用'}
+        return serper.search(query, max_results)
+
+    def _search_sogou(self, query: str, max_results: int) -> Dict[str, Any]:
+        """搜狗搜索（通过腾讯云 SearchPro API，75.07）"""
+        from .sogou_search_service import get_sogou_service
+        sogou = get_sogou_service()
+        if not sogou or not sogou.is_available():
+            return {'success': False, 'results': [], 'error': '搜狗搜索服务不可用'}
+        return sogou.search(query, max_results)
+
     def _merge_and_dedupe(self, results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        """合并去重搜索结果"""
+        """合并去重搜索结果，并按源质量排序"""
         seen_urls = set()
         merged = []
-        
+
         for item in results:
             url = item.get('url', '')
             if url and url not in seen_urls:
@@ -378,8 +489,9 @@ class SmartSearchService:
             elif not url:
                 # 无 URL 的结果也保留（如某些摘要）
                 merged.append(item)
-        
-        return merged
+
+        # 71: SourceCurator 按源质量排序
+        return self.curator.rank(merged)
     
     def _generate_summary(self, results: List[Dict[str, Any]]) -> str:
         """生成搜索结果摘要"""

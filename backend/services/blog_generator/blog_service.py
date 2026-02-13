@@ -12,6 +12,7 @@ from contextvars import copy_context
 
 from logging_config import task_id_context
 
+from .queue_bridge import update_queue_status, update_queue_progress
 from .generator import BlogGenerator
 from .schemas.state import create_initial_state
 from .services.search_service import SearchService, init_search_service, get_search_service
@@ -230,7 +231,41 @@ class BlogService:
         
         # 等待 SSE 连接建立
         time.sleep(0.5)
-        
+
+        # 注入 SSE 事件推送到 LLMService（37.34）
+        if task_manager:
+            try:
+                llm = self.generator.llm
+                llm.task_manager = task_manager
+                llm.task_id = task_id
+            except Exception:
+                pass
+
+        # 创建 Token 追踪器（37.31）
+        token_tracker = None
+        try:
+            if os.environ.get('TOKEN_TRACKING_ENABLED', 'true').lower() == 'true':
+                from utils.token_tracker import TokenTracker
+                token_tracker = TokenTracker()
+                self.generator.llm.token_tracker = token_tracker
+        except Exception:
+            pass
+
+        # 创建结构化任务日志（37.08）
+        task_log = None
+        try:
+            if os.environ.get('BLOG_TASK_LOG_ENABLED', 'true').lower() == 'true':
+                from .utils.task_log import BlogTaskLog
+                task_log = BlogTaskLog(
+                    task_id=task_id,
+                    topic=topic,
+                    article_type=article_type,
+                    target_length=target_length,
+                )
+                self.generator.task_log = task_log
+        except Exception:
+            pass
+
         try:
             # 发送开始事件
             if task_manager:
@@ -284,10 +319,17 @@ class BlogService:
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
             
             # 注入 Langfuse 追踪回调（如果已启用）
+            # 每个任务创建独立 handler，设置 session_id 使同一任务的 trace 归组
             try:
-                from app import get_langfuse_handler
-                langfuse_handler = get_langfuse_handler()
-                if langfuse_handler:
+                import os as _os
+                if _os.environ.get('TRACE_ENABLED', 'false').lower() == 'true':
+                    from langfuse.langchain import CallbackHandler as LangfuseCallbackHandler
+                    langfuse_handler = LangfuseCallbackHandler(
+                        session_id=task_id,
+                        trace_name=f"blog-gen-{topic[:30]}",
+                        metadata={"task_id": task_id, "topic": topic,
+                                  "article_type": article_type, "target_length": target_length},
+                    )
                     config["callbacks"] = [langfuse_handler]
             except Exception:
                 pass
@@ -306,8 +348,11 @@ class BlogService:
                 'deepen_content': (65, '正在深化内容...'),
                 'coder': (75, '正在生成代码示例...'),
                 'artist': (85, '正在生成配图...'),
-                'reviewer': (92, '正在审核质量...'),
+                'reviewer': (90, '正在审核质量...'),
+                'humanizer': (93, '正在优化文风...'),
                 'revision': (95, '正在修订内容...'),
+                'fact_checker': (96, '正在事实核查...'),
+                'consistency_check': (97, '正在一致性检查...'),
                 'assembler': (98, '正在组装文档...'),
             }
             
@@ -335,6 +380,12 @@ class BlogService:
                             'progress': progress_info[0],
                             'message': progress_info[1]
                         })
+                        # 同步进度到排队系统（Dashboard 进度条）
+                        update_queue_progress(
+                            task_id, progress_info[0],
+                            stage=progress_info[1],
+                            detail=node_name,
+                        )
                         
                         # 发送详细中间结果
                         if node_name == 'researcher':
@@ -629,9 +680,33 @@ class BlogService:
             except Exception as e:
                 logger.warning(f"保存历史记录失败: {e}")
             
+            # 完成 Token 追踪（37.31）
+            token_summary = None
+            if token_tracker:
+                try:
+                    logger.info(token_tracker.format_summary())
+                    token_summary = token_tracker.get_summary()
+                except Exception as e:
+                    logger.warning(f"Token 摘要生成失败: {e}")
+
+            # 完成结构化任务日志（37.08）
+            if task_log:
+                try:
+                    task_log.complete(
+                        score=final_state.get('review_score', 0),
+                        word_count=len(final_state.get('final_markdown', '')),
+                        revision_rounds=final_state.get('revision_count', 0),
+                    )
+                    if token_summary:
+                        task_log.token_summary = token_summary
+                    task_log.save()
+                    logger.info(task_log.get_summary())
+                except Exception as e:
+                    logger.warning(f"任务日志保存失败: {e}")
+
             # 发送完成事件（使用包含封面图的 markdown）
             if task_manager:
-                task_manager.send_event(task_id, 'complete', {
+                complete_data = {
                     'success': True,
                     'id': task_id,
                     'markdown': markdown_with_cover,
@@ -642,17 +717,39 @@ class BlogService:
                     'review_score': final_state.get('review_score', 0),
                     'saved_path': saved_path,
                     'cover_video': cover_video_path
-                })
+                }
+                # 注入 token 用量摘要（37.34 + 37.31）
+                if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':
+                    try:
+                        llm = self.generator.llm
+                        if hasattr(llm, 'token_tracker') and llm.token_tracker:
+                            complete_data['token_usage'] = llm.token_tracker.get_summary()
+                    except Exception:
+                        pass
+                task_manager.send_event(task_id, 'complete', complete_data)
             
             logger.info(f"博客生成完成: {task_id}, 保存到: {saved_path}")
-            
+
+            update_queue_status(
+                task_id, "completed",
+                word_count=len(final_state.get('final_markdown', '')),
+                image_count=len(final_state.get('images', [])),
+            )
+
         except Exception as e:
             logger.error(f"博客生成失败 [{task_id}]: {e}", exc_info=True)
+            if task_log:
+                try:
+                    task_log.fail(str(e))
+                    task_log.save()
+                except Exception:
+                    pass
             if task_manager:
                 task_manager.send_event(task_id, 'error', {
                     'message': str(e),
                     'recoverable': False
                 })
+            update_queue_status(task_id, "failed", error_msg=str(e))
         finally:
             # 清理日志处理器
             if sse_handler:
@@ -1218,25 +1315,34 @@ class LLMClientAdapter:
     def __init__(self, llm_service):
         """
         初始化适配器
-        
+
         Args:
             llm_service: banana-blog 的 LLMService
         """
         self.llm_service = llm_service
+
+    @property
+    def token_tracker(self):
+        return self.llm_service.token_tracker
+
+    @token_tracker.setter
+    def token_tracker(self, value):
+        self.llm_service.token_tracker = value
     
-    def chat(self, messages, response_format=None):
+    def chat(self, messages, response_format=None, caller: str = ""):
         """
         调用 LLM 进行对话
-        
+
         Args:
             messages: 消息列表
             response_format: 响应格式 (可选)，如 {"type": "json_object"}
-            
+            caller: 调用方标识 (可选)，用于日志追踪
+
         Returns:
             LLM 响应文本
         """
-        # 直接调用 LLMService 的 chat 方法，传递 response_format
-        result = self.llm_service.chat(messages, response_format=response_format)
+        # 直接调用 LLMService 的 chat 方法，传递 response_format 和 caller
+        result = self.llm_service.chat(messages, response_format=response_format, caller=caller)
         
         if result:
             return result

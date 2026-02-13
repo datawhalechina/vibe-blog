@@ -1,0 +1,43 @@
+{
+  "feature": "65-factcheck",
+  "factcheck_report": {
+    "error": "Expecting value: line 1 column 1 (char 0)"
+  },
+  "judge_eval": {
+    "checks": {
+      "F1_contradiction_detected": {
+        "result": "fail",
+        "reason": "未检出任何 CONTRADICTED"
+      },
+      "F2_supported_detected": {
+        "result": "fail",
+        "reason": "未检出任何 SUPPORTED"
+      },
+      "F3_unverified_detected": {
+        "result": "fail",
+        "reason": "未检出任何 UNVERIFIED"
+      },
+      "F4_fix_instructions": {
+        "result": "fail",
+        "reason": "修复指令为空"
+      },
+      "F5_score_reasonable": {
+        "result": "fail",
+        "reason": "未提供评分"
+      },
+      "F6_no_false_positive": {
+        "result": "pass",
+        "reason": "无误报"
+      }
+    },
+    "pass_count": 1,
+    "total": 6,
+    "verdict": "FAIL",
+    "summary": "Agent 输出为空，未完成核查任务"
+  },
+  "pass_count": 1,
+  "total": 6,
+  "verdict": "FAIL",
+  "elapsed": 19.465805053710938,
+  "timestamp": "2026-02-11T02:40:58.219334"
+}

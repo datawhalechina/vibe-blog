@@ -1,0 +1,47 @@
+{
+  "name": "problem_solution",
+  "display_name": "问题-方案型",
+  "description": "先抛出问题/痛点，再逐步给出解决方案，适合技术博客",
+  "builtin": true,
+  "structure": {
+    "opening": {
+      "mode": "question",
+      "description": "以一个引人深思的问题或痛点开头"
+    },
+    "body": {
+      "mode": "problem_solution",
+      "section_template": [
+        {"role": "pain_point", "description": "描述具体痛点"},
+        {"role": "analysis", "description": "分析问题根因"},
+        {"role": "solution", "description": "给出解决方案"},
+        {"role": "code_example", "description": "代码示例验证", "optional": true},
+        {"role": "summary", "description": "本章小结"}
+      ],
+      "transition": "question_bridge",
+      "min_sections": 3,
+      "max_sections": 6
+    },
+    "closing": {
+      "mode": "action_call",
+      "description": "总结要点 + 给读者一个行动建议"
+    }
+  },
+  "prompt_patches": {
+    "planner": "生成大纲时，每个章节必须包含明确的'问题'和'方案'。开篇章节聚焦痛点共鸣，中间章节逐步深入解决方案，最后一章给出完整的最佳实践。",
+    "writer": "撰写每个章节时，先用 1-2 段描述问题/痛点（让读者产生共鸣），再用 3-5 段给出解决方案。每个方案都要有具体的代码或配置示例。章节之间用一个承上启下的问句衔接。",
+    "reviewer": "审核时重点检查：(1) 每章是否有明确的问题-方案对应；(2) 方案是否有代码/示例支撑；(3) 章节间过渡是否自然。",
+    "artist": "配图应以技术架构图、流程图为主，展示问题到方案的转化过程。"
+  },
+  "agent_config": {
+    "coder": {"trigger": "every_section", "description": "每个方案章节都配代码示例"},
+    "artist": {"trigger": "key_concepts", "preferred_types": ["flowchart", "framework"]}
+  },
+  "outline_schema": {
+    "required_fields": ["problem", "solution"],
+    "section_structure": {
+      "problem": "本章要解决的问题",
+      "solution": "解决方案概述",
+      "code_needed": "是否需要代码示例"
+    }
+  }
+}

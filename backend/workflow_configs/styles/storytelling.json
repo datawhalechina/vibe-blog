@@ -1,0 +1,21 @@
+{
+  "name": "storytelling",
+  "display_name": "叙事",
+  "description": "叙事风格，适合经验分享和复盘",
+  "builtin": true,
+  "tone": "storytelling",
+  "complexity": "intermediate",
+  "verbosity": "verbose",
+  "language_rules": {
+    "person": "first",
+    "sentence_style": "长短交替，注重节奏感",
+    "paragraph_length": "3-5 句",
+    "rhetoric": ["场景描写", "对话", "悬念", "转折"],
+    "avoid": ["干巴巴的列举", "纯技术堆砌", "无情感的陈述"]
+  },
+  "style_guide": "用'我'讲述亲身经历。注重场景描写和情感表达。技术内容融入故事情节，让读者跟随你的探索过程。善用悬念和转折保持阅读兴趣。",
+  "profile_overrides": {
+    "enable_humanizer": true,
+    "enable_thread_check": true
+  }
+}

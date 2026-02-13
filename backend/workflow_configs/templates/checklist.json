@@ -1,0 +1,42 @@
+{
+  "name": "checklist",
+  "display_name": "清单型",
+  "description": "要点逐条列举，适合最佳实践和 Tips 合集",
+  "builtin": true,
+  "structure": {
+    "opening": {
+      "mode": "statistic",
+      "description": "概述清单的价值和适用场景"
+    },
+    "body": {
+      "mode": "checklist",
+      "section_template": [
+        {"role": "item", "description": "清单要点（可重复）"},
+        {"role": "example", "description": "示例说明", "optional": true}
+      ],
+      "transition": "none",
+      "min_sections": 5,
+      "max_sections": 15
+    },
+    "closing": {
+      "mode": "summary",
+      "description": "总结清单 + 快速参考表"
+    }
+  },
+  "prompt_patches": {
+    "planner": "大纲应列出 N 个要点，每个要点标题简洁明了（如'1. 使用语义化命名'）。按重要性或逻辑顺序排列。",
+    "writer": "每个要点用 2-3 段说明：是什么、为什么重要、怎么做。配一个简短的正反示例。",
+    "reviewer": "审核时重点检查：(1) 要点是否有遗漏；(2) 每个要点是否有实操指导；(3) 示例是否恰当。"
+  },
+  "agent_config": {
+    "coder": {"trigger": "key_concepts", "description": "关键要点配代码示例"},
+    "artist": {"trigger": "none", "preferred_types": ["infographic"]}
+  },
+  "outline_schema": {
+    "required_fields": ["item_title"],
+    "section_structure": {
+      "item_title": "要点标题",
+      "priority": "优先级（高/中/低）"
+    }
+  }
+}

@@ -47,3 +47,7 @@ pyyaml>=6.0
 # ============ Langfuse 追踪 ============
 langfuse>=3.0.0
 opentelemetry-instrumentation-threading>=0.48b0
+
+# ============ 任务排队 & 定时调度 ============
+aiosqlite>=0.19.0
+APScheduler>=3.10.0

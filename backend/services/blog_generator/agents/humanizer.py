@@ -25,6 +25,8 @@ def _extract_source_placeholders(text: str) -> set:
 def _extract_json(text: str) -> dict:
     """从 LLM 响应中提取 JSON（处理 markdown 代码块和转义问题）"""
     text = text.strip()
+    if not text:
+        raise ValueError("LLM 返回空内容，无法解析 JSON")
     if '```json' in text:
         start = text.find('```json') + 7
         end = text.find('```', start)
@@ -35,6 +37,8 @@ def _extract_json(text: str) -> dict:
         end = text.find('```', start)
         if end != -1:
             text = text[start:end].strip()
+    if not text:
+        raise ValueError("LLM 返回内容中未找到有效 JSON")
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -84,20 +88,32 @@ class HumanizerAgent:
         return _extract_json(response)
 
     def _rewrite_section(self, content: str, audience_adaptation: str) -> Dict[str, Any]:
-        """改写：去除 AI 写作痕迹"""
+        """改写：去除 AI 写作痕迹（含重试）"""
         pm = get_prompt_manager()
         prompt = pm.render_humanizer(
             section_content=content,
             audience_adaptation=audience_adaptation,
         )
 
-        response = self.llm.chat(
-            messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-        )
-        if not response:
-            raise ValueError("LLM 改写返回空响应")
-        return _extract_json(response)
+        last_err = None
+        for attempt in range(self.max_retries + 1):
+            try:
+                response = self.llm.chat(
+                    messages=[{"role": "user", "content": prompt}],
+                    response_format={"type": "json_object"},
+                    caller="humanizer",
+                )
+                if not response or not response.strip():
+                    raise ValueError("LLM 改写返回空响应")
+                return _extract_json(response)
+            except (json.JSONDecodeError, ValueError) as e:
+                last_err = e
+                logger.warning(f"[Humanizer] 改写解析失败 (attempt {attempt+1}/{self.max_retries+1}): {e}")
+                if attempt < self.max_retries:
+                    time.sleep(2)
+        # 所有重试失败，返回原文
+        logger.warning(f"[Humanizer] 改写最终失败，保留原文: {last_err}")
+        return {"rewritten_content": content}
 
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """

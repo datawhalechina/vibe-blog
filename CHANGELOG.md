@@ -4,6 +4,74 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-13
+
+### Added
+- ✨ **任务排队系统** (#85) — 零外部依赖（SQLite + asyncio），不引入 Redis
+  - `TaskQueueManager`：asyncio.PriorityQueue + Semaphore(2) 并发控制，支持入队/取消/进度更新/事件回调
+  - `TaskDB`：aiosqlite 异步 CRUD，3 张表（task_queue/scheduled_tasks/execution_history）+ 5 索引
+  - Pydantic v2 数据模型：BlogTask/ExecutionRecord/SchedulerConfig 等，8 字符短 ID
+  - 启动恢复：RUNNING→QUEUED 自动恢复，QUEUED 任务重新入队
+- ✨ **定时调度** (#85) — APScheduler AsyncIOScheduler 封装
+  - `CronParser`：中文自然语言时间 → cron/date 解析（每天/每周/每月/每N小时等 7 种模式）
+  - `SchedulerService`：cron/once 触发，一次性任务自动清理，APScheduler 可选依赖优雅降级
+- ✨ **发布流水线** (#85) — `PublishPipeline` 质量检查→发布→通知三步流程
+- ✨ **Dashboard 任务中心** (#85) — Vue 3 前端页面
+  - 统计卡片（处理中/等待中/今日完成/失败）、运行中任务进度条、等待队列、完成历史
+  - 定时任务管理（新建/暂停/恢复/删除）、自然语言时间解析
+  - 暗黑模式支持、3 秒轮询刷新、移动端响应式
+- ✨ **REST API** (#85) — 2 个 Blueprint
+  - `queue_bp`：POST/GET/DELETE /api/queue/tasks, GET /api/queue/history
+  - `scheduler_bp`：CRUD /api/scheduler/tasks, pause/resume, parse-schedule
+- ✅ 56 个单元测试全部通过（models 8 + db 10 + manager 15 + cron_parser 11 + pipeline 6 + scheduler 6）
+- ✅ Dashboard E2E 测试 TC-13（7 个用例：页面加载/统计卡片/定时任务表单/暗黑模式/API 请求/导航）
+- ✨ **LLM 响应截断自动扩容** (#37.32) — max_tokens 自动扩容 + 智能重试，解决长文生成截断问题
+- ✨ **上下文长度动态估算与自动回退** (#37.33) — 根据模型上下文窗口动态估算可用空间，超限自动降级
+- ✨ **统一 Token 追踪与成本分析** (#37.31) — TokenTracker 全局追踪 LLM 调用 token 用量与费用
+- ✨ **结构化任务日志** (#37.08) — BlogTaskLog + StepLog + StepTimer，每步耗时精确记录
+- ✨ **性能聚合统计** (#37.08) — BlogPerformanceSummary 汇总各阶段耗时、token、成本
+- ✨ **SSE 流式事件增量优化** (#37.34) — 事件去重、增量推送、断线重连
+- ✨ **统一 ToolManager** (#37.09) — 工具注册、超时保护、黑名单、调用日志 + 参数自动修复
+- ✨ **多提供商 LLM 客户端工厂** (#37.29) — OpenAI/Anthropic/DeepSeek/Qwen/智谱统一接口
+- ✨ **上下文压缩策略** (#37.06) — 工具结果保留、搜索裁剪、多级降级
+- ✨ **重复查询检测与回滚保护** (#37.04) — QueryDeduplicator + SmartSearch 集成
+- ✨ **博客生成分层架构** (#37.12) — 7 层定义、LayerValidator、YAML→JSON 迁移、DeclarativeEngine
+- ✨ **Skill 与 Agent 混合能力** (#37.14) — SkillRegistry + SkillExecutor
+- ✨ **博客衍生物体系** (#37.16) — MindMap/Flashcard/StudyNote Skills
+- ✨ **推理引擎 Extended Thinking** (#37.03) — thinking_config、Anthropic API 集成
+- ✨ **写作模板体系** (#37.13) — TemplateLoader/StyleLoader/PromptComposer + 6 模板 6 风格预置
+- ✨ **Serper Google 搜索集成** (#75.02) — API 调用、重试、SmartSearch 路由
+- ✨ **搜狗搜索集成** (#75.07) — 腾讯云 SearchPro API、微信公众号标记、SmartSearch 路由
+- ✨ **Jina 深度抓取** (#75.03) — JinaReader + HttpxScraper 降级 + DeepScraper 统一入口
+- ✨ **知识空白检测与多轮搜索** (#75.04) — KnowledgeGapDetector + MultiRoundSearcher
+- ✨ **Searcher 智能搜索改造** (#71) — 扩展源 + SourceCurator + 健康检查
+- ✨ **Crawl4AI 主动爬取** (#75.06) — LocalMaterialStore + BlogCrawler
+- ✅ Playwright E2E 测试套件 — 12 个测试用例覆盖 TC-1~TC-12
+- ✨ **飞书机器人集成** — 对话式写作入口，私聊/群聊 @bot 触发
+  - `feishu_routes.py`：Webhook 事件订阅、意图解析、vibe-blog API 调用、卡片消息回复
+  - 富文本卡片消息：帮助/任务启动/进度/完成/失败 5 种卡片，lark_md 格式
+  - 进度轮询推送：后台线程轮询 SSE 任务状态，自动推送进度到飞书
+  - 模板优先降级：支持 template_id + variables，无模板时降级为代码构建卡片
+  - 多用户隔离：按 open_id 隔离写作会话
+  - Docker 部署支持：docker-compose.yml 添加飞书环境变量
+- 📄 **飞书部署文档** — `docs/feishu-deploy.md` 本地开发/远程部署/多用户隔离/故障排查
+
+### Changed
+- 🔧 **Dashboard 任务中心增强** — 新增失败/已取消任务列表、进度百分比显示、cancelled_count 统计
+- 🔧 **任务排队恢复策略** — 服务重启时 RUNNING/QUEUED 任务标记为 FAILED（而非重新入队），避免僵尸任务
+- 🔧 **生成进度同步到排队系统** — `update_queue_progress()` 桥接 SSE 进度到 Dashboard 进度条
+- 🔧 **Humanizer 改写重试** — JSON 解析失败时最多重试 3 次，最终失败保留原文
+- 🔧 **Planner 素材分配日志** — 打印每个章节的素材分配情况
+- 🔧 **LLMClientAdapter** — 透传 token_tracker 属性
+- 🔧 **WritingSession 用户隔离** — get/list 支持 user_id 过滤
+- 🔧 **WhatsApp 网关启动脚本** — start-local.sh 支持 ENABLE_WHATSAPP 可选启动
+- 🔧 **mini 模式默认开启 humanizer/fact_check** — StyleProfile.mini() 调整
+
+### Fixed
+- 🐛 **Humanizer 空响应崩溃** — 增加空字符串检查，避免 JSON 解析异常
+
+---
+
 ## 2026-02-12
 
 ### Added

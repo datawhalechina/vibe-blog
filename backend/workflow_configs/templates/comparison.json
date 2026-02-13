@@ -1,0 +1,43 @@
+{
+  "name": "comparison",
+  "display_name": "对比分析型",
+  "description": "多维度对比分析，适合技术选型和框架对比",
+  "builtin": true,
+  "structure": {
+    "opening": {
+      "mode": "scenario",
+      "description": "引入对比场景和选型需求"
+    },
+    "body": {
+      "mode": "comparison",
+      "section_template": [
+        {"role": "overview", "description": "各方案概述"},
+        {"role": "dimension", "description": "对比维度（可重复）"},
+        {"role": "matrix", "description": "总结对比矩阵"}
+      ],
+      "transition": "contrast_bridge",
+      "min_sections": 3,
+      "max_sections": 8
+    },
+    "closing": {
+      "mode": "action_call",
+      "description": "给出推荐建议和适用场景"
+    }
+  },
+  "prompt_patches": {
+    "planner": "大纲应先列出对比对象，再按维度（性能、易用性、生态、成本等）逐一对比，最后给出总结矩阵。",
+    "writer": "每个对比维度用表格或并列结构呈现。避免偏向某一方，客观呈现优缺点。",
+    "reviewer": "审核时重点检查：(1) 对比维度是否全面；(2) 数据是否准确；(3) 结论是否客观。"
+  },
+  "agent_config": {
+    "coder": {"trigger": "key_concepts", "description": "关键差异配代码对比"},
+    "artist": {"trigger": "key_concepts", "preferred_types": ["comparison_table", "radar_chart"]}
+  },
+  "outline_schema": {
+    "required_fields": ["dimension"],
+    "section_structure": {
+      "dimension": "对比维度名称",
+      "subjects": "参与对比的对象列表"
+    }
+  }
+}

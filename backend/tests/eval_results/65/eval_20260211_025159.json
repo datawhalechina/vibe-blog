@@ -1,0 +1,43 @@
+{
+  "feature": "65-factcheck",
+  "factcheck_report": {
+    "error": "Unterminated string starting at: line 49 column 19 (char 1271)"
+  },
+  "judge_eval": {
+    "checks": {
+      "F1_contradiction_detected": {
+        "result": "fail",
+        "reason": "未检出任何 CONTRADICTED"
+      },
+      "F2_supported_detected": {
+        "result": "fail",
+        "reason": "未生成 SUPPORTED"
+      },
+      "F3_unverified_detected": {
+        "result": "fail",
+        "reason": "未生成 UNVERIFIED"
+      },
+      "F4_fix_instructions": {
+        "result": "fail",
+        "reason": "无修复指令"
+      },
+      "F5_score_reasonable": {
+        "result": "fail",
+        "reason": "未生成评分"
+      },
+      "F6_no_false_positive": {
+        "result": "pass",
+        "reason": "无误报情况"
+      }
+    },
+    "pass_count": 1,
+    "total": 6,
+    "verdict": "FAIL",
+    "summary": "Agent 输出错误，未完成核查任务"
+  },
+  "pass_count": 1,
+  "total": 6,
+  "verdict": "FAIL",
+  "elapsed": 67.37869501113892,
+  "timestamp": "2026-02-11T02:51:59.123599"
+}

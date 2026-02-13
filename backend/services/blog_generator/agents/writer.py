@@ -57,15 +57,48 @@ class WriterAgent:
     """
     内容撰写师 - 负责章节正文撰写
     """
-    
+
     def __init__(self, llm_client):
         """
         初始化 Writer Agent
-        
+
         Args:
             llm_client: LLM 客户端
         """
         self.llm = llm_client
+
+        # 37.13 写作模板体系（可选）
+        self._prompt_composer = None
+        self._template_data = None
+        self._style_data = None
+        try:
+            from ..orchestrator.prompt_composer import PromptComposer
+            from ..orchestrator.template_loader import TemplateLoader
+            from ..orchestrator.style_loader import StyleLoader
+            self._prompt_composer = PromptComposer()
+            self._template_loader = TemplateLoader()
+            self._style_loader = StyleLoader()
+        except Exception:
+            pass
+
+    def _apply_template_and_style(self, base_prompt: str, agent_name: str, kwargs: dict) -> str:
+        """应用写作模板和风格（37.13）"""
+        if not self._prompt_composer:
+            return base_prompt
+        template_name = kwargs.get('template')
+        style_name = kwargs.get('style')
+        if not template_name and not style_name:
+            return base_prompt
+        template = self._template_loader.get(template_name) if template_name else None
+        style = self._style_loader.get(style_name) if style_name else None
+        if not template and not style:
+            return base_prompt
+        return self._prompt_composer.compose(
+            agent_name=agent_name,
+            base_prompt=base_prompt,
+            template=template,
+            style=style,
+        )
     
     @observe(name="writer.write_section", as_type="generation")
     def write_section(
@@ -128,6 +161,9 @@ class WriterAgent:
             narrative_flow=narrative_flow or {},
             assigned_materials=assigned_materials
         )
+
+        # 37.13 写作模板 + 风格注入
+        prompt = self._apply_template_and_style(prompt, "writer", kwargs)
         
         # 输出完整的 Writer Prompt 到日志（用于诊断）
         logger.info(f"[Writer] ========== 章节 Prompt ({len(prompt)} 字): {section_outline.get('title', 'Unknown')} ==========")
@@ -372,7 +408,9 @@ class WriterAgent:
                 'verbatim_data': verbatim_data,
                 'learning_objectives': learning_objectives,
                 'narrative_mode': narrative_mode,
-                'narrative_flow': narrative_flow
+                'narrative_flow': narrative_flow,
+                'template': state.get('writing_template'),  # 37.13
+                'style': state.get('writing_style'),  # 37.13
             })
         
         # 使用环境变量配置或传入的参数
@@ -401,7 +439,9 @@ class WriterAgent:
                     verbatim_data=task.get('verbatim_data', []),
                     learning_objectives=task.get('learning_objectives', []),
                     narrative_mode=task.get('narrative_mode', ''),
-                    narrative_flow=task.get('narrative_flow', {})
+                    narrative_flow=task.get('narrative_flow', {}),
+                    template=task.get('template'),  # 37.13
+                    style=task.get('style'),  # 37.13
                 )
                 return {
                     'success': True,
@@ -443,7 +483,9 @@ class WriterAgent:
                         verbatim_data=task.get('verbatim_data', []),
                         learning_objectives=task.get('learning_objectives', []),
                         narrative_mode=task.get('narrative_mode', ''),
-                        narrative_flow=task.get('narrative_flow', {})
+                        narrative_flow=task.get('narrative_flow', {}),
+                        template=task.get('template'),  # 37.13
+                        style=task.get('style'),  # 37.13
                     )
                     results[task['order_idx']] = {
                         'success': True,

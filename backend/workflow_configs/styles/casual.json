@@ -1,0 +1,21 @@
+{
+  "name": "casual",
+  "display_name": "口语化",
+  "description": "轻松口语化风格，适合科普和入门教程",
+  "builtin": true,
+  "tone": "casual",
+  "complexity": "beginner",
+  "verbosity": "balanced",
+  "language_rules": {
+    "person": "second",
+    "sentence_style": "短句为主，关键处用长句总结",
+    "paragraph_length": "3-5 句",
+    "rhetoric": ["类比", "反问", "举例"],
+    "avoid": ["过度学术化", "堆砌术语", "长定语从句"]
+  },
+  "style_guide": "用'你'称呼读者。每个抽象概念都配一个生活中的类比。段落短小精悍。善用代码示例但会先用文字解释思路。偶尔用反问句引导思考。",
+  "profile_overrides": {
+    "enable_humanizer": true,
+    "enable_thread_check": true
+  }
+}

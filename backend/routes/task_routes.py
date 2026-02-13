@@ -101,7 +101,16 @@ def stream_task_progress(task_id: str):
                 if message:
                     event_type = message.get('event', 'progress')
                     data = message.get('data', {})
-                    yield f"event: {event_type}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n"
+                    event_id = message.get('id', '')
+                    timestamp = message.get('timestamp')
+                    if timestamp:
+                        data['_ts'] = timestamp
+                    lines = []
+                    if event_id:
+                        lines.append(f"id: {event_id}")
+                    lines.append(f"event: {event_type}")
+                    lines.append(f"data: {json.dumps(data, ensure_ascii=False)}")
+                    yield "".join(line + "\n" for line in lines) + "\n"
 
                     if event_type in ('complete', 'cancelled'):
                         break

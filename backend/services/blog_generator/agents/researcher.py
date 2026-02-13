@@ -49,6 +49,36 @@ class ResearcherAgent:
             if not smart_service:
                 init_smart_search_service(llm_client)
             logger.info("🧠 智能知识源搜索已启用")
+
+        # 75.03 深度抓取开关
+        self.deep_scrape_enabled = os.environ.get('DEEP_SCRAPE_ENABLED', 'false').lower() == 'true'
+        self._deep_scraper = None
+        if self.deep_scrape_enabled:
+            try:
+                from ..services.deep_scraper import DeepScraper
+                self._deep_scraper = DeepScraper(
+                    jina_api_key=os.environ.get('JINA_API_KEY'),
+                    llm_service=llm_client,
+                    top_n=int(os.environ.get('DEEP_SCRAPE_TOP_N', '3')),
+                )
+                logger.info("🔗 深度抓取已启用 (Jina + httpx)")
+            except Exception as e:
+                logger.warning(f"深度抓取初始化失败: {e}")
+
+        # 75.06 本地素材库开关
+        self.local_material_enabled = os.environ.get('LOCAL_MATERIAL_ENABLED', 'false').lower() == 'true'
+        self._material_store = None
+        if self.local_material_enabled:
+            try:
+                from ..services.local_material_store import LocalMaterialStore
+                material_dir = os.environ.get(
+                    'LOCAL_MATERIAL_DIR',
+                    os.path.join(os.path.dirname(__file__), '..', '..', '..', 'materials')
+                )
+                self._material_store = LocalMaterialStore(base_dir=material_dir)
+                logger.info(f"📦 本地素材库已启用: {material_dir}")
+            except Exception as e:
+                logger.warning(f"本地素材库初始化失败: {e}")
     
     def generate_search_queries(self, topic: str, target_audience: str) -> List[str]:
         """
@@ -612,7 +642,34 @@ class ResearcherAgent:
         state['learning_objectives'] = instructional_analysis.get('learning_objectives', [])
         state['verbatim_data'] = instructional_analysis.get('verbatim_data', [])
 
-        # 5. 深度提炼 + 缺口分析（52号方案）
+        # 5. 本地素材库查询（75.06）
+        if self._material_store and search_results:
+            try:
+                local_hits = self._material_store.search(topic, limit=5)
+                if local_hits:
+                    logger.info(f"📦 本地素材库命中 {len(local_hits)} 条")
+                    for hit in local_hits:
+                        search_results.append({
+                            'title': hit.get('title', ''),
+                            'url': hit.get('url', ''),
+                            'content': hit.get('summary', ''),
+                            'source': 'local_material',
+                        })
+            except Exception as e:
+                logger.warning(f"本地素材库查询失败: {e}")
+
+        # 6. 深度抓取 Top N 搜索结果（75.03）
+        deep_scraped = []
+        if self._deep_scraper and search_results:
+            try:
+                logger.info("🔗 开始深度抓取 Top N 搜索结果...")
+                deep_scraped = self._deep_scraper.scrape_top_n(search_results, topic)
+                if deep_scraped:
+                    logger.info(f"🔗 深度抓取完成: {len(deep_scraped)} 篇高质量素材")
+            except Exception as e:
+                logger.warning(f"深度抓取失败: {e}")
+
+        # 7. 深度提炼 + 缺口分析（52号方案）
         distilled = {}
         gap_analysis = {}
         if search_results:
@@ -630,6 +687,7 @@ class ResearcherAgent:
         state['content_gaps'] = gap_analysis.get('content_gaps', [])
         state['unique_angles'] = gap_analysis.get('unique_angles', [])
         state['writing_recommendations'] = gap_analysis.get('writing_recommendations', {})
+        state['deep_scraped_materials'] = deep_scraped  # 75.03 深度抓取素材
 
         stats = state['knowledge_source_stats']
         logger.info(f"✅ 素材收集完成: 文档知识 {stats['document_count']} 条, "

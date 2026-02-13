@@ -1,0 +1,21 @@
+{
+  "name": "humorous",
+  "display_name": "幽默",
+  "description": "轻松幽默风格，适合轻松技术文",
+  "builtin": true,
+  "tone": "humorous",
+  "complexity": "beginner",
+  "verbosity": "balanced",
+  "language_rules": {
+    "person": "second",
+    "sentence_style": "短句为主，穿插俏皮话",
+    "paragraph_length": "2-4 句",
+    "rhetoric": ["类比", "夸张", "自嘲", "梗"],
+    "avoid": ["过度严肃", "学术术语堆砌", "冗长段落"]
+  },
+  "style_guide": "用'你'称呼读者。适当使用幽默和梗让技术内容更有趣。每个难点用一个有趣的类比解释。可以自嘲但不贬低读者。保持信息准确性的同时增加趣味性。",
+  "profile_overrides": {
+    "enable_humanizer": true,
+    "enable_voice_check": true
+  }
+}

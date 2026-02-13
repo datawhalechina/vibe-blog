@@ -1,0 +1,22 @@
+{
+  "name": "academic",
+  "display_name": "学术",
+  "description": "学术严谨风格，适合论文解读和深度分析",
+  "builtin": true,
+  "tone": "academic",
+  "complexity": "advanced",
+  "verbosity": "verbose",
+  "language_rules": {
+    "person": "impersonal",
+    "sentence_style": "长句为主，使用被动语态和从句",
+    "paragraph_length": "5-8 句",
+    "rhetoric": ["引用", "推导", "定义"],
+    "avoid": ["口语化", "主观臆断", "网络用语", "感叹号"]
+  },
+  "style_guide": "使用'本文'或无主语句式。每个论点都需要引用来源或数据支撑。使用学术术语但首次出现时给出定义。逻辑推导严密，结论谨慎。",
+  "profile_overrides": {
+    "max_revision_rounds": 5,
+    "enable_fact_check": true,
+    "enable_thread_check": true
+  }
+}
