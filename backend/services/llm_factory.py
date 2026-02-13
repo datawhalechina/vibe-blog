@@ -149,7 +149,7 @@ def create_llm_client(
             base_url=base_url,
             temperature=temperature,
             max_tokens=max_tokens,
-            max_retries=6,
+            max_retries=2,
         )
 
 
