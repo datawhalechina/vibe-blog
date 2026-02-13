@@ -28,12 +28,6 @@ def init_queue_routes(queue_manager):
 
 def _run_async(coro):
     """在同步 Flask 上下文中运行异步协程"""
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
     return asyncio.run(coro)
 
 

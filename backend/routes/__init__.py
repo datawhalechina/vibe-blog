@@ -12,6 +12,7 @@ from routes.publish_routes import publish_bp
 from routes.queue_routes import queue_bp
 from routes.scheduler_routes import scheduler_bp
 from routes.chat_routes import chat_bp
+from routes.feishu_routes import feishu_bp
 
 
 def register_all_blueprints(app):
@@ -27,3 +28,4 @@ def register_all_blueprints(app):
     app.register_blueprint(queue_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(chat_bp)
+    app.register_blueprint(feishu_bp)

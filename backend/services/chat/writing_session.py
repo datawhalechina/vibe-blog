@@ -14,6 +14,7 @@ import sqlite3
 class WritingSession:
     session_id: str
     topic: str
+    user_id: str = ""
     article_type: str = "problem-solution"
     target_audience: str = "beginner"
     target_length: str = "medium"
@@ -34,7 +35,7 @@ _JSON_FIELDS = {"outline", "sections", "search_results", "key_concepts", "code_b
 
 # 所有可更新的字段
 _ALL_FIELDS = {
-    "topic", "article_type", "target_audience", "target_length",
+    "topic", "user_id", "article_type", "target_audience", "target_length",
     "outline", "sections", "search_results", "research_summary",
     "key_concepts", "code_blocks", "images", "status",
 }
@@ -51,6 +52,7 @@ class WritingSessionManager:
             CREATE TABLE IF NOT EXISTS writing_sessions (
                 session_id TEXT PRIMARY KEY,
                 topic TEXT NOT NULL,
+                user_id TEXT DEFAULT '',
                 article_type TEXT DEFAULT 'problem-solution',
                 target_audience TEXT DEFAULT 'beginner',
                 target_length TEXT DEFAULT 'medium',
@@ -67,6 +69,14 @@ class WritingSessionManager:
             )
         """)
         self._conn.commit()
+        self._migrate()
+
+    def _migrate(self):
+        cursor = self._conn.execute("PRAGMA table_info(writing_sessions)")
+        columns = {row[1] for row in cursor.fetchall()}
+        if "user_id" not in columns:
+            self._conn.execute("ALTER TABLE writing_sessions ADD COLUMN user_id TEXT DEFAULT ''")
+            self._conn.commit()
 
     def _row_to_session(self, row: sqlite3.Row) -> WritingSession:
         d = dict(row)
@@ -77,11 +87,12 @@ class WritingSessionManager:
                 d[f] = []
         return WritingSession(**d)
 
-    def create(self, topic: str, **kwargs) -> WritingSession:
+    def create(self, topic: str, user_id: str = "", **kwargs) -> WritingSession:
         now = datetime.now(timezone.utc).isoformat()
         session = WritingSession(
             session_id=f"ws_{uuid.uuid4().hex[:12]}",
             topic=topic,
+            user_id=user_id,
             created_at=now,
             updated_at=now,
             **{k: v for k, v in kwargs.items() if k in _ALL_FIELDS},
@@ -99,10 +110,16 @@ class WritingSessionManager:
         self._conn.commit()
         return session
 
-    def get(self, session_id: str) -> Optional[WritingSession]:
-        row = self._conn.execute(
-            "SELECT * FROM writing_sessions WHERE session_id = ?", (session_id,)
-        ).fetchone()
+    def get(self, session_id: str, user_id: str = None) -> Optional[WritingSession]:
+        if user_id:
+            row = self._conn.execute(
+                "SELECT * FROM writing_sessions WHERE session_id = ? AND user_id = ?",
+                (session_id, user_id),
+            ).fetchone()
+        else:
+            row = self._conn.execute(
+                "SELECT * FROM writing_sessions WHERE session_id = ?", (session_id,)
+            ).fetchone()
         if row is None:
             return None
         return self._row_to_session(row)
@@ -125,11 +142,17 @@ class WritingSessionManager:
         self._conn.commit()
         return self.get(session_id)
 
-    def list(self, limit: int = 20, offset: int = 0) -> List[WritingSession]:
-        rows = self._conn.execute(
-            "SELECT * FROM writing_sessions ORDER BY created_at DESC LIMIT ? OFFSET ?",
-            (limit, offset),
-        ).fetchall()
+    def list(self, limit: int = 20, offset: int = 0, user_id: str = None) -> List[WritingSession]:
+        if user_id:
+            rows = self._conn.execute(
+                "SELECT * FROM writing_sessions WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (user_id, limit, offset),
+            ).fetchall()
+        else:
+            rows = self._conn.execute(
+                "SELECT * FROM writing_sessions ORDER BY created_at DESC LIMIT ? OFFSET ?",
+                (limit, offset),
+            ).fetchall()
         return [self._row_to_session(r) for r in rows]
 
     def delete(self, session_id: str) -> bool:

@@ -126,6 +126,9 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
     console_handler._vibe_blog_handler = True  # type: ignore[attr-defined]
     root_logger.addHandler(console_handler)
 
+    # 屏蔽 werkzeug 高频轮询日志（Dashboard 每 3s 心跳）
+    logging.getLogger("werkzeug").setLevel(logging.WARNING)
+
     if not enable_file:
         return
 

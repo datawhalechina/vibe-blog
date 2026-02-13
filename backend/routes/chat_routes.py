@@ -19,8 +19,20 @@ def init_chat_service(session_mgr, dispatcher):
     _dispatcher = dispatcher
 
 
+def _get_user_id():
+    """从请求中提取 user_id（优先 header，其次 JSON body）。
+    WhatsApp 场景下 NanoClaw Bridge 会在 header 中传 X-User-Id（即 WhatsApp JID）。
+    """
+    uid = request.headers.get('X-User-Id', '').strip()
+    if not uid:
+        data = request.get_json(silent=True) or {}
+        uid = data.get('user_id', '').strip()
+    return uid
+
+
 def _get_session_or_404(session_id):
-    session = _session_mgr.get(session_id)
+    user_id = _get_user_id()
+    session = _session_mgr.get(session_id, user_id=user_id or None)
     if not session:
         return None, jsonify({"error": "Session not found"}), 404
     return session, None, None
@@ -34,20 +46,22 @@ def create_session():
     topic = data.get('topic', '').strip()
     if not topic:
         return jsonify({"error": "topic is required"}), 400
+    user_id = _get_user_id()
     kwargs = {k: v for k, v in data.items()
               if k in ('article_type', 'target_audience', 'target_length')}
-    session = _session_mgr.create(topic=topic, **kwargs)
+    session = _session_mgr.create(topic=topic, user_id=user_id, **kwargs)
     return jsonify({"session_id": session.session_id, "topic": session.topic,
-                     "status": session.status}), 201
+                     "user_id": session.user_id, "status": session.status}), 201
 
 
 @chat_bp.route('/sessions', methods=['GET'])
 def list_sessions():
     limit = request.args.get('limit', 20, type=int)
     offset = request.args.get('offset', 0, type=int)
-    sessions = _session_mgr.list(limit=limit, offset=offset)
+    user_id = _get_user_id()
+    sessions = _session_mgr.list(limit=limit, offset=offset, user_id=user_id or None)
     return jsonify([{"session_id": s.session_id, "topic": s.topic,
-                      "status": s.status} for s in sessions])
+                      "user_id": s.user_id, "status": s.status} for s in sessions])
 
 
 @chat_bp.route('/session/<session_id>', methods=['GET'])

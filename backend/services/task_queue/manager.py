@@ -97,6 +97,9 @@ class TaskQueueManager:
             'failed': [t.model_dump() for t in
                        await self.db.get_tasks_by_status(
                            QueueStatus.FAILED, limit=10)],
+            'cancelled': [t.model_dump() for t in
+                          await self.db.get_tasks_by_status(
+                              QueueStatus.CANCELLED, limit=10)],
             'stats': {
                 'queued_count': await self.db.count_by_status(
                     QueueStatus.QUEUED),
@@ -105,6 +108,8 @@ class TaskQueueManager:
                 'completed_today': await self.db.count_completed_today(),
                 'failed_count': await self.db.count_by_status(
                     QueueStatus.FAILED),
+                'cancelled_count': await self.db.count_by_status(
+                    QueueStatus.CANCELLED),
                 'max_concurrent': self.max_concurrent,
             },
         }
@@ -237,20 +242,29 @@ class TaskQueueManager:
     async def _recover_queued_tasks(self):
         queued = await self.db.get_tasks_by_status(QueueStatus.QUEUED)
         running = await self.db.get_tasks_by_status(QueueStatus.RUNNING)
-        to_requeue = list(queued)
+
+        # RUNNING 状态的任务在重启后标记为 FAILED（线程已丢失，无法恢复）
         for task in running:
-            task.status = QueueStatus.QUEUED
+            task.status = QueueStatus.FAILED
+            task.completed_at = datetime.now()
+            task.stage_detail = "服务重启，任务中断"
             await self.db.save_task(task)
-            to_requeue.append(task)
-        for task in to_requeue:
-            await self._queue.put((
-                -task.priority.value,
-                task.created_at.timestamp(),
-                task.id,
-            ))
-        if to_requeue:
+            logger.warning(
+                f"[Queue] 标记中断任务为失败: {task.id} '{task.name}'"
+            )
+
+        # QUEUED 状态的任务也标记为 FAILED（无 worker 消费）
+        for task in queued:
+            task.status = QueueStatus.FAILED
+            task.completed_at = datetime.now()
+            task.stage_detail = "服务重启，排队任务已清理"
+            await self.db.save_task(task)
+
+        total = len(running) + len(queued)
+        if total:
             logger.info(
-                f"[Queue] 恢复 {len(to_requeue)} 个排队任务"
+                f"[Queue] 清理 {total} 个残留任务 "
+                f"(running={len(running)}, queued={len(queued)})"
             )
 
     # ── 事件系统 ──

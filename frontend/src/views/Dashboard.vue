@@ -23,6 +23,10 @@
           <div class="stat-value">{{ stats.failed_count }}</div>
           <div class="stat-label">失败</div>
         </div>
+        <div class="stat-card">
+          <div class="stat-value">{{ stats.cancelled_count }}</div>
+          <div class="stat-label">已取消</div>
+        </div>
       </div>
 
       <!-- 处理中的任务 -->
@@ -32,13 +36,14 @@
           <div class="task-card running" v-for="task in running" :key="task.id">
             <div class="task-header">
               <span class="task-name">{{ task.name }}</span>
-              <span class="task-stage">{{ task.current_stage }}</span>
+              <span class="task-stage">{{ task.current_stage || '准备中...' }}</span>
             </div>
             <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: task.progress + '%' }"></div>
+              <div class="progress-fill" :style="{ width: (task.progress || 0) + '%' }"></div>
             </div>
             <div class="task-footer">
-              <span class="task-detail">{{ task.stage_detail }}</span>
+              <span class="task-detail">{{ task.stage_detail || task.generation?.topic }}</span>
+              <span class="task-progress-text">{{ task.progress || 0 }}%</span>
               <button class="btn-cancel" @click="cancelTask(task.id)">取消</button>
             </div>
           </div>
@@ -76,6 +81,40 @@
             <div class="task-footer">
               <span class="task-detail">耗时 {{ formatDuration(record.duration_ms) }}</span>
               <span class="task-time">{{ formatTime(record.completed_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 失败的任务 -->
+      <section class="task-section" v-if="failed.length">
+        <h2>失败</h2>
+        <div class="task-list">
+          <div class="task-card failed" v-for="task in failed" :key="task.id">
+            <div class="task-header">
+              <span class="task-name">{{ task.name }}</span>
+              <span class="task-badge fail-badge">失败</span>
+            </div>
+            <div class="task-footer">
+              <span class="task-detail">{{ task.stage_detail || task.generation?.topic }}</span>
+              <span class="task-time">{{ formatTime(task.completed_at || task.created_at) }}</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- 已取消的任务 -->
+      <section class="task-section" v-if="cancelled.length">
+        <h2>已取消</h2>
+        <div class="task-list">
+          <div class="task-card cancelled" v-for="task in cancelled" :key="task.id">
+            <div class="task-header">
+              <span class="task-name">{{ task.name }}</span>
+              <span class="task-badge cancelled-badge">已取消</span>
+            </div>
+            <div class="task-footer">
+              <span class="task-detail">{{ task.generation?.topic }}</span>
+              <span class="task-time">{{ formatTime(task.completed_at || task.created_at) }}</span>
             </div>
           </div>
         </div>
@@ -148,9 +187,12 @@ const stats = reactive({
   queued_count: 0,
   completed_today: 0,
   failed_count: 0,
+  cancelled_count: 0,
 })
 const running = ref<any[]>([])
 const queued = ref<any[]>([])
+const failed = ref<any[]>([])
+const cancelled = ref<any[]>([])
 const history = ref<any[]>([])
 const scheduledTasks = ref<any[]>([])
 
@@ -172,6 +214,8 @@ async function fetchSnapshot() {
     Object.assign(stats, data.stats || {})
     running.value = data.running || []
     queued.value = data.queued || []
+    failed.value = data.failed || []
+    cancelled.value = data.cancelled || []
   } catch { /* 静默 */ }
 }
 
@@ -291,7 +335,7 @@ onUnmounted(() => {
 /* 统计卡片 */
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 12px;
   margin-bottom: 32px;
 }
@@ -341,6 +385,8 @@ onUnmounted(() => {
 .task-card.running { border-left: 3px solid #3b82f6; }
 .task-card.queued { border-left: 3px solid #f59e0b; }
 .task-card.completed { border-left: 3px solid #10b981; }
+.task-card.failed { border-left: 3px solid #ef4444; }
+.task-card.cancelled { border-left: 3px solid #94a3b8; }
 .task-card.scheduled { border-left: 3px solid #8b5cf6; }
 
 .task-header {
@@ -362,6 +408,7 @@ onUnmounted(() => {
 .fail-badge { background: #fee2e2; color: #991b1b; }
 .active-badge { background: #ede9fe; color: #5b21b6; }
 .paused-badge { background: #f1f5f9; color: #64748b; }
+.cancelled-badge { background: #f1f5f9; color: #64748b; }
 
 /* 进度条 */
 .progress-bar {
@@ -386,6 +433,7 @@ onUnmounted(() => {
   color: var(--color-text-secondary, #64748b);
 }
 .task-detail { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.task-progress-text { font-size: 0.75rem; font-weight: 600; color: var(--color-primary, #8b5cf6); margin: 0 8px; white-space: nowrap; }
 .task-time { font-size: 0.75rem; margin-left: 8px; }
 .task-actions { display: flex; gap: 6px; }
 

@@ -18,11 +18,15 @@ NC='\033[0m' # No Color
 BACKEND_PORT=5001
 FRONTEND_PORT=5173
 
+# WhatsApp 网关（可选）
+ENABLE_WHATSAPP=${ENABLE_WHATSAPP:-false}
+
 # 项目路径
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
+WHATSAPP_DIR="$PROJECT_ROOT/whatsapp-gateway"
 LOG_DIR="$PROJECT_ROOT/logs"
 
 # 时间戳（精确到秒）
@@ -87,6 +91,12 @@ cleanup() {
         echo -e "   前端已停止 (PID: $FRONTEND_PID)"
     fi
     
+    # 停止 WhatsApp 网关
+    if [ -n "$WHATSAPP_PID" ]; then
+        kill $WHATSAPP_PID 2>/dev/null || true
+        echo -e "   WhatsApp 网关已停止 (PID: $WHATSAPP_PID)"
+    fi
+    
     echo -e "${GREEN}✅ 所有服务已停止${NC}"
     exit 0
 }
@@ -144,9 +154,10 @@ echo -e "\n${BLUE}[3/5] 创建日志目录${NC}"
 mkdir -p "$LOG_DIR"
 echo -e "${GREEN}✅ 日志目录: $LOG_DIR${NC}"
 
-# 清理旧日志，前后端各保留最近 8 条
+# 清理旧日志，各保留最近 8 条
 cleanup_old_logs "backend" 8
 cleanup_old_logs "frontend" 8
+cleanup_old_logs "whatsapp" 8
 
 # 4. 启动后端
 echo -e "\n${BLUE}[4/5] 启动后端${NC}"
@@ -166,6 +177,31 @@ FRONTEND_PID=$!
 echo -e "   前端 PID: $FRONTEND_PID"
 echo -e "   日志: $FRONTEND_LOG"
 
+# 6. 启动 WhatsApp 网关（可选）
+if [ "$ENABLE_WHATSAPP" = "true" ] && [ -d "$WHATSAPP_DIR" ]; then
+    echo -e "\n${BLUE}[6/6] 启动 WhatsApp 网关${NC}"
+    
+    # 检查 node_modules
+    if [ ! -d "$WHATSAPP_DIR/node_modules" ]; then
+        echo -e "${YELLOW}⚠️  WhatsApp 网关依赖未安装，正在安装...${NC}"
+        cd "$WHATSAPP_DIR" && npm install
+    fi
+    
+    # 检查认证
+    if [ ! -d "$WHATSAPP_DIR/store/auth" ] || [ -z "$(ls -A $WHATSAPP_DIR/store/auth 2>/dev/null)" ]; then
+        echo -e "${YELLOW}⚠️  WhatsApp 未认证，请先运行:${NC}"
+        echo -e "   cd $WHATSAPP_DIR && node src/auth.js"
+        echo -e "${YELLOW}   跳过 WhatsApp 网关启动${NC}"
+    else
+        cd "$WHATSAPP_DIR"
+        WHATSAPP_LOG="$LOG_DIR/whatsapp_${TIMESTAMP}.log"
+        VIBE_BLOG_URL="http://localhost:$BACKEND_PORT" node src/index.js > "$WHATSAPP_LOG" 2>&1 &
+        WHATSAPP_PID=$!
+        echo -e "   WhatsApp PID: $WHATSAPP_PID"
+        echo -e "   日志: $WHATSAPP_LOG"
+    fi
+fi
+
 # 等待服务启动
 echo ""
 wait_for_service $BACKEND_PORT "后端"
@@ -178,8 +214,12 @@ echo -e "${GREEN}============================================================${N
 echo -e ""
 echo -e "   ${BLUE}前端地址:${NC} http://localhost:$FRONTEND_PORT"
 echo -e "   ${BLUE}后端地址:${NC} http://localhost:$BACKEND_PORT"
+if [ -n "$WHATSAPP_PID" ]; then
+    echo -e "   ${BLUE}WhatsApp:${NC} 已连接"
+fi
 echo -e ""
 echo -e "   ${YELLOW}按 Ctrl+C 停止所有服务${NC}"
+echo -e "   ${YELLOW}启用 WhatsApp: ENABLE_WHATSAPP=true bash docker/start-local.sh${NC}"
 echo -e ""
 
 # 保持脚本运行，等待用户中断

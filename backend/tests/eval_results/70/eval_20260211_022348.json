@@ -1,0 +1,137 @@
+{
+  "feature": "70.2-consistency-check",
+  "thread_checker": {
+    "issues": [
+      {
+        "section_id": "introduction",
+        "issue_type": "narrative_consistency",
+        "severity": "high",
+        "description": "[叙事一致性-promise_fulfillment] 引言承诺5种方案，但正文仅覆盖3种。",
+        "suggestion": "补充缺失的重排序和查询改写章节。",
+        "check_type": "promise_fulfillment"
+      },
+      {
+        "section_id": "document",
+        "issue_type": "narrative_consistency",
+        "severity": "high",
+        "description": "[叙事一致性-narrative_coverage] 逻辑链中重排序和查询改写未覆盖。",
+        "suggestion": "新增相关章节以完整覆盖逻辑链。",
+        "check_type": "narrative_coverage"
+      },
+      {
+        "section_id": "section_1",
+        "issue_type": "narrative_consistency",
+        "severity": "medium",
+        "description": "[叙事一致性-core_question] 未明确解释RAG基本原理。",
+        "suggestion": "补充RAG原理的详细说明。",
+        "check_type": "core_question"
+      },
+      {
+        "section_id": "section_2_to_section_3",
+        "issue_type": "narrative_consistency",
+        "severity": "low",
+        "description": "[叙事一致性-transition] 章节间缺乏自然过渡。",
+        "suggestion": "添加承上启下的过渡句。",
+        "check_type": "transition"
+      }
+    ],
+    "eval": {
+      "checks": {
+        "T1_promise_fulfillment": {
+          "result": "pass",
+          "reason": "正确检出承诺未兑现问题"
+        },
+        "T2_fact_consistency": {
+          "result": "fail",
+          "reason": "未检出准确率数据矛盾"
+        },
+        "T3_terminology": {
+          "result": "pass",
+          "reason": "术语一致性无误报"
+        },
+        "T4_no_false_positive": {
+          "result": "pass",
+          "reason": "无明显误报问题"
+        }
+      },
+      "pass_count": 3,
+      "total": 4,
+      "verdict": "FAIL",
+      "summary": "Agent 未检出准确率数据矛盾问题"
+    },
+    "elapsed": 20.69660496711731
+  },
+  "voice_checker": {
+    "issues": [
+      {
+        "section_id": "section_1_to_section_2",
+        "issue_type": "voice_consistency",
+        "severity": "high",
+        "description": "[语气统一-tone_consistency] 语气从热情突变为冷淡。",
+        "suggestion": "调整 section_2 语气更亲切。",
+        "check_type": "tone_consistency"
+      },
+      {
+        "section_id": "section_1",
+        "issue_type": "voice_consistency",
+        "severity": "medium",
+        "description": "[语气统一-formality_consistency] 正式度偏低，偏离目标。",
+        "suggestion": "减少口语化表达。",
+        "check_type": "formality_consistency"
+      },
+      {
+        "section_id": "section_3",
+        "issue_type": "voice_consistency",
+        "severity": "medium",
+        "description": "[语气统一-formality_consistency] 正式度偏低，偏离目标。",
+        "suggestion": "避免使用'其实'等口语词。",
+        "check_type": "formality_consistency"
+      },
+      {
+        "section_id": "section_2",
+        "issue_type": "voice_consistency",
+        "severity": "medium",
+        "description": "[语气统一-person_consistency] 人称切换为无主语。",
+        "suggestion": "统一使用'你'或'我们'。",
+        "check_type": "person_consistency"
+      },
+      {
+        "section_id": "section_3",
+        "issue_type": "voice_consistency",
+        "severity": "low",
+        "description": "[语气统一-high_frequency_word] 高频使用'然后'、'其实'。",
+        "suggestion": "替换高频词，增加多样性。",
+        "check_type": "high_frequency_word"
+      }
+    ],
+    "eval": {
+      "checks": {
+        "V1_person_consistency": {
+          "result": "pass",
+          "reason": "正确检出人称混乱问题"
+        },
+        "V2_formality_consistency": {
+          "result": "pass",
+          "reason": "正确检出正式度波动问题"
+        },
+        "V3_self_reference": {
+          "result": "fail",
+          "reason": "未检出自称不一致问题"
+        },
+        "V4_no_false_positive": {
+          "result": "pass",
+          "reason": "无明显误报问题"
+        }
+      },
+      "pass_count": 3,
+      "total": 4,
+      "verdict": "FAIL",
+      "summary": "Agent 未检出自称不一致问题"
+    },
+    "elapsed": 19.537776708602905
+  },
+  "pass_count": 6,
+  "total": 8,
+  "verdict": "PASS",
+  "timestamp": "2026-02-11T02:23:48.708785"
+}

@@ -168,7 +168,15 @@ class PlannerAgent:
                 section.setdefault('core_question', '')
                 section.setdefault('assigned_materials', [])
                 section.setdefault('subsections', [])
-            
+
+            # 打印素材分配情况
+            for section in outline.get('sections', []):
+                materials = section.get('assigned_materials', [])
+                if materials:
+                    logger.info(f"📎 素材分配: [{section.get('title', '')}] ← {len(materials)} 条素材")
+                    for m in materials:
+                        logger.debug(f"   - source_index={m.get('source_index')}, {m.get('instruction', '')[:60]}")
+
             return outline
             
         except json.JSONDecodeError as e:

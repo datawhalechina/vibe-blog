@@ -31,12 +31,6 @@ def init_scheduler_routes(scheduler_service):
 
 def _run_async(coro):
     import asyncio
-    loop = asyncio.get_event_loop()
-    if loop.is_running():
-        import concurrent.futures
-        with concurrent.futures.ThreadPoolExecutor() as pool:
-            future = pool.submit(asyncio.run, coro)
-            return future.result()
     return asyncio.run(coro)
 
 

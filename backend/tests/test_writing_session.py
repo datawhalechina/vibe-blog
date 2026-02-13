@@ -126,6 +126,50 @@ class TestWritingSessionDelete:
         assert result is False
 
 
+class TestWritingSessionUserIsolation:
+    """WS12-WS16: user_id 用户隔离"""
+
+    def test_ws12_create_with_user_id(self, session_mgr):
+        """WS12: 创建会话时指定 user_id"""
+        session = session_mgr.create(topic="用户A的主题", user_id="user_a")
+        assert session.user_id == "user_a"
+        fetched = session_mgr.get(session.session_id)
+        assert fetched.user_id == "user_a"
+
+    def test_ws13_get_filtered_by_user_id(self, session_mgr):
+        """WS13: 按 user_id 过滤获取会话"""
+        s_a = session_mgr.create(topic="A的会话", user_id="user_a")
+        s_b = session_mgr.create(topic="B的会话", user_id="user_b")
+        # user_a 只能看到自己的
+        assert session_mgr.get(s_a.session_id, user_id="user_a") is not None
+        assert session_mgr.get(s_b.session_id, user_id="user_a") is None
+        # user_b 只能看到自己的
+        assert session_mgr.get(s_b.session_id, user_id="user_b") is not None
+        assert session_mgr.get(s_a.session_id, user_id="user_b") is None
+
+    def test_ws14_get_without_user_id_returns_all(self, session_mgr):
+        """WS14: 不传 user_id 时可获取任意会话（管理员模式）"""
+        s_a = session_mgr.create(topic="A的会话", user_id="user_a")
+        fetched = session_mgr.get(s_a.session_id)
+        assert fetched is not None
+        assert fetched.user_id == "user_a"
+
+    def test_ws15_list_filtered_by_user_id(self, session_mgr):
+        """WS15: 按 user_id 过滤列表"""
+        for i in range(3):
+            session_mgr.create(topic=f"A-{i}", user_id="user_a")
+        for i in range(2):
+            session_mgr.create(topic=f"B-{i}", user_id="user_b")
+        assert len(session_mgr.list(user_id="user_a")) == 3
+        assert len(session_mgr.list(user_id="user_b")) == 2
+        assert len(session_mgr.list()) == 5  # 不传 user_id 返回全部
+
+    def test_ws16_default_user_id_empty(self, session_mgr):
+        """WS16: 不传 user_id 时默认为空字符串"""
+        session = session_mgr.create(topic="无用户")
+        assert session.user_id == ""
+
+
 # ============ Fixtures ============
 
 @pytest.fixture

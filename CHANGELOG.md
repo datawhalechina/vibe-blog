@@ -47,6 +47,28 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **Searcher 智能搜索改造** (#71) — 扩展源 + SourceCurator + 健康检查
 - ✨ **Crawl4AI 主动爬取** (#75.06) — LocalMaterialStore + BlogCrawler
 - ✅ Playwright E2E 测试套件 — 12 个测试用例覆盖 TC-1~TC-12
+- ✨ **飞书机器人集成** — 对话式写作入口，私聊/群聊 @bot 触发
+  - `feishu_routes.py`：Webhook 事件订阅、意图解析、vibe-blog API 调用、卡片消息回复
+  - 富文本卡片消息：帮助/任务启动/进度/完成/失败 5 种卡片，lark_md 格式
+  - 进度轮询推送：后台线程轮询 SSE 任务状态，自动推送进度到飞书
+  - 模板优先降级：支持 template_id + variables，无模板时降级为代码构建卡片
+  - 多用户隔离：按 open_id 隔离写作会话
+  - Docker 部署支持：docker-compose.yml 添加飞书环境变量
+- 📄 **飞书部署文档** — `docs/feishu-deploy.md` 本地开发/远程部署/多用户隔离/故障排查
+
+### Changed
+- 🔧 **Dashboard 任务中心增强** — 新增失败/已取消任务列表、进度百分比显示、cancelled_count 统计
+- 🔧 **任务排队恢复策略** — 服务重启时 RUNNING/QUEUED 任务标记为 FAILED（而非重新入队），避免僵尸任务
+- 🔧 **生成进度同步到排队系统** — `update_queue_progress()` 桥接 SSE 进度到 Dashboard 进度条
+- 🔧 **Humanizer 改写重试** — JSON 解析失败时最多重试 3 次，最终失败保留原文
+- 🔧 **Planner 素材分配日志** — 打印每个章节的素材分配情况
+- 🔧 **LLMClientAdapter** — 透传 token_tracker 属性
+- 🔧 **WritingSession 用户隔离** — get/list 支持 user_id 过滤
+- 🔧 **WhatsApp 网关启动脚本** — start-local.sh 支持 ENABLE_WHATSAPP 可选启动
+- 🔧 **mini 模式默认开启 humanizer/fact_check** — StyleProfile.mini() 调整
+
+### Fixed
+- 🐛 **Humanizer 空响应崩溃** — 增加空字符串检查，避免 JSON 解析异常
 
 ---
 

@@ -1,0 +1,43 @@
+{
+  "sample_title": "LangGraph 框架深度解析",
+  "feature": "63-humanizer-agent",
+  "humanizer_result": {
+    "skipped": false,
+    "score_before": 14,
+    "score_after": 39,
+    "elapsed": 61.03120017051697
+  },
+  "eval_result": {
+    "checks": {
+      "C1_ai_vocabulary": {
+        "result": "pass",
+        "reason": "AI高频词汇基本消除"
+      },
+      "C2_filler_phrases": {
+        "result": "pass",
+        "reason": "填充短语已去除"
+      },
+      "C3_structure": {
+        "result": "pass",
+        "reason": "公式化结构已打破"
+      },
+      "C4_content_integrity": {
+        "result": "pass",
+        "reason": "核心信息完整保留"
+      },
+      "C5_placeholders": {
+        "result": "pass",
+        "reason": "占位符无改动"
+      },
+      "C6_naturalness": {
+        "result": "fail",
+        "reason": "句式仍显机械化"
+      }
+    },
+    "pass_count": 5,
+    "total": 6,
+    "verdict": "PASS",
+    "summary": "改写有效但句式仍需更自然化"
+  },
+  "timestamp": "2026-02-11T02:13:46.592187"
+}

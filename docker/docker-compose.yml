@@ -20,6 +20,11 @@ services:
       - LOG_DIR=/app/logs
       - OUTPUT_FOLDER=/app/outputs
       - UPLOAD_FOLDER=/app/uploads
+      # 飞书机器人（对话式写作入口）
+      - FEISHU_APP_ID=${FEISHU_APP_ID:-}
+      - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}
+      - FEISHU_VERIFICATION_TOKEN=${FEISHU_VERIFICATION_TOKEN:-}
+      - FEISHU_ENCRYPT_KEY=${FEISHU_ENCRYPT_KEY:-}
     logging:
       driver: "local"
       options:

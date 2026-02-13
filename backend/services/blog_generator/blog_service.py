@@ -12,7 +12,7 @@ from contextvars import copy_context
 
 from logging_config import task_id_context
 
-from .queue_bridge import update_queue_status
+from .queue_bridge import update_queue_status, update_queue_progress
 from .generator import BlogGenerator
 from .schemas.state import create_initial_state
 from .services.search_service import SearchService, init_search_service, get_search_service
@@ -348,8 +348,11 @@ class BlogService:
                 'deepen_content': (65, '正在深化内容...'),
                 'coder': (75, '正在生成代码示例...'),
                 'artist': (85, '正在生成配图...'),
-                'reviewer': (92, '正在审核质量...'),
+                'reviewer': (90, '正在审核质量...'),
+                'humanizer': (93, '正在优化文风...'),
                 'revision': (95, '正在修订内容...'),
+                'fact_checker': (96, '正在事实核查...'),
+                'consistency_check': (97, '正在一致性检查...'),
                 'assembler': (98, '正在组装文档...'),
             }
             
@@ -377,6 +380,12 @@ class BlogService:
                             'progress': progress_info[0],
                             'message': progress_info[1]
                         })
+                        # 同步进度到排队系统（Dashboard 进度条）
+                        update_queue_progress(
+                            task_id, progress_info[0],
+                            stage=progress_info[1],
+                            detail=node_name,
+                        )
                         
                         # 发送详细中间结果
                         if node_name == 'researcher':
@@ -1306,11 +1315,19 @@ class LLMClientAdapter:
     def __init__(self, llm_service):
         """
         初始化适配器
-        
+
         Args:
             llm_service: banana-blog 的 LLMService
         """
         self.llm_service = llm_service
+
+    @property
+    def token_tracker(self):
+        return self.llm_service.token_tracker
+
+    @token_tracker.setter
+    def token_tracker(self, value):
+        self.llm_service.token_tracker = value
     
     def chat(self, messages, response_format=None, caller: str = ""):
         """
