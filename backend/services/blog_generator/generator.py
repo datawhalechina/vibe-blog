@@ -122,9 +122,30 @@ class BlogGenerator:
         self.tracker = SessionTracker()
         self.summary_generator = SummaryGeneratorAgent(llm_client) if self._env_summary else None
 
+        # 37.12 分层架构校验器（可选）
+        self._layer_validator = None
+        if os.environ.get('LAYER_VALIDATION_ENABLED', 'false').lower() == 'true':
+            try:
+                from .orchestrator.layer_definitions import BLOG_LAYERS, LayerValidator
+                self._layer_validator = LayerValidator(BLOG_LAYERS)
+                logger.info("🏗️ 分层架构校验已启用")
+            except Exception as e:
+                logger.warning(f"分层架构校验初始化失败: {e}")
+
         # 构建工作流
         self.workflow = self._build_workflow()
         self.app = None
+
+    def _validate_layer(self, layer_name: str, state: Dict[str, Any]):
+        """37.12 层间数据契约校验（仅日志警告，不阻断流程）"""
+        if not self._layer_validator:
+            return
+        try:
+            ok, missing = self._layer_validator.validate_inputs(layer_name, state)
+            if not ok:
+                logger.warning(f"🏗️ [{layer_name}] 层输入缺失: {missing}")
+        except Exception as e:
+            logger.debug(f"层校验异常: {e}")
     
     def _build_workflow(self) -> StateGraph:
         """
@@ -227,11 +248,13 @@ class BlogGenerator:
     def _researcher_node(self, state: SharedState) -> SharedState:
         """素材收集节点"""
         logger.info("=== Step 1: 素材收集 ===")
+        self._validate_layer("research", state)
         return self.researcher.run(state)
     
     def _planner_node(self, state: SharedState) -> SharedState:
         """大纲规划节点"""
         logger.info("=== Step 2: 大纲规划 ===")
+        self._validate_layer("structure", state)
         # 使用实例变量中的流式回调
         on_stream = getattr(self, '_outline_stream_callback', None)
         return self.planner.run(state, on_stream=on_stream)
@@ -239,6 +262,7 @@ class BlogGenerator:
     def _writer_node(self, state: SharedState) -> SharedState:
         """内容撰写节点"""
         logger.info("=== Step 3: 内容撰写 ===")
+        self._validate_layer("content", state)
         before_count = _get_content_word_count(state)
         result = self.writer.run(state)
         after_count = _get_content_word_count(result)
@@ -1055,7 +1079,37 @@ class BlogGenerator:
 
         logger.info("无需细化搜索，继续到追问阶段")
         return "continue"
-    
+
+    def _run_derivative_skills(self, final_state: Dict[str, Any]) -> Dict[str, Any]:
+        """37.14/37.16 运行博客衍生物 Skills（MindMap/Flashcard/StudyNote）"""
+        if os.environ.get('SKILL_DERIVATIVES_ENABLED', 'false').lower() != 'true':
+            return {}
+        try:
+            from .skills.executor import SkillExecutor
+            from .skills.registry import SkillRegistry
+            # 确保 skills 已注册（导入触发 @register 装饰器）
+            from .skills import mindmap, flashcard, study_note  # noqa: F401
+
+            executor = SkillExecutor()
+            markdown = final_state.get('final_markdown', '')
+            if not markdown:
+                return {}
+
+            input_data = {"markdown": markdown, "topic": final_state.get('topic', '')}
+            results = {}
+            for skill_name in SkillRegistry.get_post_process_skills():
+                try:
+                    result = executor.execute(skill_name, input_data)
+                    if result.get('success'):
+                        results[skill_name] = result.get('output')
+                        logger.info(f"🎯 衍生物 [{skill_name}] 生成完成")
+                except Exception as e:
+                    logger.warning(f"衍生物 [{skill_name}] 生成失败: {e}")
+            return results
+        except Exception as e:
+            logger.warning(f"衍生物系统初始化失败: {e}")
+            return {}
+
     def compile(self, checkpointer=None):
         """
         编译工作流
@@ -1190,6 +1244,12 @@ class BlogGenerator:
             }
             if token_summary:
                 result["token_summary"] = token_summary
+
+            # 37.14/37.16 博客衍生物生成（Skill 后处理）
+            derivatives = self._run_derivative_skills(final_state)
+            if derivatives:
+                result["derivatives"] = derivatives
+
             return result
             
         except Exception as e:
