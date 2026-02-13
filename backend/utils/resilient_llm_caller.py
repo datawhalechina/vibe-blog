@@ -12,6 +12,7 @@ LLM 弹性调用模块 — 截断扩容、智能重试、超时保护
 import logging
 import os
 import signal
+import threading
 import time
 from contextlib import contextmanager
 from typing import Tuple
@@ -96,6 +97,11 @@ def timeout_guard(seconds: int):
     """
     if not hasattr(signal, 'SIGALRM'):
         # Windows 不支持 SIGALRM，降级
+        yield
+        return
+
+    if threading.current_thread() is not threading.main_thread():
+        # signal.alarm 只能在主线程使用，非主线程降级为无超时保护
         yield
         return
 
