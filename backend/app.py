@@ -138,6 +138,24 @@ def create_app(config_class=None):
     from routes.blog_routes import init_blog_services
     init_blog_services(app.config)
 
+    # 初始化对话式写作服务
+    try:
+        from services.chat.writing_session import WritingSessionManager
+        from services.chat.agent_dispatcher import AgentDispatcher
+        from routes.chat_routes import init_chat_service
+
+        chat_db_path = os.path.join(os.path.dirname(__file__), 'data', 'writing_sessions.db')
+        os.makedirs(os.path.dirname(chat_db_path), exist_ok=True)
+        chat_session_mgr = WritingSessionManager(db_path=chat_db_path)
+        chat_dispatcher = AgentDispatcher(
+            llm_client=get_llm_service(),
+            search_service=get_search_service(),
+        )
+        init_chat_service(chat_session_mgr, chat_dispatcher)
+        logger.info("对话式写作服务已初始化")
+    except Exception as e:
+        logger.warning(f"对话式写作服务初始化失败 (可选模块): {e}")
+
     # 注册所有 Blueprint
     from routes import register_all_blueprints
     register_all_blueprints(app)

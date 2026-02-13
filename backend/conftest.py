@@ -208,3 +208,90 @@ def reset_mocks():
     """Reset all mocks after each test."""
     yield
     # Cleanup happens automatically with pytest-mock
+
+
+# ============ Chat Fixtures ============
+
+@pytest.fixture
+def chat_session_mgr():
+    """In-memory WritingSessionManager for chat testing."""
+    from services.chat.writing_session import WritingSessionManager
+    return WritingSessionManager(db_path=":memory:")
+
+
+@pytest.fixture
+def chat_session_id(chat_session_mgr):
+    """Create a test session and return its ID."""
+    session = chat_session_mgr.create(topic="测试主题：AI 入门指南")
+    return session.session_id
+
+
+@pytest.fixture
+def sample_outline():
+    """Sample outline for testing."""
+    return {
+        "title": "AI 入门指南",
+        "sections": [
+            {"id": "s1", "title": "什么是 AI", "key_points": ["定义", "历史"]},
+            {"id": "s2", "title": "机器学习基础", "key_points": ["监督学习", "无监督学习"]},
+            {"id": "s3", "title": "深度学习", "key_points": ["神经网络", "CNN", "RNN"]},
+        ]
+    }
+
+
+@pytest.fixture
+def mock_dispatcher():
+    """Mock AgentDispatcher with all methods mocked."""
+    dispatcher = MagicMock()
+    dispatcher.search.return_value = {"search_results": [{"title": "result"}]}
+    dispatcher.detect_knowledge_gaps.return_value = {"knowledge_gaps": []}
+    dispatcher.generate_outline.return_value = {
+        "outline": {"title": "AI 指南", "sections": [{"id": "s1", "title": "简介"}]}
+    }
+    dispatcher.edit_outline.return_value = {
+        "outline": {"title": "新标题", "sections": []}
+    }
+    dispatcher.write_section.return_value = {
+        "section": {"id": "s1", "title": "简介", "content": "这是简介内容"}
+    }
+    dispatcher.edit_section.return_value = {"content": "编辑后的内容"}
+    dispatcher.enhance_section.return_value = {"content": "增强后的内容"}
+    dispatcher.generate_code.return_value = {"code_block": {"code": "print('hi')"}}
+    dispatcher.generate_image.return_value = {"image": {"url": "http://img.png"}}
+    dispatcher.review.return_value = {"review": {"score": 85}}
+    dispatcher.factcheck.return_value = {"factcheck": {"score": 90}}
+    dispatcher.humanize.return_value = {"humanized": {"rewritten": "自然内容"}}
+    dispatcher.assemble.return_value = {"markdown": {"final_markdown": "# AI\n..."}}
+    dispatcher.get_preview.return_value = {"preview": "# AI\n...", "section_count": 1}
+    return dispatcher
+
+
+@pytest.fixture
+def chat_app(monkeypatch, mock_dispatcher, chat_session_mgr):
+    """Flask app with chat services initialized."""
+    monkeypatch.setattr('routes.blog_routes.get_blog_service', lambda: MagicMock())
+    monkeypatch.setattr('routes.blog_routes.get_db_service', lambda: MagicMock())
+    monkeypatch.setattr('routes.blog_routes.get_file_parser', lambda: MagicMock())
+    monkeypatch.setattr('routes.history_routes.get_db_service', lambda: MagicMock())
+    monkeypatch.setattr('routes.task_routes.get_task_manager', lambda: MagicMock())
+    monkeypatch.setattr('routes.static_routes.get_db_service', lambda: MagicMock())
+    monkeypatch.setattr('routes.book_routes.get_db_service', lambda: MagicMock())
+
+    from app import create_app
+    from routes.chat_routes import init_chat_service
+
+    flask_app = create_app()
+    flask_app.config.update({'TESTING': True, 'DEBUG': False})
+
+    init_chat_service(chat_session_mgr, mock_dispatcher)
+
+    flask_app.mock_dispatcher = mock_dispatcher
+    flask_app.chat_session_mgr = chat_session_mgr
+
+    yield flask_app
+
+
+@pytest.fixture
+def chat_client(chat_app):
+    """Flask test client for chat API."""
+    return chat_app.test_client()
