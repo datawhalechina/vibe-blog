@@ -561,6 +561,32 @@ const connectSSE = (taskId: string) => {
     const data = d.data || {}
 
     switch (d.type) {
+      case 'search_started':
+        addProgressItem(`🔍 搜索: ${data.query || ''}`, 'info')
+        break
+
+      case 'search_results':
+        progressItems.value.push({
+          time: new Date().toLocaleTimeString(),
+          message: `🔍 ${data.query || '搜索结果'}`,
+          type: 'search',
+          data: data,
+        })
+        break
+
+      case 'crawl_completed':
+        progressItems.value.push({
+          time: new Date().toLocaleTimeString(),
+          message: `📖 已抓取 ${data.count || 0} 篇`,
+          type: 'crawl',
+          data: data,
+        })
+        break
+
+      case 'search_completed':
+        addProgressItem(`✅ ${data.message || '搜索完成'}`, 'success')
+        break
+
       case 'researcher_complete':
         if (data.document_count > 0 || data.web_count > 0) {
           addProgressItem(`📊 知识来源: 文档 ${data.document_count} 条, 网络 ${data.web_count} 条`, 'info')

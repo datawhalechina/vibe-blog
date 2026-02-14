@@ -364,6 +364,52 @@ class BlogService:
                         'logger': record.name.split('.')[-1],
                         'message': msg
                     })
+                    # 识别搜索日志，额外推送结构化 result 事件
+                    self._emit_structured_search_event(msg, record)
+
+            def _emit_structured_search_event(self, msg, record):
+                """从日志中识别搜索/爬取模式，推送结构化 result 事件"""
+                import re
+                import json as _json
+                try:
+                    # 搜索开始: "使用智谱 Web Search 搜索: xxx" 或 "启动智能知识源搜索"
+                    m = re.search(r'(?:Web Search 搜索|智能.*搜索)[：:]\s*(.+)', msg)
+                    if m:
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'search_started',
+                            'data': {'query': m.group(1).strip()}
+                        })
+                        return
+                    # 搜索请求参数: 包含 search_query 的 JSON
+                    if '请求参数' in msg and 'search_query' in msg:
+                        m2 = re.search(r'\{.*\}', msg)
+                        if m2:
+                            try:
+                                payload = _json.loads(m2.group(0))
+                                self.task_manager.send_event(self.task_id, 'result', {
+                                    'type': 'search_started',
+                                    'data': {'query': payload.get('search_query', '')}
+                                })
+                            except _json.JSONDecodeError:
+                                pass
+                        return
+                    # 深度抓取完成: "深度抓取完成: N 篇高质量素材"
+                    m3 = re.search(r'深度抓取完成[：:]\s*(\d+)', msg)
+                    if m3:
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'crawl_completed',
+                            'data': {'count': int(m3.group(1))}
+                        })
+                        return
+                    # 智能搜索完成: "智能搜索完成，使用搜索源: [...]"
+                    if '智能搜索完成' in msg:
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'search_completed',
+                            'data': {'message': msg}
+                        })
+                        return
+                except Exception:
+                    pass
         
         # 添加日志处理器
         sse_handler = None
@@ -567,6 +613,32 @@ class BlogService:
                                     'total_length': len(content)
                                 })
                             
+                            # 推送搜索结果卡片数据
+                            raw_results = state.get('search_results', [])
+                            if raw_results:
+                                from urllib.parse import urlparse
+                                card_results = []
+                                for r in raw_results[:10]:
+                                    url = r.get('url', '')
+                                    domain = ''
+                                    try:
+                                        domain = urlparse(url).hostname or ''
+                                    except Exception:
+                                        pass
+                                    card_results.append({
+                                        'url': url,
+                                        'title': r.get('title', ''),
+                                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:120],
+                                        'domain': domain,
+                                    })
+                                task_manager.send_event(task_id, 'result', {
+                                    'type': 'search_results',
+                                    'data': {
+                                        'query': state.get('topic', ''),
+                                        'results': card_results,
+                                    }
+                                })
+
                             task_manager.send_event(task_id, 'result', {
                                 'type': 'researcher_complete',
                                 'data': {
