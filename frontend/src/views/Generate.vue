@@ -270,35 +270,35 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--color-bg-primary, #0a0a0a);
-  color: var(--color-text-primary, #e0e0e0);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
 }
 
 .generate-toolbar {
   display: flex;
   align-items: center;
-  gap: var(--space-md, 16px);
-  padding: var(--space-sm, 8px) var(--space-lg, 24px);
-  border-bottom: 1px solid var(--color-border, #222);
-  background: var(--color-bg-elevated, #111);
+  gap: var(--space-md);
+  padding: var(--space-sm) var(--space-lg);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   flex-shrink: 0;
 }
 
 .toolbar-btn {
-  padding: var(--space-xs, 4px) var(--space-sm, 8px);
+  padding: var(--space-xs) var(--space-sm);
   background: transparent;
-  border: 1px solid var(--color-border, #333);
-  border-radius: var(--radius-sm, 4px);
-  color: var(--color-text-secondary, #999);
-  font-size: var(--font-size-xs, 12px);
-  font-family: var(--font-mono, monospace);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .toolbar-btn:hover {
-  color: var(--color-text-primary, #e0e0e0);
-  border-color: var(--color-primary, #4ade80);
+  color: var(--color-text-primary);
+  border-color: var(--color-primary);
 }
 
 .stop-btn {
@@ -319,28 +319,28 @@ onUnmounted(() => {
   flex: 1;
   display: flex;
   align-items: center;
-  gap: var(--space-sm, 8px);
+  gap: var(--space-sm);
 }
 
 .status-badge {
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 11px;
-  font-family: var(--font-mono, monospace);
-  background: rgba(74, 222, 128, 0.15);
-  color: #4ade80;
+  font-family: var(--font-mono);
+  background: var(--color-primary-light);
+  color: var(--color-primary);
 }
 
 .status-text {
-  font-size: var(--font-size-xs, 12px);
-  color: var(--color-text-muted, #666);
-  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
 }
 
 .toolbar-actions {
   display: flex;
   align-items: center;
-  gap: var(--space-sm, 8px);
+  gap: var(--space-sm);
 }
 
 .generate-main {
@@ -352,7 +352,7 @@ onUnmounted(() => {
 .generate-left {
   width: 40%;
   min-width: 320px;
-  border-right: 1px solid var(--color-border, #222);
+  border-right: 1px solid var(--color-border);
   overflow-y: auto;
 }
 
@@ -360,31 +360,32 @@ onUnmounted(() => {
   width: 60%;
   flex: 1;
   overflow-y: auto;
-  padding: var(--space-lg, 24px);
+  padding: var(--space-lg);
+  background: var(--color-bg-base);
 }
 
 .mobile-tabs {
   display: flex;
-  border-bottom: 1px solid var(--color-border, #222);
-  background: var(--color-bg-elevated, #111);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--color-bg-elevated);
   flex-shrink: 0;
 }
 
 .mobile-tab {
   flex: 1;
-  padding: var(--space-sm, 8px);
+  padding: var(--space-sm);
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--color-text-muted, #666);
-  font-family: var(--font-mono, monospace);
-  font-size: var(--font-size-xs, 12px);
+  color: var(--color-text-muted);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
   cursor: pointer;
 }
 
 .mobile-tab.active {
-  color: var(--color-primary, #4ade80);
-  border-bottom-color: var(--color-primary, #4ade80);
+  color: var(--color-primary);
+  border-bottom-color: var(--color-primary);
 }
 
 .mobile-tab:disabled {
@@ -395,14 +396,14 @@ onUnmounted(() => {
 .preview-footer {
   display: flex;
   justify-content: center;
-  padding: var(--space-lg, 24px);
+  padding: var(--space-lg);
 }
 
 .view-btn {
-  color: var(--color-primary, #4ade80);
-  border-color: var(--color-primary, #4ade80);
-  font-size: var(--font-size-sm, 14px);
-  padding: var(--space-sm, 8px) var(--space-lg, 24px);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+  font-size: var(--font-size-sm);
+  padding: var(--space-sm) var(--space-lg);
 }
 
 @media (max-width: 767px) {
@@ -423,15 +424,15 @@ onUnmounted(() => {
   font-size: 15px;
 }
 
-.preview-panel :deep(h1) { font-size: 1.8em; margin: 1em 0 0.5em; color: var(--color-text-primary, #e0e0e0); }
-.preview-panel :deep(h2) { font-size: 1.4em; margin: 1.2em 0 0.4em; color: var(--color-text-primary, #e0e0e0); border-bottom: 1px solid var(--color-border, #222); padding-bottom: 0.3em; }
-.preview-panel :deep(h3) { font-size: 1.2em; margin: 1em 0 0.3em; color: var(--color-text-secondary, #ccc); }
+.preview-panel :deep(h1) { font-size: 1.8em; margin: 1em 0 0.5em; color: var(--color-text-primary); }
+.preview-panel :deep(h2) { font-size: 1.4em; margin: 1.2em 0 0.4em; color: var(--color-text-primary); border-bottom: 1px solid var(--color-border); padding-bottom: 0.3em; }
+.preview-panel :deep(h3) { font-size: 1.2em; margin: 1em 0 0.3em; color: var(--color-text-secondary); }
 .preview-panel :deep(p) { margin: 0.6em 0; }
-.preview-panel :deep(code) { background: rgba(255,255,255,0.06); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
-.preview-panel :deep(pre) { background: rgba(255,255,255,0.04); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 1em 0; }
-.preview-panel :deep(a) { color: #4ade80; text-decoration: underline; cursor: pointer; }
+.preview-panel :deep(code) { background: var(--color-bg-input); padding: 2px 6px; border-radius: 3px; font-size: 0.9em; }
+.preview-panel :deep(pre) { background: var(--color-terminal-bg); color: var(--color-terminal-text); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 1em 0; }
+.preview-panel :deep(a) { color: var(--color-primary); text-decoration: underline; cursor: pointer; }
 .preview-panel :deep(img) { max-width: 100%; border-radius: 8px; margin: 1em 0; }
-.preview-panel :deep(blockquote) { border-left: 3px solid #4ade80; padding-left: 16px; margin: 1em 0; color: var(--color-text-muted, #888); }
+.preview-panel :deep(blockquote) { border-left: 3px solid var(--color-primary); padding-left: 16px; margin: 1em 0; color: var(--color-text-muted); }
 
 .preview-empty {
   display: flex;
@@ -439,8 +440,8 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   height: 100%;
-  gap: var(--space-md, 16px);
-  color: var(--color-text-muted, #555);
+  gap: var(--space-md);
+  color: var(--color-text-muted);
 }
 
 .preview-empty-icon {
@@ -449,7 +450,7 @@ onUnmounted(() => {
 }
 
 .preview-empty-text {
-  font-size: var(--font-size-sm, 14px);
-  font-family: var(--font-mono, monospace);
+  font-size: var(--font-size-sm);
+  font-family: var(--font-mono);
 }
 </style>
