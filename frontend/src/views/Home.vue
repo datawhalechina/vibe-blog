@@ -40,6 +40,8 @@
                       v-model:image-style="imageStyle"
                       v-model:generate-cover-video="generateCoverVideo"
                       v-model:video-aspect-ratio="videoAspectRatio"
+                      v-model:deep-thinking="deepThinking"
+                      v-model:background-investigation="backgroundInvestigation"
                       v-model:custom-config="customConfig"
                       :image-styles="imageStyles"
                       :app-config="appConfig"
@@ -219,6 +221,8 @@ const audienceAdaptation = ref('default')
 const imageStyle = ref('cartoon')
 const generateCoverVideo = ref(false)
 const videoAspectRatio = ref('16:9')
+const deepThinking = ref(false)
+const backgroundInvestigation = ref(true)
 const imageStyles = ref<Array<{ id: string; name: string; icon: string }>>([
   { id: 'cartoon', name: '默认风格', icon: '🎨' }
 ])
@@ -421,7 +425,9 @@ const handleGenerate = async () => {
         document_ids: getReadyDocumentIds(),
         image_style: imageStyle.value,
         generate_cover_video: generateCoverVideo.value,
-        video_aspect_ratio: videoAspectRatio.value
+        video_aspect_ratio: videoAspectRatio.value,
+        deep_thinking: deepThinking.value,
+        background_investigation: backgroundInvestigation.value,
       }
 
       if (targetLength.value === 'custom') {

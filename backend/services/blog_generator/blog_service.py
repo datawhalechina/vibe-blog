@@ -131,6 +131,8 @@ class BlogService:
         generate_cover_video: bool = False,
         video_aspect_ratio: str = "16:9",
         custom_config: dict = None,
+        deep_thinking: bool = False,
+        background_investigation: bool = True,
         task_manager=None,
         app=None
     ):
@@ -150,6 +152,8 @@ class BlogService:
             image_style: 图片风格 ID
             generate_cover_video: 是否生成封面动画
             custom_config: 自定义配置（仅当 target_length='custom' 时使用）
+            deep_thinking: 是否启用深度思考模式
+            background_investigation: 是否启用背景调查（搜索）
             task_manager: 任务管理器
             app: Flask 应用实例
         """
@@ -174,6 +178,8 @@ class BlogService:
                             generate_cover_video=generate_cover_video,
                             video_aspect_ratio=video_aspect_ratio,
                             custom_config=custom_config,
+                            deep_thinking=deep_thinking,
+                            background_investigation=background_investigation,
                             task_manager=task_manager
                         )
                 else:
@@ -191,6 +197,8 @@ class BlogService:
                         generate_cover_video=generate_cover_video,
                         video_aspect_ratio=video_aspect_ratio,
                         custom_config=custom_config,
+                        deep_thinking=deep_thinking,
+                        background_investigation=background_investigation,
                         task_manager=task_manager
                     )
             finally:
@@ -217,6 +225,8 @@ class BlogService:
         generate_cover_video: bool = False,
         video_aspect_ratio: str = "16:9",
         custom_config: dict = None,
+        deep_thinking: bool = False,
+        background_investigation: bool = True,
         task_manager=None
     ):
         """

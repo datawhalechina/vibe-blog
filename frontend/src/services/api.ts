@@ -14,6 +14,8 @@ export interface BlogGenerateParams {
   image_style?: string
   generate_cover_video?: boolean
   video_aspect_ratio?: string
+  deep_thinking?: boolean
+  background_investigation?: boolean
   custom_config?: {
     sections_count?: number
     images_count?: number

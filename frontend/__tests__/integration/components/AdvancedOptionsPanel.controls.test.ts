@@ -1,0 +1,94 @@
+/**
+ * 101.06 输入框交互增强 — 深度思考/背景调查开关测试
+ */
+import { describe, it, expect } from 'vitest'
+import { mount } from '@vue/test-utils'
+import AdvancedOptionsPanel from '@/components/home/AdvancedOptionsPanel.vue'
+
+const baseProps = {
+  articleType: 'tutorial',
+  targetLength: 'mini',
+  audienceAdaptation: 'default',
+  imageStyle: 'cartoon',
+  generateCoverVideo: false,
+  videoAspectRatio: '16:9',
+  deepThinking: false,
+  backgroundInvestigation: true,
+  customConfig: {
+    sectionsCount: 4,
+    imagesCount: 4,
+    codeBlocksCount: 2,
+    targetWordCount: 3500,
+  },
+  imageStyles: [{ id: 'cartoon', name: '默认风格', icon: '🎨' }],
+  appConfig: { features: {} },
+}
+
+describe('AdvancedOptionsPanel — deep thinking & background investigation', () => {
+  it('should render background investigation checkbox (checked by default)', () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    // backgroundInvestigation is the first new checkbox
+    const bgCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('背景调查')
+    })
+    expect(bgCheckbox).toBeTruthy()
+    expect((bgCheckbox!.element as HTMLInputElement).checked).toBe(true)
+  })
+
+  it('should render deep thinking checkbox (unchecked by default)', () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    const dtCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('深度思考')
+    })
+    expect(dtCheckbox).toBeTruthy()
+    expect((dtCheckbox!.element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('should emit update:deepThinking when deep thinking checkbox toggled', async () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    const dtCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('深度思考')
+    })
+    await dtCheckbox!.setValue(true)
+    expect(wrapper.emitted('update:deepThinking')).toBeTruthy()
+    expect(wrapper.emitted('update:deepThinking')![0]).toEqual([true])
+  })
+
+  it('should emit update:backgroundInvestigation when background investigation checkbox toggled', async () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    const bgCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('背景调查')
+    })
+    await bgCheckbox!.setValue(false)
+    expect(wrapper.emitted('update:backgroundInvestigation')).toBeTruthy()
+    expect(wrapper.emitted('update:backgroundInvestigation')![0]).toEqual([false])
+  })
+
+  it('should show tooltip hints for both controls', () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const hints = wrapper.findAll('.option-hint')
+    const hintTitles = hints.map((h) => h.attributes('title'))
+    expect(hintTitles.some((t) => t?.includes('深入的推理'))).toBe(true)
+    expect(hintTitles.some((t) => t?.includes('搜索相关资料'))).toBe(true)
+  })
+
+  it('should reflect deepThinking=true from props', () => {
+    const wrapper = mount(AdvancedOptionsPanel, {
+      props: { ...baseProps, deepThinking: true },
+    })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    const dtCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('深度思考')
+    })
+    expect((dtCheckbox!.element as HTMLInputElement).checked).toBe(true)
+  })
+})

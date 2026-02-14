@@ -261,6 +261,8 @@ def generate_blog():
         generate_cover_video = data.get('generate_cover_video', False)
         video_aspect_ratio = data.get('video_aspect_ratio', '16:9')
         custom_config = data.get('custom_config', None)
+        deep_thinking = data.get('deep_thinking', False)
+        background_investigation = data.get('background_investigation', True)
 
         if target_length == 'custom':
             if not custom_config:
@@ -313,6 +315,8 @@ def generate_blog():
             generate_cover_video=generate_cover_video,
             video_aspect_ratio=video_aspect_ratio,
             custom_config=custom_config,
+            deep_thinking=deep_thinking,
+            background_investigation=background_investigation,
             task_manager=task_manager,
             app=current_app._get_current_object()
         )

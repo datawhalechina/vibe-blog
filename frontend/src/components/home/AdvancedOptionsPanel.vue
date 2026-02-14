@@ -73,6 +73,26 @@
           <option value="9:16">竖屏(9:16)</option>
         </select>
       </div>
+
+      <!-- 背景调查 -->
+      <div class="option-item checkbox-item">
+        <label>
+          <input type="checkbox" v-model="localBackgroundInvestigation">
+          <Search :size="14" />
+          <span>背景调查</span>
+        </label>
+        <span class="option-hint" title="生成前先搜索相关资料，关闭可加速但可能降低内容丰富度">ⓘ</span>
+      </div>
+
+      <!-- 深度思考 -->
+      <div class="option-item checkbox-item">
+        <label>
+          <input type="checkbox" v-model="localDeepThinking">
+          <Brain :size="14" />
+          <span>深度思考</span>
+        </label>
+        <span class="option-hint" title="启用后 LLM 会进行更深入的推理，生成时间约增加 2-3 倍">ⓘ</span>
+      </div>
     </div>
 
     <!-- 自定义配置面板 -->
@@ -125,7 +145,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { FileText, File, Users, Palette, Video, Monitor, Settings } from 'lucide-vue-next'
+import { FileText, File, Users, Palette, Video, Monitor, Settings, Search, Brain } from 'lucide-vue-next'
 
 interface CustomConfig {
   sectionsCount: number
@@ -147,6 +167,8 @@ interface Props {
   imageStyle: string
   generateCoverVideo: boolean
   videoAspectRatio: string
+  deepThinking: boolean
+  backgroundInvestigation: boolean
   customConfig: CustomConfig
   imageStyles: ImageStyle[]
   appConfig: {
@@ -161,6 +183,8 @@ interface Emits {
   (e: 'update:imageStyle', value: string): void
   (e: 'update:generateCoverVideo', value: boolean): void
   (e: 'update:videoAspectRatio', value: string): void
+  (e: 'update:deepThinking', value: boolean): void
+  (e: 'update:backgroundInvestigation', value: boolean): void
   (e: 'update:customConfig', value: CustomConfig): void
 }
 
@@ -196,6 +220,16 @@ const localGenerateCoverVideo = computed({
 const localVideoAspectRatio = computed({
   get: () => props.videoAspectRatio,
   set: (value) => emit('update:videoAspectRatio', value)
+})
+
+const localDeepThinking = computed({
+  get: () => props.deepThinking,
+  set: (value) => emit('update:deepThinking', value)
+})
+
+const localBackgroundInvestigation = computed({
+  get: () => props.backgroundInvestigation,
+  set: (value) => emit('update:backgroundInvestigation', value)
 })
 
 const localCustomConfig = computed({
