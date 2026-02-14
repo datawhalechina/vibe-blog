@@ -156,8 +156,14 @@
               </span>
             </div>
             <div class="task-footer">
-              <span class="task-detail">{{ st.next_run ? '下次: ' + formatTime(st.next_run) : '已暂停' }}</span>
+              <span class="task-detail">
+                {{ st.next_run_at ? '下次: ' + formatTime(st.next_run_at) : '已暂停' }}
+                <span v-if="st.last_status === 'error'" class="error-text" style="margin-left: 8px">
+                  ⚠ {{ st.last_error || '执行失败' }} (连续{{ st.consecutive_errors }}次)
+                </span>
+              </span>
               <div class="task-actions">
+                <button v-if="st.last_status === 'error'" class="btn-sm" @click="retrySchedule(st.id)">重试</button>
                 <button class="btn-sm" @click="toggleSchedule(st)">
                   {{ st.enabled ? '暂停' : '恢复' }}
                 </button>
@@ -256,8 +262,8 @@ async function parseScheduleText() {
 async function createScheduledTask() {
   if (!canCreateSchedule.value || !parsedSchedule.value) return
   const trigger = parsedSchedule.value.type === 'cron'
-    ? { type: 'cron', cron: parsedSchedule.value.cron }
-    : { type: 'date', run_date: parsedSchedule.value.run_date }
+    ? { type: 'cron', cron_expression: parsedSchedule.value.cron_expression }
+    : { type: 'once', scheduled_at: parsedSchedule.value.scheduled_at }
   await fetch(`${API_BASE}/api/scheduler/tasks`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -278,6 +284,11 @@ async function createScheduledTask() {
 async function toggleSchedule(st: any) {
   const action = st.enabled ? 'pause' : 'resume'
   await fetch(`${API_BASE}/api/scheduler/tasks/${st.id}/${action}`, { method: 'POST' })
+  await fetchScheduledTasks()
+}
+
+async function retrySchedule(id: string) {
+  await fetch(`${API_BASE}/api/scheduler/tasks/${id}/retry`, { method: 'POST' })
   await fetchScheduledTasks()
 }
 

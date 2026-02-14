@@ -5,11 +5,17 @@
 *.pem
 *.key
 
-# 缓存数据库（可能含敏感信息）
-backend/cache/
+# 测试覆盖率产物
+.coverage
+coverage.json
+coverage.lcov
+htmlcov/
 backend/.coverage
 backend/coverage.json
 backend/coverage.lcov
+
+# 缓存数据库（可能含敏感信息）
+backend/cache/
 
 # Python
 __pycache__/
@@ -96,8 +102,7 @@ backend/logs/
 *.bak
 *.swp
 
-# 文档目录（保留部署文档）
-docs  # 允许 docs 目录
+# 文档目录：设计文档应提交，不忽略 docs/
 
 backend/test_*.py
 backend/test_*.md

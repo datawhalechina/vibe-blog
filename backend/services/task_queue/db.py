@@ -18,6 +18,7 @@ import aiosqlite
 from .models import (
     BlogTask, BlogGenerationConfig, ExecutionRecord,
     PublishConfig, QueueStatus, TriggerConfig,
+    CronJob, CronJobState, CronJobStatus, CronSchedule, CronScheduleKind,
 )
 
 logger = logging.getLogger(__name__)
@@ -182,6 +183,118 @@ class TaskDB:
                 "DELETE FROM scheduled_tasks WHERE id = ?", (task_id,)
             )
             await db.commit()
+
+    # ── Cron Job CRUD ──
+
+    async def save_cron_job(self, job: CronJob):
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("""
+                INSERT OR REPLACE INTO cron_jobs
+                (id, name, description, enabled, delete_after_run,
+                 schedule_kind, schedule_at, schedule_every_seconds,
+                 schedule_anchor_at, schedule_expr, schedule_tz,
+                 generation_config, publish_config, timeout_seconds,
+                 next_run_at, running_at, last_run_at, last_status,
+                 last_error, last_duration_ms, consecutive_errors,
+                 schedule_error_count,
+                 created_at, updated_at, tags, user_id)
+                VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """, (
+                job.id, job.name, job.description,
+                1 if job.enabled else 0,
+                1 if job.delete_after_run else 0,
+                job.schedule.kind.value,
+                job.schedule.at.isoformat() if job.schedule.at else None,
+                job.schedule.every_seconds,
+                job.schedule.anchor_at.isoformat() if job.schedule.anchor_at else None,
+                job.schedule.expr,
+                job.schedule.tz,
+                job.generation.model_dump_json(),
+                job.publish.model_dump_json(),
+                job.timeout_seconds,
+                job.state.next_run_at.isoformat() if job.state.next_run_at else None,
+                job.state.running_at.isoformat() if job.state.running_at else None,
+                job.state.last_run_at.isoformat() if job.state.last_run_at else None,
+                job.state.last_status.value if job.state.last_status else None,
+                job.state.last_error,
+                job.state.last_duration_ms,
+                job.state.consecutive_errors,
+                job.state.schedule_error_count,
+                job.created_at.isoformat(),
+                job.updated_at.isoformat(),
+                json.dumps(job.tags),
+                job.user_id,
+            ))
+            await db.commit()
+
+    async def get_cron_job(self, job_id: str) -> Optional[CronJob]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            async with db.execute(
+                "SELECT * FROM cron_jobs WHERE id = ?", (job_id,)
+            ) as cursor:
+                row = await cursor.fetchone()
+                if row:
+                    return self._row_to_cron_job(dict(row))
+        return None
+
+    async def get_cron_jobs(self, include_disabled: bool = True) -> list[CronJob]:
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            if include_disabled:
+                sql = "SELECT * FROM cron_jobs ORDER BY created_at DESC"
+                params = ()
+            else:
+                sql = "SELECT * FROM cron_jobs WHERE enabled = 1 ORDER BY created_at DESC"
+                params = ()
+            async with db.execute(sql, params) as cursor:
+                rows = await cursor.fetchall()
+                return [self._row_to_cron_job(dict(r)) for r in rows]
+
+    async def delete_cron_job(self, job_id: str) -> bool:
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "DELETE FROM cron_jobs WHERE id = ?", (job_id,)
+            )
+            await db.commit()
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def _row_to_cron_job(row: dict) -> CronJob:
+        schedule = CronSchedule(
+            kind=CronScheduleKind(row['schedule_kind']),
+            at=datetime.fromisoformat(row['schedule_at']) if row.get('schedule_at') else None,
+            every_seconds=row.get('schedule_every_seconds'),
+            anchor_at=datetime.fromisoformat(row['schedule_anchor_at']) if row.get('schedule_anchor_at') else None,
+            expr=row.get('schedule_expr'),
+            tz=row.get('schedule_tz') or 'Asia/Shanghai',
+        )
+        state = CronJobState(
+            next_run_at=datetime.fromisoformat(row['next_run_at']) if row.get('next_run_at') else None,
+            running_at=datetime.fromisoformat(row['running_at']) if row.get('running_at') else None,
+            last_run_at=datetime.fromisoformat(row['last_run_at']) if row.get('last_run_at') else None,
+            last_status=CronJobStatus(row['last_status']) if row.get('last_status') else None,
+            last_error=row.get('last_error'),
+            last_duration_ms=row.get('last_duration_ms'),
+            consecutive_errors=row.get('consecutive_errors') or 0,
+            schedule_error_count=row.get('schedule_error_count') or 0,
+        )
+        return CronJob(
+            id=row['id'],
+            name=row['name'],
+            description=row.get('description'),
+            enabled=bool(row.get('enabled', 1)),
+            delete_after_run=bool(row.get('delete_after_run', 0)),
+            schedule=schedule,
+            generation=BlogGenerationConfig.model_validate_json(row['generation_config']),
+            publish=PublishConfig.model_validate_json(row['publish_config']),
+            timeout_seconds=row.get('timeout_seconds') or 600,
+            state=state,
+            created_at=row.get('created_at') or datetime.now().isoformat(),
+            updated_at=row.get('updated_at') or datetime.now().isoformat(),
+            tags=json.loads(row.get('tags') or '[]'),
+            user_id=row.get('user_id'),
+        )
 
     # ── 内部转换 ──
 

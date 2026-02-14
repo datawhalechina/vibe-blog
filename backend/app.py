@@ -138,11 +138,11 @@ def create_app(config_class=None):
     from routes.blog_routes import init_blog_services
     init_blog_services(app.config)
 
-    # 初始化任务排队系统（TaskQueueManager + SchedulerService）
+    # 初始化任务排队系统（TaskQueueManager + CronScheduler）
     try:
         import asyncio
         from services.task_queue import TaskQueueManager
-        from services.task_queue.scheduler import SchedulerService
+        from services.task_queue.cron_scheduler import CronScheduler
         from routes.queue_routes import init_queue_routes
         from routes.scheduler_routes import init_scheduler_routes
 
@@ -153,11 +153,11 @@ def create_app(config_class=None):
         init_queue_routes(queue_manager)
         app.queue_manager = queue_manager
 
-        scheduler_service = SchedulerService(queue_manager, db_path=db_path)
-        scheduler_service.start()
-        init_scheduler_routes(scheduler_service)
+        cron_scheduler = CronScheduler(queue_manager, db_path=db_path)
+        asyncio.run(cron_scheduler.start())
+        init_scheduler_routes(cron_scheduler)
 
-        logger.info("任务排队系统已初始化 (TaskQueueManager + SchedulerService)")
+        logger.info("任务排队系统已初始化 (TaskQueueManager + CronScheduler)")
     except Exception as e:
         logger.warning(f"任务排队系统初始化失败 (可选模块): {e}")
 
