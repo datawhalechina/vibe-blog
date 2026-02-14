@@ -247,6 +247,9 @@ class BlogGenerator:
     
     def _researcher_node(self, state: SharedState) -> SharedState:
         """素材收集节点"""
+        if state.get('skip_researcher'):
+            logger.info("=== Step 1: 素材收集（已跳过） ===")
+            return state
         logger.info("=== Step 1: 素材收集 ===")
         self._validate_layer("research", state)
         return self.researcher.run(state)

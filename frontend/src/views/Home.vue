@@ -474,8 +474,15 @@ const handleGenerate = async () => {
 
     if (data.success && data.task_id) {
       currentTaskId.value = data.task_id
-      addProgressItem(`✓ 任务创建成功 (ID: ${data.task_id})`, 'success')
-      connectSSE(data.task_id)
+      if (isStorybook) {
+        // 绘本任务保持原有 SSE 逻辑
+        addProgressItem(`✓ 任务创建成功 (ID: ${data.task_id})`, 'success')
+        connectSSE(data.task_id)
+      } else {
+        // 博客/Mini 任务跳转到 Generate 页面
+        router.push(`/generate/${data.task_id}`)
+        return
+      }
     } else {
       addProgressItem(`✗ 任务创建失败: ${data.error || '未知错误'}`, 'error')
       statusBadge.value = '错误'

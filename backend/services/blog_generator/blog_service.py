@@ -512,6 +512,25 @@ class BlogService:
             # 注意：不要将函数放入 state，会导致 LangGraph checkpoint 序列化失败
             # 取消检查已在主循环中处理 (line 272)
             
+            # deep_thinking: 设置 LLM thinking mode（更深入推理，生成时间更长）
+            if deep_thinking:
+                try:
+                    self.generator.llm.thinking_enabled = True
+                    logger.info(f"深度思考模式已启用 [{task_id}]")
+                except Exception:
+                    logger.warning("LLM 不支持 thinking mode，忽略 deep_thinking 参数")
+            
+            # background_investigation=false: 跳过 researcher，直接从 planner 开始
+            if not background_investigation:
+                initial_state['skip_researcher'] = True
+                if task_manager:
+                    task_manager.send_event(task_id, 'progress', {
+                        'stage': 'researcher_skipped',
+                        'progress': 15,
+                        'message': '已跳过背景调查，直接开始规划'
+                    })
+                logger.info(f"背景调查已跳过 [{task_id}]")
+            
             # 设置大纲流式回调到 generator 实例
             def on_outline_stream(delta, accumulated):
                 if task_manager:
@@ -717,6 +736,16 @@ class BlogService:
                                             'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
                                         }
                                     })
+                                    # 发送 writing_chunk 事件：累积所有已完成章节的 markdown
+                                    accumulated_md = ''
+                                    for j in range(i + 1):
+                                        s = sections[j]
+                                        accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                                    task_manager.send_event(task_id, 'writing_chunk', {
+                                        'section_index': i + 1,
+                                        'delta': section.get('content', ''),
+                                        'accumulated': accumulated_md.strip(),
+                                    })
                                 completed_sections = new_count
                         
                         elif node_name == 'check_knowledge':
@@ -916,7 +945,8 @@ class BlogService:
                     target_sections_count=article_config.get('sections_count'),
                     target_images_count=article_config.get('images_count'),
                     target_code_blocks_count=article_config.get('code_blocks_count'),
-                    target_word_count=article_config.get('target_word_count')
+                    target_word_count=article_config.get('target_word_count'),
+                    citations=json.dumps(citations, ensure_ascii=False) if citations else None
                 )
                 logger.info(f"历史记录已保存: {task_id}")
                 
@@ -967,6 +997,27 @@ class BlogService:
                 except Exception as e:
                     logger.warning(f"任务日志保存失败: {e}")
 
+            # 构建 citations 列表（合并 search_results + top_references，URL 去重）
+            citations = []
+            seen_urls = set()
+            for src_list_key in ('search_results', 'top_references'):
+                for r in (final_state.get(src_list_key) or []):
+                    url = r.get('url') or r.get('source', '')
+                    if not url or url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    try:
+                        from urllib.parse import urlparse
+                        domain = urlparse(url).hostname or ''
+                    except Exception:
+                        domain = ''
+                    citations.append({
+                        'url': url,
+                        'title': r.get('title', ''),
+                        'domain': domain,
+                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
+                    })
+            
             # 发送完成事件（使用包含封面图的 markdown）
             if task_manager:
                 complete_data = {
@@ -979,7 +1030,8 @@ class BlogService:
                     'code_blocks_count': len(final_state.get('code_blocks', [])),
                     'review_score': final_state.get('review_score', 0),
                     'saved_path': saved_path,
-                    'cover_video': cover_video_path
+                    'cover_video': cover_video_path,
+                    'citations': citations
                 }
                 # 注入 token 用量摘要（37.34 + 37.31）
                 if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':

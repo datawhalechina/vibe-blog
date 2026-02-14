@@ -38,6 +38,11 @@ const routes = [
     component: () => import('../views/BlogDetail.vue')
   },
   {
+    path: '/generate/:taskId',
+    name: 'Generate',
+    component: () => import('../views/Generate.vue')
+  },
+  {
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('../views/Dashboard.vue')

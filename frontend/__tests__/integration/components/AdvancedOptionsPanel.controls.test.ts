@@ -93,3 +93,28 @@ describe('AdvancedOptionsPanel — deep thinking & background investigation', ()
     expect((dtCheckbox!.element as HTMLInputElement).checked).toBe(true)
   })
 })
+
+describe('AdvancedOptionsPanel — interactive mode', () => {
+  it('should render interactive checkbox (unchecked by default)', () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    const interactiveCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('交互式生成')
+    })
+    expect(interactiveCheckbox).toBeTruthy()
+    expect((interactiveCheckbox!.element as HTMLInputElement).checked).toBe(false)
+  })
+
+  it('should emit update:interactive when interactive checkbox toggled', async () => {
+    const wrapper = mount(AdvancedOptionsPanel, { props: baseProps })
+    const checkboxes = wrapper.findAll('input[type="checkbox"]')
+    const interactiveCheckbox = checkboxes.find((cb) => {
+      const label = cb.element.closest('label')
+      return label?.textContent?.includes('交互式生成')
+    })
+    await interactiveCheckbox!.setValue(true)
+    expect(wrapper.emitted('update:interactive')).toBeTruthy()
+    expect(wrapper.emitted('update:interactive')![0]).toEqual([true])
+  })
+})

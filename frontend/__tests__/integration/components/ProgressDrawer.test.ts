@@ -504,4 +504,233 @@ describe('ProgressDrawer.vue', () => {
       expect(logMsg.html()).toContain('<strong>Bold text</strong>')
     })
   })
+
+  describe('search card rendering', () => {
+    const searchItem = {
+      time: '10:00:00',
+      message: '🔍 LangGraph 教程',
+      type: 'search',
+      data: {
+        query: 'LangGraph 教程',
+        results: [
+          { title: 'LangGraph 入门', url: 'https://example.com/1', domain: 'example.com' },
+          { title: 'LangGraph 进阶', url: 'https://example.com/2', domain: 'example.com' },
+          { title: 'LangGraph 实战', url: 'https://example.com/3', domain: 'blog.com' },
+        ],
+      },
+    }
+
+    it('should render search query text', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      expect(wrapper.find('.search-query').text()).toContain('LangGraph 教程')
+    })
+
+    it('should render search result card titles', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      const cards = wrapper.findAll('.search-card')
+      expect(cards).toHaveLength(3)
+      expect(cards[0].find('.search-card-title').text()).toBe('LangGraph 入门')
+      expect(cards[1].find('.search-card-title').text()).toBe('LangGraph 进阶')
+    })
+
+    it('should render favicon images with correct src', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      const favicon = wrapper.find('.search-card-favicon')
+      expect(favicon.attributes('src')).toContain('example.com')
+    })
+
+    it('should render search card links with correct href', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      const card = wrapper.find('.search-card')
+      expect(card.attributes('href')).toBe('https://example.com/1')
+      expect(card.attributes('target')).toBe('_blank')
+    })
+
+    it('should limit search results to 8 cards', () => {
+      const manyResults = Array.from({ length: 12 }, (_, i) => ({
+        title: `Result ${i + 1}`,
+        url: `https://example.com/${i}`,
+        domain: 'example.com',
+      }))
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          expanded: true,
+          progressItems: [{
+            ...searchItem,
+            data: { query: 'test', results: manyResults },
+          }],
+        },
+      })
+      const cards = wrapper.findAll('.search-card')
+      expect(cards).toHaveLength(8)
+    })
+
+    it('should not affect normal log rendering', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          expanded: true,
+          progressItems: [
+            { time: '10:00:00', message: 'Normal log', type: 'info' },
+            searchItem,
+          ],
+        },
+      })
+      const normalLogs = wrapper.findAll('.progress-log-item.info')
+      expect(normalLogs.length).toBeGreaterThanOrEqual(1)
+      expect(normalLogs[0].find('.progress-log-msg').text()).toBe('Normal log')
+    })
+  })
+
+  describe('crawl card rendering', () => {
+    const crawlItem = {
+      time: '10:00:01',
+      message: '📖 已抓取 3 篇',
+      type: 'crawl',
+      data: {
+        title: 'LangGraph 官方文档',
+        url: 'https://docs.langchain.com/langgraph',
+        contentLength: 15360,
+        count: 3,
+      },
+    }
+
+    it('should render crawl card with title and URL', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      const block = wrapper.find('.crawl-block')
+      expect(block.exists()).toBe(true)
+      expect(block.find('.crawl-link').text()).toBe('LangGraph 官方文档')
+    })
+
+    it('should render crawl link as clickable anchor', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      const link = wrapper.find('.crawl-link')
+      expect(link.attributes('href')).toBe('https://docs.langchain.com/langgraph')
+      expect(link.attributes('target')).toBe('_blank')
+    })
+
+    it('should render content size in KB', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      const size = wrapper.find('.crawl-size')
+      expect(size.text()).toContain('15.0')
+      expect(size.text()).toContain('KB')
+    })
+
+    it('should fallback to URL when title is missing', () => {
+      const noTitleItem = {
+        ...crawlItem,
+        data: { url: 'https://example.com/page', contentLength: 1024 },
+      }
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [noTitleItem] },
+      })
+      const link = wrapper.find('.crawl-link')
+      expect(link.text()).toBe('https://example.com/page')
+    })
+  })
+
+  describe('mixed rendering', () => {
+    it('should render search cards, crawl cards, and normal logs together', () => {
+      const mixedItems = [
+        { time: '10:00:00', message: 'Starting', type: 'info' },
+        {
+          time: '10:00:01',
+          message: '🔍 搜索',
+          type: 'search',
+          data: {
+            query: 'test',
+            results: [{ title: 'R1', url: 'https://a.com', domain: 'a.com' }],
+          },
+        },
+        {
+          time: '10:00:02',
+          message: '📖 爬取',
+          type: 'crawl',
+          data: { title: 'Page', url: 'https://b.com', count: 1 },
+        },
+        { time: '10:00:03', message: 'Done', type: 'success' },
+      ]
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: mixedItems },
+      })
+
+      expect(wrapper.find('.search-results-block').exists()).toBe(true)
+      expect(wrapper.find('.crawl-block').exists()).toBe(true)
+      const normalLogs = wrapper.findAll('.progress-log-item.info, .progress-log-item.success')
+      expect(normalLogs.length).toBe(2)
+    })
+  })
+
+  describe('animation control', () => {
+    const makeSearchItem = (count: number) => ({
+      time: '10:00:00',
+      message: '🔍 search',
+      type: 'search',
+      data: {
+        query: 'test',
+        results: Array.from({ length: count }, (_, i) => ({
+          title: `Result ${i + 1}`,
+          url: `https://example.com/${i}`,
+          domain: 'example.com',
+        })),
+      },
+    })
+
+    it('should apply animation to the first 6 cards', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [makeSearchItem(8)] },
+      })
+      const cards = wrapper.findAll('.search-card')
+      // First 6 cards should have card-in animation
+      for (let i = 0; i < 6; i++) {
+        const style = cards[i].attributes('style') || ''
+        expect(style).toContain('card-in')
+      }
+    })
+
+    it('should not apply animation to cards after the 6th', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [makeSearchItem(8)] },
+      })
+      const cards = wrapper.findAll('.search-card')
+      // Cards 7 and 8 (index 6, 7) should have animation: none
+      for (let i = 6; i < 8; i++) {
+        const style = cards[i].attributes('style') || ''
+        expect(style).toContain('animation: none')
+      }
+    })
+
+    it('should cap animation delay at 300ms', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [makeSearchItem(8)] },
+      })
+      const cards = wrapper.findAll('.search-card')
+      // Card at index 5 (6th): Math.min(5 * 50, 300) = 250ms
+      const style5 = cards[5].attributes('style') || ''
+      expect(style5).toContain('250ms')
+      // Verify no delay exceeds 300ms for animated cards
+      for (let i = 0; i < 6; i++) {
+        const style = cards[i].attributes('style') || ''
+        const delayMatch = style.match(/animation-delay:\s*(\d+)ms/)
+        if (delayMatch) {
+          expect(parseInt(delayMatch[1])).toBeLessThanOrEqual(300)
+        }
+      }
+    })
+  })
 })

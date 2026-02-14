@@ -258,3 +258,90 @@ def export_markdown_with_images():
     except Exception as e:
         logger.error(f"导出 Markdown 失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@history_bp.route('/api/export/word', methods=['POST'])
+def export_word():
+    """导出 Word (.docx) 文件"""
+    try:
+        data = request.get_json()
+        if not data or 'markdown' not in data:
+            return jsonify({'success': False, 'error': '缺少 markdown 参数'}), 400
+
+        markdown_content = data.get('markdown', '')
+        title = data.get('title', 'blog')
+        safe_title = re.sub(r'[^\w\u4e00-\u9fa5_-]', '_', title)[:50]
+
+        try:
+            from docx import Document
+            from docx.shared import Pt, Inches
+            from docx.enum.text import WD_ALIGN_PARAGRAPH
+        except ImportError:
+            return jsonify({'success': False, 'error': '服务端未安装 python-docx，请运行 pip install python-docx'}), 500
+
+        doc = Document()
+
+        # 设置默认字体
+        style = doc.styles['Normal']
+        font = style.font
+        font.name = 'Microsoft YaHei'
+        font.size = Pt(11)
+
+        lines = markdown_content.split('\n')
+        for line in lines:
+            stripped = line.strip()
+            if not stripped:
+                continue
+
+            # 标题
+            if stripped.startswith('# '):
+                doc.add_heading(stripped[2:], level=1)
+            elif stripped.startswith('## '):
+                doc.add_heading(stripped[3:], level=2)
+            elif stripped.startswith('### '):
+                doc.add_heading(stripped[4:], level=3)
+            elif stripped.startswith('#### '):
+                doc.add_heading(stripped[5:], level=4)
+            elif stripped.startswith('- ') or stripped.startswith('* '):
+                doc.add_paragraph(stripped[2:], style='List Bullet')
+            elif re.match(r'^\d+\.\s', stripped):
+                text = re.sub(r'^\d+\.\s', '', stripped)
+                doc.add_paragraph(text, style='List Number')
+            elif stripped.startswith('> '):
+                p = doc.add_paragraph()
+                p.style = doc.styles['Normal']
+                p.paragraph_format.left_indent = Inches(0.5)
+                # 去除 markdown 加粗/斜体标记
+                clean = re.sub(r'\*\*(.*?)\*\*', r'\1', stripped[2:])
+                clean = re.sub(r'\*(.*?)\*', r'\1', clean)
+                p.add_run(clean)
+            elif stripped.startswith('```'):
+                # 跳过代码块标记行
+                continue
+            elif stripped.startswith('!['):
+                # 跳过图片标记
+                continue
+            else:
+                # 普通段落：去除 markdown 内联标记
+                clean = re.sub(r'\*\*(.*?)\*\*', r'\1', stripped)
+                clean = re.sub(r'\*(.*?)\*', r'\1', clean)
+                clean = re.sub(r'`([^`]+)`', r'\1', clean)
+                clean = re.sub(r'\[([^\]]+)\]\([^)]+\)', r'\1', clean)
+                doc.add_paragraph(clean)
+
+        # 保存到内存
+        buffer = io.BytesIO()
+        doc.save(buffer)
+        buffer.seek(0)
+
+        return Response(
+            buffer.getvalue(),
+            mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+            headers={
+                'Content-Disposition': f'attachment; filename="{safe_title}.docx"'
+            }
+        )
+
+    except Exception as e:
+        logger.error(f"导出 Word 失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500

@@ -104,22 +104,62 @@
 
         <!-- 进度日志 -->
         <div class="progress-log-list">
-          <div
+          <template
             v-for="(item, index) in visibleItems"
             :key="index"
-            v-memo="[item.message, item.type, item.detail]"
-            class="progress-log-item"
-            :class="item.type"
           >
-            <span class="progress-log-time">{{ item.time }}</span>
-            <span class="progress-log-icon" :class="item.type">
-              {{ getLogIcon(item.type) }}
-            </span>
-            <span class="progress-log-msg" v-html="item.message"></span>
-            <div v-if="item.detail" class="progress-log-detail">
-              <pre>{{ item.detail }}</pre>
+            <!-- 搜索结果卡片 -->
+            <div v-if="item.type === 'search' && item.data?.results" class="progress-log-item search">
+              <div class="search-results-block">
+                <div class="search-query">$ search "{{ item.data.query }}"</div>
+                <div class="search-tree">
+                  <a
+                    v-for="(r, ri) in item.data.results.slice(0, 8)"
+                    :key="ri"
+                    class="search-card"
+                    :href="r.url"
+                    target="_blank"
+                    rel="noopener"
+                    :style="ri < 6 ? `animation: card-in 0.2s ease-out both; animation-delay: ${Math.min(ri * 50, 300)}ms` : 'animation: none'"
+                  >
+                    <span class="search-card-index">[{{ ri + 1 }}]</span>
+                    <img class="search-card-favicon" :src="`https://www.google.com/s2/favicons?domain=${r.domain}&sz=16`" :alt="r.domain" width="16" height="16" />
+                    <span class="search-card-domain">{{ r.domain }}</span>
+                    <span class="search-card-title">{{ r.title }}</span>
+                  </a>
+                </div>
+              </div>
             </div>
-          </div>
+
+            <!-- 爬取完成卡片 -->
+            <div v-else-if="item.type === 'crawl' && item.data" class="progress-log-item crawl">
+              <div class="crawl-block">
+                <span class="crawl-prefix">$ crawl</span>
+                <a class="crawl-link" :href="item.data.url || '#'" target="_blank" rel="noopener">
+                  {{ item.data.title || item.data.url || '未知页面' }}
+                </a>
+                <span v-if="item.data.contentLength" class="crawl-size">→ {{ (item.data.contentLength / 1024).toFixed(1) }}KB ✓</span>
+                <span v-else-if="item.data.count" class="crawl-size">→ {{ item.data.count }} 篇 ✓</span>
+              </div>
+            </div>
+
+            <!-- 普通日志 -->
+            <div
+              v-else
+              v-memo="[item.message, item.type, item.detail]"
+              class="progress-log-item"
+              :class="item.type"
+            >
+              <span class="progress-log-time">{{ item.time }}</span>
+              <span class="progress-log-icon" :class="item.type">
+                {{ getLogIcon(item.type) }}
+              </span>
+              <span class="progress-log-msg" v-html="item.message"></span>
+              <div v-if="item.detail" class="progress-log-detail">
+                <pre>{{ item.detail }}</pre>
+              </div>
+            </div>
+          </template>
 
           <!-- 加载动画 -->
           <div v-if="isLoading" class="progress-loading-line">
@@ -149,6 +189,7 @@ interface ProgressItem {
   message: string
   type: string
   detail?: string
+  data?: any
 }
 
 interface OutlineData {
@@ -771,5 +812,107 @@ const getLogIcon = (type: string) => {
 
 .progress-logs-container::-webkit-scrollbar-thumb:hover {
   background: var(--color-border-hover);
+}
+
+/* 搜索结果卡片 */
+.search-results-block {
+  padding: var(--space-xs) 0;
+}
+
+.search-query {
+  font-size: var(--font-size-xs);
+  color: var(--color-terminal-keyword, var(--color-primary));
+  margin-bottom: var(--space-xs);
+}
+
+.search-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-left: var(--space-sm);
+  border-left: 1px solid var(--color-text-muted, var(--color-border));
+}
+
+.search-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: 3px var(--space-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  border-radius: var(--radius-sm);
+  transition: background 0.15s;
+  overflow: hidden;
+}
+
+.search-card:hover {
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+}
+
+.search-card-index {
+  color: var(--color-text-muted, var(--color-border));
+  flex-shrink: 0;
+  width: 24px;
+}
+
+.search-card-favicon {
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+.search-card-domain {
+  color: var(--color-terminal-string, var(--color-success));
+  flex-shrink: 0;
+  min-width: 80px;
+}
+
+.search-card-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@keyframes card-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* 爬取卡片 */
+.crawl-block {
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  font-size: var(--font-size-xs);
+  padding: var(--space-xs) 0;
+}
+
+.crawl-prefix {
+  color: var(--color-terminal-keyword, var(--color-primary));
+  flex-shrink: 0;
+}
+
+.crawl-link {
+  color: var(--color-terminal-string, var(--color-success));
+  text-decoration: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crawl-link:hover {
+  text-decoration: underline;
+}
+
+.crawl-size {
+  color: var(--color-text-muted, var(--color-border));
+  flex-shrink: 0;
 }
 </style>

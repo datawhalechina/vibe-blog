@@ -4,6 +4,33 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-14
+
+### Added
+- ✨ **后端 deep_thinking / background_investigation 逻辑** — `BlogService` 支持深度思考模式（LLM thinking mode）和跳过背景调查（skip_researcher）
+- ✨ **writing_chunk SSE 事件** — 章节写完后推送累积 markdown，前端可实时预览
+- ✨ **citations 字段持久化** — 合并 search_results + top_references（URL 去重），保存到历史记录
+- ✨ **Word 导出 API** — `POST /api/export/word`，Markdown → Word(.docx) 转换，支持标题/列表/引用/段落
+- ✨ **Generate 页面** — `/generate/:taskId` 路由 + `Generate.vue` 页面，集成 ProgressDrawer 实时预览
+- ✨ **useTaskStream composable** — SSE 连接 + 事件处理 + 大纲确认 + 预览节流
+- ✨ **useExport composable** — 多格式导出（Markdown/HTML/TXT/Word）
+- ✨ **citationMatcher 工具** — 前端引用链接匹配工具函数
+- ✨ **ProgressDrawer 搜索/爬取卡片** — 搜索结果卡片（favicon + 域名 + 标题，限 8 条）+ 爬取完成卡片（标题/URL/大小）+ 动画控制（前 6 张有动画，延迟上限 300ms）
+
+### Changed
+- 🔧 **Home.vue 导航** — 博客/Mini 任务创建成功后跳转到 Generate 页面，绘本任务保持原有 SSE 逻辑
+- 🔧 **vite.config.ts / tsconfig.json** — 添加 `@/` 路径别名
+- 🔧 **env.d.ts** — 添加 `.vue` 模块类型声明
+
+### Tests
+- ✅ **ProgressDrawer 搜索/爬取/动画测试** — 14 个新用例（搜索卡片 6 + 爬取卡片 4 + 混合渲染 1 + 动画控制 3）
+- ✅ **api.test.ts** — 3 个新用例（confirmOutline accept/edit + interactive 参数传递）
+- ✅ **AdvancedOptionsPanel interactive 测试** — 2 个新用例（checkbox 渲染 + emit）
+- ✅ **Home.toggles.test.ts** — 2 个新用例（deepThinking/backgroundInvestigation 参数传递到 API 请求体）
+- ✅ **后端 test_blog_api.py** — 新增 deep_thinking/background_investigation/interactive/confirm-outline/Word 导出测试
+
+---
+
 ## 2026-02-13
 
 ### Added
