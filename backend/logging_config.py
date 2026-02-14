@@ -7,10 +7,14 @@ from __future__ import annotations
 import logging
 import os
 from contextvars import ContextVar
+from datetime import datetime
 from typing import Iterable
 
 # 任务 ID 上下文变量（供异步任务链路注入）
 task_id_context: ContextVar[str] = ContextVar("task_id", default="")
+
+# 本次启动的 session 日志目录（进程级单例）
+_session_log_dir: str | None = None
 
 
 class TaskIdFilter(logging.Filter):
@@ -77,7 +81,9 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
     1) 控制台使用 Rich 彩色输出（若 rich 不可用则自动降级）
     2) 文件日志保留 DEBUG 级别（在可写环境下）
     3) 注入 task_id 上下文字段
+    4) 每次启动创建独立 session 目录: logs/backend_YYYYMMDD_HHMMSS/
     """
+    global _session_log_dir
 
     level = _resolve_level(log_level)
     root_logger = logging.getLogger()
@@ -132,13 +138,17 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
     if not enable_file:
         return
 
-    # 文件 handler：在只读环境（如 Vercel）下自动跳过
+    # 文件 handler：创建 session 目录 logs/backend_YYYYMMDD_HHMMSS/
     try:
         base_dir = os.path.dirname(os.path.realpath(__file__))
-        resolved_log_dir = log_dir or os.path.join(base_dir, "logs")
-        os.makedirs(resolved_log_dir, exist_ok=True)
+        logs_root = log_dir or os.path.join(base_dir, "logs")
 
-        log_file = os.path.join(resolved_log_dir, "app.log")
+        if _session_log_dir is None:
+            ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+            _session_log_dir = os.path.join(logs_root, f"backend_{ts}")
+        os.makedirs(_session_log_dir, exist_ok=True)
+
+        log_file = os.path.join(_session_log_dir, "app.log")
         file_handler = logging.FileHandler(log_file, encoding="utf-8")
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(plain_formatter)
@@ -153,4 +163,9 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
 def get_logger(name: str) -> logging.Logger:
     """统一入口，便于未来切换日志实现。"""
     return logging.getLogger(name)
+
+
+def get_session_log_dir() -> str | None:
+    """返回本次启动的 session 日志目录路径，供任务日志等模块复用。"""
+    return _session_log_dir
 

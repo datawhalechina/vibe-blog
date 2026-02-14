@@ -36,6 +36,10 @@
             :images-count="blog?.imagesCount"
             :code-blocks-count="blog?.codeBlocksCount"
           />
+          <TokenUsageCard
+            :token-usage="blog?.tokenUsage"
+            :duration="blog?.generationDuration"
+          />
           <DownloadCard
             :is-downloading="isDownloading"
             @download="handleDownload"
@@ -102,6 +106,7 @@ import BlogDetailContent from '../components/blog-detail/BlogDetailContent.vue'
 import AuthorCard from '../components/blog-detail/sidebar/AuthorCard.vue'
 import TagsCard from '../components/blog-detail/sidebar/TagsCard.vue'
 import StatsCard from '../components/blog-detail/sidebar/StatsCard.vue'
+import TokenUsageCard from '../components/blog-detail/sidebar/TokenUsageCard.vue'
 import DownloadCard from '../components/blog-detail/sidebar/DownloadCard.vue'
 import VideoCard from '../components/blog-detail/sidebar/VideoCard.vue'
 import PublishModal from '../components/blog-detail/PublishModal.vue'

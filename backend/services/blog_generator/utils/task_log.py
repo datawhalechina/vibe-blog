@@ -132,7 +132,13 @@ class BlogTaskLog:
         self.log_step("system", "task_failed", error, level="error")
 
     def save(self, logs_dir: str = None) -> str:
-        """保存为 JSON 文件，返回文件路径"""
+        """保存为 JSON 文件，返回文件路径。优先存入 session 日志目录。"""
+        if not logs_dir:
+            try:
+                from logging_config import get_session_log_dir
+                logs_dir = get_session_log_dir()
+            except Exception:
+                pass
         logs_dir = logs_dir or os.environ.get("BLOG_LOGS_DIR", "logs/blog_tasks")
         Path(logs_dir).mkdir(parents=True, exist_ok=True)
 
@@ -145,19 +151,50 @@ class BlogTaskLog:
 
     def get_summary(self) -> str:
         """生成人类可读的摘要"""
-        total_tok = self.total_tokens["input"] + self.total_tokens["output"]
+        # 优先从 token_summary（TokenTracker 注入）取真实数据
+        if self.token_summary and self.token_summary.get("total_tokens"):
+            total_tok = self.token_summary["total_tokens"]
+            total_calls = self.token_summary.get("total_calls", 0)
+        else:
+            total_tok = self.total_tokens["input"] + self.total_tokens["output"]
+            total_calls = 0
+
+        # 从 start_time/end_time 计算真实耗时
+        duration_s = 0.0
+        if self.start_time and self.end_time:
+            try:
+                t0 = datetime.fromisoformat(self.start_time)
+                t1 = datetime.fromisoformat(self.end_time)
+                duration_s = (t1 - t0).total_seconds()
+            except (ValueError, TypeError):
+                duration_s = self.total_duration_ms / 1000
+        else:
+            duration_s = self.total_duration_ms / 1000
+
         lines = [
             f"博客生成报告 [{self.task_id}]",
             f"  主题: {self.topic}",
             f"  状态: {self.status}",
-            f"  总用时: {self.total_duration_ms / 1000:.1f}s",
-            f"  总 Token: {total_tok:,}",
+            f"  总用时: {duration_s:.1f}s",
+            f"  总 Token: {total_tok:,}" + (f" ({total_calls} calls)" if total_calls else ""),
             f"  修订轮数: {self.revision_rounds}",
             f"  最终分数: {self.final_score}/10",
             f"  字数: {self.word_count:,}",
         ]
 
-        if self.agent_stats:
+        # 优先用 token_summary.agent_breakdown
+        breakdown = (self.token_summary or {}).get("agent_breakdown")
+        if breakdown:
+            lines.append("  Agent 统计:")
+            for agent, stats in sorted(
+                breakdown.items(),
+                key=lambda x: x[1].get("input", 0) + x[1].get("output", 0),
+                reverse=True,
+            ):
+                tok = stats.get("input", 0) + stats.get("output", 0)
+                calls = stats.get("calls", 0)
+                lines.append(f"    {agent}: {tok:,} tokens ({calls} calls)")
+        elif self.agent_stats:
             lines.append("  Agent 统计:")
             for agent, stats in sorted(
                 self.agent_stats.items(),
@@ -166,7 +203,7 @@ class BlogTaskLog:
             ):
                 total_tokens = stats["tokens_input"] + stats["tokens_output"]
                 lines.append(
-                    f"  - {agent}: {stats['steps']}步 | "
+                    f"    {agent}: {stats['steps']}步 | "
                     f"{stats['duration_ms']/1000:.1f}s | "
                     f"{total_tokens:,} tokens"
                 )

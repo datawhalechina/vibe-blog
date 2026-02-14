@@ -150,26 +150,32 @@ class ResearcherAgent:
             return []
 
         queries = self.generate_search_queries(topic, target_audience)
-        all_results = []
 
-        for query in queries:
-            try:
-                result = self.search_service.search(query, max_results=max_results // len(queries))
-                if result.get('success') and result.get('results'):
-                    all_results.extend(result['results'])
-            except Exception as e:
-                logger.error(f"搜索失败 [{query}]: {e}")
+        # 75.08 P0-2: 优先使用 Serper batch_search 并行搜索
+        batch_result = self._try_batch_search(queries, max_results)
+        if batch_result is not None:
+            final_results = batch_result[:max_results]
+        else:
+            # 降级：串行搜索（原有逻辑）
+            all_results = []
+            for query in queries:
+                try:
+                    result = self.search_service.search(query, max_results=max_results // len(queries))
+                    if result.get('success') and result.get('results'):
+                        all_results.extend(result['results'])
+                except Exception as e:
+                    logger.error(f"搜索失败 [{query}]: {e}")
 
-        # 去重
-        seen_urls = set()
-        unique_results = []
-        for item in all_results:
-            url = item.get('url', '')
-            if url and url not in seen_urls:
-                seen_urls.add(url)
-                unique_results.append(item)
+            # 去重
+            seen_urls = set()
+            unique_results = []
+            for item in all_results:
+                url = item.get('url', '')
+                if url and url not in seen_urls:
+                    seen_urls.add(url)
+                    unique_results.append(item)
 
-        final_results = unique_results[:max_results]
+            final_results = unique_results[:max_results]
 
         # 保存到缓存
         if self.cache:
@@ -182,7 +188,30 @@ class ResearcherAgent:
             )
 
         return final_results
-    
+
+    def _try_batch_search(self, queries: List[str], max_results: int) -> Optional[List[Dict]]:
+        """尝试使用 Serper batch_search 并行搜索（75.08 P0-2）
+
+        Returns:
+            去重后的结果列表，如果 Serper 不可用则返回 None（触发降级）
+        """
+        try:
+            from ..services.serper_search_service import get_serper_service
+            serper = get_serper_service()
+            if not serper or not serper.is_available():
+                return None
+
+            result = serper.batch_search(
+                queries,
+                max_results_per_query=max(1, max_results // len(queries)),
+            )
+            if result.get("success") and result.get("results"):
+                logger.info(f"🔍 批量搜索完成: {len(queries)} 个查询 → {len(result['results'])} 条结果")
+                return result["results"]
+        except Exception as e:
+            logger.warning(f"批量搜索失败，降级为串行: {e}")
+        return None
+
     def _smart_search(self, topic: str, target_audience: str, max_results: int = 15) -> List[Dict]:
         """
         使用智能搜索服务（LLM 路由 + 多源并行）

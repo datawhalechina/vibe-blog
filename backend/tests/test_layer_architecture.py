@@ -94,7 +94,7 @@ class TestMigrateYamlToJson:
         )
         yaml_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "services", "blog_generator", "workflow_configs", "medium.yaml",
+            "configs", "workflows", "medium.yaml",
         )
         result = migrate_yaml_to_json(yaml_path)
         assert result["name"] == "medium"
@@ -108,7 +108,7 @@ class TestMigrateYamlToJson:
         )
         yaml_path = os.path.join(
             os.path.dirname(__file__), "..",
-            "services", "blog_generator", "workflow_configs", "agent_registry.yaml",
+            "configs", "workflows", "agent_registry.yaml",
         )
         result = migrate_yaml_to_json(yaml_path)
         assert "agents" in result
@@ -119,7 +119,7 @@ class TestMigrateYamlToJson:
         )
         configs_dir = os.path.join(
             os.path.dirname(__file__), "..",
-            "services", "blog_generator", "workflow_configs",
+            "configs", "workflows",
         )
         with tempfile.TemporaryDirectory() as tmpdir:
             results = migrate_all_presets(configs_dir, tmpdir)

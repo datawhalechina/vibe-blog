@@ -5,6 +5,7 @@
 import logging
 import threading
 import os
+import time
 from datetime import datetime
 from typing import Dict, Any, Optional, Callable
 from queue import Queue
@@ -268,6 +269,7 @@ class BlogService:
 
         try:
             # 发送开始事件
+            generation_start_time = time.time()
             if task_manager:
                 task_manager.send_event(task_id, 'progress', {
                     'stage': 'start',
@@ -637,6 +639,15 @@ class BlogService:
                 from services.database_service import get_db_service
                 import json
                 db_service = get_db_service()
+                # 构建 token_usage JSON
+                _token_usage_json = None
+                _gen_duration = round(time.time() - generation_start_time, 1)
+                try:
+                    if token_tracker:
+                        _token_usage_json = json.dumps(token_tracker.get_summary(), ensure_ascii=False)
+                except Exception:
+                    pass
+
                 db_service.save_history(
                     history_id=task_id,
                     topic=topic,
@@ -653,7 +664,9 @@ class BlogService:
                     target_sections_count=article_config.get('sections_count'),
                     target_images_count=article_config.get('images_count'),
                     target_code_blocks_count=article_config.get('code_blocks_count'),
-                    target_word_count=article_config.get('target_word_count')
+                    target_word_count=article_config.get('target_word_count'),
+                    token_usage=_token_usage_json,
+                    generation_duration_s=_gen_duration,
                 )
                 logger.info(f"历史记录已保存: {task_id}")
                 

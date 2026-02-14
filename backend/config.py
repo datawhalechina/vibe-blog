@@ -50,6 +50,7 @@ class Config:
     ZAI_SEARCH_MAX_RESULTS = int(os.getenv('ZAI_SEARCH_MAX_RESULTS', '5'))
     ZAI_SEARCH_CONTENT_SIZE = os.getenv('ZAI_SEARCH_CONTENT_SIZE', 'medium')
     ZAI_SEARCH_RECENCY_FILTER = os.getenv('ZAI_SEARCH_RECENCY_FILTER', 'noLimit')
+    SEARCH_RECENCY_WINDOW = os.getenv('SEARCH_RECENCY_WINDOW', '')
     
     # MinerU PDF 解析 API
     MINERU_TOKEN = os.getenv('MINERU_TOKEN', '')

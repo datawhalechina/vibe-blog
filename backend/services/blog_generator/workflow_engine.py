@@ -23,8 +23,8 @@ from .style_profile import StyleProfile
 
 logger = logging.getLogger(__name__)
 
-# 默认配置目录
-_DEFAULT_CONFIGS_DIR = Path(__file__).parent / "workflow_configs"
+# 默认配置目录（统一到 backend/configs/workflows/）
+_DEFAULT_CONFIGS_DIR = Path(__file__).resolve().parent.parent.parent / "configs" / "workflows"
 
 
 @dataclass

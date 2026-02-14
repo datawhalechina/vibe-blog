@@ -450,6 +450,7 @@ banana-blog/
 | `ZAI_SEARCH_MAX_RESULTS`    | Max search results        | 5                                               |
 | `ZAI_SEARCH_CONTENT_SIZE`   | Content size              | medium                                          |
 | `ZAI_SEARCH_RECENCY_FILTER` | Recency filter            | noLimit                                         |
+| `SEARCH_RECENCY_WINDOW`     | Unified recency window    | 1m / 3m (empty = no limit)                      |
 
 ### Multi-Search Configuration
 

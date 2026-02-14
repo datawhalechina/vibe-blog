@@ -1,0 +1,357 @@
+# ============================================================
+# vibe-blog 搜索源统一配置
+# ============================================================
+#
+# 所有搜索源、专业博客、AI 话题增强、路由规则集中管理。
+# 新增/删除搜索源只需编辑此文件，无需改代码。
+#
+# 来源：95.00 DeepResearch 集成方案 + 71 号 Searcher 改造
+# ============================================================
+
+# ----------------------------------------------------------
+# 一、搜索引擎（Search Engines）
+# ----------------------------------------------------------
+# 每个引擎对应一个独立的 service 类。
+# enabled: false 可临时禁用而不删除配置。
+# env_keys: 列出该引擎依赖的环境变量（缺失则自动 disabled）。
+
+engines:
+  # 智谱 Web Search — 默认通用搜索
+  zhipu:
+    name: "智谱 Web Search"
+    type: general            # general | academic | site_search | social
+    service: search_service  # 对应 services/ 下的模块名
+    enabled: true
+    quality_weight: 0.60
+    env_keys: ["ZAI_SEARCH_API_KEY"]
+    config:
+      search_engine: "search_std"
+      content_size: "medium"
+      max_results: 10
+
+  # Google 搜索 — 通过 Serper API（75.02）
+  google:
+    name: "Google Search"
+    type: general
+    service: serper_search_service
+    enabled: true
+    quality_weight: 0.65
+    env_keys: ["SERPER_API_KEY"]
+    config:
+      max_results: 10
+      timeout: 10
+    capabilities:
+      - batch_search          # P0-2: 批量多查询
+      - locale_switch         # DeepResearch: gl/hl 自动切换
+      - recency_filter        # 时间窗口过滤
+      - images                # P2-5: 图片搜索（Serper Images API）
+
+  # 搜狗搜索 — 腾讯云 SearchPro API（75.07）
+  sogou:
+    name: "搜狗搜索"
+    type: general
+    service: sogou_search_service
+    enabled: true
+    quality_weight: 0.55
+    env_keys: ["TENCENTCLOUD_SECRET_ID", "TENCENTCLOUD_SECRET_KEY"]
+    config:
+      max_results: 10
+      timeout: 10
+    tags: ["chinese", "wechat"]   # 特殊能力标签
+
+  # arXiv — 学术论文（免费 API）
+  arxiv:
+    name: "arXiv"
+    type: academic
+    service: arxiv_service
+    enabled: true
+    quality_weight: 0.90
+    env_keys: []                  # 无需 API Key
+    config:
+      max_results: 5
+      sort_by: relevance
+    routing_keywords:
+      - "论文"
+      - "paper"
+      - "研究"
+      - "research"
+      - "算法"
+      - "algorithm"
+      - "模型"
+      - "model"
+      - "transformer"
+      - "attention"
+
+  # Google Scholar — 学术搜索（P1-1，95.00 DeepResearch）
+  # 通过 Serper Scholar API 实现
+  scholar:
+    name: "Google Scholar"
+    type: academic
+    service: scholar_search_service
+    enabled: true                     # 75.09 已实现
+    quality_weight: 0.92
+    env_keys: ["SERPER_API_KEY"]      # 复用 Serper Key
+    config:
+      max_results: 5
+      api_url: "https://google.serper.dev/scholar"
+    routing_keywords:
+      - "论文"
+      - "paper"
+      - "citation"
+      - "引用"
+      - "学术"
+      - "academic"
+
+# ----------------------------------------------------------
+# 二、专业博客源（Professional Blogs）
+# ----------------------------------------------------------
+# 通过 site: 限定搜索，使用通用搜索引擎执行。
+# 不需要独立的 service 类。
+#
+# search_engine: 指定用哪个引擎执行 site: 搜索
+#   - zhipu（默认）：通过智谱 Web Search API
+#   - serper：通过 Serper Google API（需 SERPER_API_KEY）
+#
+# deep_scrape: true 时，搜索后自动用 Jina Reader 抓取全文
+#   并通过 LLM 做结构化提取（P0-1），而非仅返回搜索摘要片段。
+#   需要 JINA_API_KEY 和 DEEP_SCRAPE_ENABLED=true。
+
+blogs:
+  # ===== 官方研究博客（最高权重）=====
+  anthropic:
+    site: "anthropic.com"
+    name: "Anthropic Research"
+    quality_weight: 0.95
+    keywords: ["claude", "anthropic", "constitutional ai", "rlhf"]
+    search_engine: serper       # Serper site: 搜索质量优于智谱
+    deep_scrape: true           # 搜索后 Jina 抓取全文
+
+  openai:
+    site: "openai.com"
+    name: "OpenAI Blog"
+    quality_weight: 0.95
+    keywords: ["gpt", "chatgpt", "openai", "dall-e", "whisper", "sora"]
+    search_engine: serper
+    deep_scrape: true
+
+  deepmind:
+    site: "deepmind.google"
+    name: "Google DeepMind"
+    quality_weight: 0.95
+    keywords: ["deepmind", "alphafold", "alphacode", "gemma", "deepmind research"]
+    search_engine: serper
+    deep_scrape: true
+
+  meta_ai:
+    site: "ai.meta.com"
+    name: "Meta AI"
+    quality_weight: 0.95
+    keywords: ["meta ai", "llama", "llama3", "codellama", "meta research", "fair"]
+    search_engine: serper
+    deep_scrape: true
+
+  google_ai:
+    site: "blog.google/technology/ai"
+    name: "Google AI Blog"
+    quality_weight: 0.90
+    keywords: ["google", "gemini", "bard", "deepmind", "tensorflow", "jax"]
+    search_engine: serper
+    deep_scrape: true
+
+  ms_research:
+    site: "microsoft.com/research"
+    name: "Microsoft Research"
+    quality_weight: 0.90
+    keywords: ["microsoft research", "phi", "orca", "autogen", "semantic kernel"]
+    search_engine: serper
+    deep_scrape: true
+
+  mistral:
+    site: "mistral.ai"
+    name: "Mistral AI"
+    quality_weight: 0.90
+    keywords: ["mistral", "mixtral", "mistral ai", "pixtral", "codestral"]
+    search_engine: serper
+    deep_scrape: true
+
+  # ===== 产品博客 =====
+  langchain:
+    site: "blog.langchain.dev"
+    name: "LangChain Blog"
+    quality_weight: 0.85
+    keywords: ["langchain", "langgraph", "lcel", "langsmith"]
+
+  xai:
+    site: "x.ai"
+    name: "xAI"
+    quality_weight: 0.85
+    keywords: ["xai", "grok", "x.ai"]
+
+  huggingface:
+    site: "huggingface.co"
+    name: "Hugging Face"
+    quality_weight: 0.85
+    keywords: ["huggingface", "transformers", "diffusers", "开源模型", "llama", "mistral"]
+
+  aws:
+    site: "aws.amazon.com/blogs"
+    name: "AWS Blog"
+    quality_weight: 0.80
+    keywords: ["aws", "lambda", "sagemaker", "bedrock", "s3", "ec2"]
+
+  microsoft:
+    site: "devblogs.microsoft.com"
+    name: "Microsoft DevBlogs"
+    quality_weight: 0.80
+    keywords: ["azure", "microsoft", "copilot", ".net", "typescript", "vscode"]
+
+  # ===== 技术社区 =====
+  github:
+    site: "github.com"
+    name: "GitHub"
+    quality_weight: 0.75
+    keywords: ["github", "开源", "repo", "仓库", "源码"]
+
+  hackernews:
+    site: "news.ycombinator.com"
+    name: "Hacker News"
+    quality_weight: 0.75
+    keywords: ["hacker news", "hn", "ycombinator", "hackernews"]
+
+  stackoverflow:
+    site: "stackoverflow.com"
+    name: "Stack Overflow"
+    quality_weight: 0.75
+    keywords: ["stackoverflow", "问答", "debug", "报错", "error"]
+
+  devto:
+    site: "dev.to"
+    name: "Dev.to"
+    quality_weight: 0.70
+    keywords: ["dev.to", "社区", "tutorial"]
+
+  reddit_ai:
+    site: "reddit.com"
+    name: "Reddit AI"
+    quality_weight: 0.70
+    keywords: ["reddit", "社区讨论", "r/machinelearning", "r/localllama"]
+
+  # ===== 中文媒体 =====
+  jiqizhixin:
+    site: "jiqizhixin.com"
+    name: "机器之心"
+    quality_weight: 0.70
+    keywords: ["机器之心", "中文", "ai资讯"]
+
+# ----------------------------------------------------------
+# 三、AI 话题自动增强（Phase C, 71 号方案）
+# ----------------------------------------------------------
+
+ai_boost:
+  enabled: true
+  # 触发增强的关键词
+  keywords:
+    # 通用 AI 术语
+    - "ai"
+    - "人工智能"
+    - "artificial intelligence"
+    - "machine learning"
+    - "机器学习"
+    - "deep learning"
+    - "深度学习"
+    - "neural network"
+    - "神经网络"
+    # LLM 相关
+    - "llm"
+    - "大模型"
+    - "大语言模型"
+    - "large language model"
+    - "foundation model"
+    - "prompt"
+    - "rag"
+    - "agent"
+    - "fine-tuning"
+    - "微调"
+    - "embedding"
+    # 具体模型/产品
+    - "gpt"
+    - "claude"
+    - "gemini"
+    - "llama"
+    - "mistral"
+    - "grok"
+    - "chatgpt"
+    - "copilot"
+    - "cursor"
+    - "midjourney"
+    - "stable diffusion"
+    # AI 应用
+    - "ai agent"
+    - "ai coding"
+    - "vibe coding"
+    - "ai 编程"
+    - "ai 写作"
+    - "mcp"
+    - "model context protocol"
+
+  # AI 话题自动增加的博客源 ID（引用 blogs 中的 key）
+  boost_sources:
+    - anthropic
+    - openai
+    - google_ai
+    - deepmind
+    - meta_ai
+    - mistral
+    - huggingface
+
+  # AI 话题自动增加的引擎 ID
+  boost_engines:
+    - arxiv
+
+# ----------------------------------------------------------
+# 四、搜索策略（Search Strategies）
+# ----------------------------------------------------------
+# 来源：95.00 DeepResearch 集成方案
+
+strategies:
+  # 默认策略
+  default:
+    always_include: ["general"]    # 始终包含通用搜索
+    max_sources_per_search: 8      # 单次搜索最大源数
+    max_workers: 3                 # 并行线程数
+    recency_window: ""             # 默认不限时间，可设为 1m/3m
+
+  # 深度研究策略（P1-2 DeepResearcherAgent 使用）
+  deep_research:
+    always_include: ["general", "google"]
+    max_sources_per_search: 12
+    max_workers: 5
+    recency_window: ""
+    features:
+      - batch_search               # 批量多查询（P0-2）
+      - incremental_extraction     # 增量提取（P0-3）
+      - cross_verify               # 交叉验证（P1-4）
+
+  # 快速搜索策略（mini 模式）
+  quick:
+    always_include: ["general"]
+    max_sources_per_search: 3
+    max_workers: 2
+    recency_window: "3m"
+
+  # 学术搜索策略
+  academic:
+    always_include: ["arxiv", "google"]
+    max_sources_per_search: 6
+    max_workers: 3
+    recency_window: ""
+    prefer_engines: ["arxiv", "scholar"]
+
+# ----------------------------------------------------------
+# 五、健康检查（SourceCurator 配置）
+# ----------------------------------------------------------
+
+health:
+  max_consecutive_failures: 3      # 连续失败 N 次后禁用
+  cooldown_seconds: 1800           # 禁用后冷却时间（30 分钟）
+  default_weight: 0.50             # 未配置权重的源的默认权重

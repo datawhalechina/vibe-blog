@@ -8,8 +8,11 @@ import os
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
+from .recency_utils import normalize_recency_window, apply_recency_hint
 from .search_service import get_search_service
 from .arxiv_service import get_arxiv_service
+from .scholar_search_service import get_scholar_service
+from .search_source_registry import get_search_source_registry
 
 logger = logging.getLogger(__name__)
 
@@ -160,21 +163,28 @@ class SmartSearchService:
     智能搜索服务 - 根据主题智能选择搜索源
     """
     
-    def __init__(self, llm_client=None):
+    def __init__(self, llm_client=None, strategy: str = 'default'):
         """
         初始化智能搜索服务
 
         Args:
             llm_client: LLM 客户端，用于智能路由
+            strategy: 搜索策略名称（对应 backend/configs/search/search_sources.yaml 中的 strategies）
         """
         self.llm = llm_client
-        self.max_workers = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
+        # 加载搜索源注册中心
+        self.registry = get_search_source_registry()
+        strategy_cfg = self.registry.get_strategy(strategy)
+        self.max_workers = strategy_cfg.get('max_workers',
+            int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3')))
+        self._strategy_name = strategy
         # 37.04: 查询重复检测
         from utils.query_deduplicator import QueryDeduplicator
         self.deduplicator = QueryDeduplicator()
-        # 71: SourceCurator 源质量评估与健康检查
+        # 71: SourceCurator 源质量评估与健康检查（从 Registry 加载权重）
         from .source_curator import SourceCurator
-        self.curator = SourceCurator()
+        self.curator = SourceCurator(registry=self.registry)
+        self.default_recency_window = strategy_cfg.get('recency_window', '') or os.environ.get('SEARCH_RECENCY_WINDOW', '')
     
     def search(self, topic: str, article_type: str = '', max_results_per_source: int = 5) -> Dict[str, Any]:
         """
@@ -212,6 +222,11 @@ class SmartSearchService:
         sources = routing_result.get('sources', ['general'])
         arxiv_query = routing_result.get('arxiv_query', topic)
         blog_query = routing_result.get('blog_query', topic)
+        recency_window = normalize_recency_window(self.default_recency_window)
+
+        if recency_window:
+            arxiv_query = apply_recency_hint(arxiv_query, recency_window)
+            blog_query = apply_recency_hint(blog_query, recency_window)
 
         # 71 号方案 Phase C：AI 话题自动增强
         if os.environ.get('AI_BOOST_ENABLED', 'true').lower() == 'true':
@@ -246,6 +261,10 @@ class SmartSearchService:
         # 搜狗搜索（75.07 腾讯云 SearchPro）
         if 'sogou' in sources:
             search_tasks.append(('sogou', blog_query))
+
+        # Google Scholar 学术搜索（75.09 P1-1）
+        if 'scholar' in sources:
+            search_tasks.append(('scholar', arxiv_query))
         
         # 并行执行
         with ThreadPoolExecutor(max_workers=self.max_workers) as executor:
@@ -262,11 +281,19 @@ class SmartSearchService:
                     future = executor.submit(self._search_general, task[1], max_results_per_source)
                     futures[future] = 'general'
                 elif task[0] == 'google':
-                    future = executor.submit(self._search_google, task[1], max_results_per_source)
+                    future = executor.submit(
+                        self._search_google,
+                        task[1],
+                        max_results_per_source,
+                        recency_window,
+                    )
                     futures[future] = 'google'
                 elif task[0] == 'sogou':
                     future = executor.submit(self._search_sogou, task[1], max_results_per_source)
                     futures[future] = 'sogou'
+                elif task[0] == 'scholar':
+                    future = executor.submit(self._search_scholar, task[1], max_results_per_source)
+                    futures[future] = 'scholar'
             
             for future in as_completed(futures):
                 source_name = futures[future]
@@ -348,25 +375,38 @@ class SmartSearchService:
             return json.loads(text, strict=False)
     
     def _rule_based_routing(self, topic: str) -> Dict[str, Any]:
-        """基于规则的简单路由（LLM 不可用时的备选）"""
+        """基于规则的简单路由（LLM 不可用时的备选）
+
+        优先从 SearchSourceRegistry 读取配置，fallback 到硬编码。
+        """
         topic_lower = topic.lower()
-        sources = ['general']
-        
-        # 检查是否需要 arXiv
-        arxiv_keywords = ['论文', 'paper', '研究', 'research', '算法', 'algorithm', '模型', 'model', 'transformer', 'attention']
-        if any(kw in topic_lower for kw in arxiv_keywords):
-            sources.append('arxiv')
-        
-        # 检查专业博客
-        for blog_id, config in PROFESSIONAL_BLOGS.items():
-            if any(kw in topic_lower for kw in config['keywords']):
+        strategy_cfg = self.registry.get_strategy(self._strategy_name)
+        sources = list(strategy_cfg.get('always_include', ['general']))
+
+        # 引擎路由关键词匹配（从 YAML 读取）
+        for engine_id, keywords in self.registry.get_engine_routing_keywords().items():
+            if any(kw in topic_lower for kw in keywords):
+                if engine_id not in sources:
+                    sources.append(engine_id)
+
+        # 专业博客关键词匹配（从 YAML 读取）
+        matched_blogs = self.registry.match_blogs_by_topic(topic)
+        for blog_id in matched_blogs:
+            if blog_id not in sources:
                 sources.append(blog_id)
+
+        # Fallback: 硬编码的 PROFESSIONAL_BLOGS（兼容未迁移的博客）
+        for blog_id, config in PROFESSIONAL_BLOGS.items():
+            if blog_id not in self.registry.get_all_blogs():
+                if any(kw in topic_lower for kw in config.get('keywords', [])):
+                    if blog_id not in sources:
+                        sources.append(blog_id)
 
         # 75.02: 如果 Serper 可用，自动加入 Google 搜索
         try:
             from .serper_search_service import get_serper_service
             serper = get_serper_service()
-            if serper and serper.is_available():
+            if serper and serper.is_available() and 'google' not in sources:
                 sources.append('google')
         except Exception:
             pass
@@ -375,13 +415,26 @@ class SmartSearchService:
         try:
             from .sogou_search_service import get_sogou_service
             sogou = get_sogou_service()
-            if sogou and sogou.is_available():
+            if sogou and sogou.is_available() and 'sogou' not in sources:
                 has_chinese = any('\u4e00' <= c <= '\u9fff' for c in topic)
                 if has_chinese:
                     sources.append('sogou')
         except Exception:
             pass
-        
+
+        # 75.09: 如果 Scholar 可用且主题匹配学术关键词，自动加入
+        if 'scholar' not in sources:
+            scholar_service = get_scholar_service()
+            if scholar_service and scholar_service.is_available():
+                scholar_keywords = self.registry.get_engine_routing_keywords().get('scholar', [])
+                if any(kw in topic_lower for kw in scholar_keywords):
+                    sources.append('scholar')
+
+        # 限制最大源数
+        max_sources = strategy_cfg.get('max_sources_per_search', 8)
+        if len(sources) > max_sources:
+            sources = sources[:max_sources]
+
         return {
             'sources': sources,
             'arxiv_query': topic,
@@ -390,28 +443,35 @@ class SmartSearchService:
 
     # ===== 71 号方案 Phase C: AI 话题自动增强 =====
 
-    @staticmethod
-    def _is_ai_topic(topic: str) -> bool:
-        """检测是否为 AI 相关话题"""
-        topic_lower = topic.lower()
-        return any(kw in topic_lower for kw in AI_TOPIC_KEYWORDS)
+    def _is_ai_topic(self, topic: str) -> bool:
+        """检测是否为 AI 相关话题（优先从 Registry 读取关键词）"""
+        return self.registry.is_ai_topic(topic)
 
     def _boost_ai_sources(self, sources: List[str], topic: str) -> List[str]:
-        """AI 话题自动增强：确保覆盖所有 AI 权威博客源"""
+        """AI 话题自动增强：确保覆盖所有 AI 权威博客源（从 Registry 读取）"""
         if not self._is_ai_topic(topic):
             return sources
 
         boosted = list(sources)
         added = 0
-        for src in AI_BOOST_SOURCES:
+
+        # 从 Registry 读取增强博客源
+        for src in self.registry.get_ai_boost_sources():
             if src not in boosted:
                 boosted.append(src)
                 added += 1
 
-        # AI 话题也加入 arXiv
-        if 'arxiv' not in boosted:
-            boosted.append('arxiv')
-            added += 1
+        # 从 Registry 读取增强引擎
+        for eng in self.registry.get_ai_boost_engines():
+            if eng not in boosted:
+                boosted.append(eng)
+                added += 1
+
+        # Fallback: 硬编码的 AI_BOOST_SOURCES（兼容）
+        for src in AI_BOOST_SOURCES:
+            if src not in boosted:
+                boosted.append(src)
+                added += 1
 
         if added:
             logger.info(f"🚀 AI 话题增强: +{added} 个额外源")
@@ -423,28 +483,108 @@ class SmartSearchService:
         if arxiv_service:
             return arxiv_service.search(query, max_results)
         return {'success': False, 'results': [], 'error': 'arXiv 服务不可用'}
-    
+
+    def _search_scholar(self, query: str, max_results: int) -> Dict[str, Any]:
+        """搜索 Google Scholar（75.09 P1-1）"""
+        scholar_service = get_scholar_service()
+        if scholar_service and scholar_service.is_available():
+            logger.info(f"📚 Scholar 搜索: {query}")
+            return scholar_service.search(query, max_results)
+        return {'success': False, 'results': [], 'error': 'Google Scholar 服务不可用'}
+
     def _search_blog(self, blog_id: str, query: str, max_results: int) -> Dict[str, Any]:
-        """搜索专业博客（使用 site: 限定）"""
-        search_service = get_search_service()
-        if not search_service or not search_service.is_available():
-            return {'success': False, 'results': [], 'error': '搜索服务不可用'}
-        
-        blog_config = PROFESSIONAL_BLOGS.get(blog_id)
+        """搜索专业博客（使用 site: 限定）
+
+        支持两种搜索引擎（由 backend/configs/search/search_sources.yaml 中的 search_engine 字段控制）：
+        - zhipu（默认）：通过智谱 Web Search API
+        - serper：通过 Serper Google API（质量更高）
+
+        当 deep_scrape=true 时，搜索后自动用 Jina Reader 抓取全文并提取关键信息。
+        """
+        # 优先从 Registry 读取
+        blog_config = self.registry.get_blog(blog_id)
+        if not blog_config:
+            # Fallback 到硬编码
+            blog_config = PROFESSIONAL_BLOGS.get(blog_id)
         if not blog_config:
             return {'success': False, 'results': [], 'error': f'未知博客: {blog_id}'}
-        
-        # 使用 site: 限定搜索
+
         site_query = f"{query} site:{blog_config['site']}"
-        logger.info(f"📝 专业博客搜索: {site_query}")
-        
-        result = search_service.search(site_query, max_results)
-        
+        search_engine = blog_config.get('search_engine', 'zhipu')
+
+        # 根据配置选择搜索引擎
+        if search_engine == 'serper':
+            result = self._search_blog_via_serper(site_query, max_results)
+        else:
+            result = self._search_blog_via_zhipu(site_query, max_results)
+
         # 标记来源
         if result.get('results'):
             for item in result['results']:
                 item['source'] = blog_config['name']
-        
+
+        # deep_scrape: 搜索后用 Jina 抓取全文
+        if blog_config.get('deep_scrape') and result.get('results'):
+            result = self._deep_scrape_results(result, query, blog_config['name'])
+
+        return result
+
+    def _search_blog_via_serper(self, site_query: str, max_results: int) -> Dict[str, Any]:
+        """通过 Serper Google API 搜索专业博客"""
+        from .serper_search_service import get_serper_service
+        serper = get_serper_service()
+        if serper and serper.is_available():
+            logger.info(f"📝 专业博客搜索 [Serper]: {site_query}")
+            return serper.search(site_query, max_results)
+        # Serper 不可用时 fallback 到智谱
+        logger.info(f"Serper 不可用，fallback 到智谱: {site_query}")
+        return self._search_blog_via_zhipu(site_query, max_results)
+
+    def _search_blog_via_zhipu(self, site_query: str, max_results: int) -> Dict[str, Any]:
+        """通过智谱 Web Search API 搜索专业博客（原有逻辑）"""
+        search_service = get_search_service()
+        if not search_service or not search_service.is_available():
+            return {'success': False, 'results': [], 'error': '搜索服务不可用'}
+        logger.info(f"📝 专业博客搜索 [智谱]: {site_query}")
+        return search_service.search(site_query, max_results)
+
+    def _deep_scrape_results(
+        self, result: Dict[str, Any], topic: str, source_name: str,
+    ) -> Dict[str, Any]:
+        """对搜索结果用 Jina Reader 深度抓取全文，替代搜索摘要片段
+
+        需要 DEEP_SCRAPE_ENABLED=true 和 JINA_API_KEY。
+        """
+        if os.environ.get('DEEP_SCRAPE_ENABLED', 'false').lower() != 'true':
+            return result
+
+        try:
+            from .deep_scraper import DeepScraper
+        except ImportError:
+            return result
+
+        try:
+            scraper = DeepScraper(
+                jina_api_key=os.environ.get('JINA_API_KEY'),
+                top_n=min(len(result['results']), 3),
+            )
+            enriched = scraper.scrape_top_n(result['results'], topic)
+            if enriched:
+                # 用深度抓取的全文替代搜索摘要
+                for item in enriched:
+                    item['source'] = source_name
+                    item['content'] = item.get('extracted_info', item.get('full_text', ''))
+                    item['deep_scraped'] = True
+                logger.info(
+                    f"🔗 专业博客深度抓取完成: {len(enriched)}/{len(result['results'])} 篇"
+                )
+                # 保留深度抓取结果 + 未抓取的原始结果
+                scraped_urls = {e.get('url') for e in enriched}
+                remaining = [r for r in result['results'] if r.get('url') not in scraped_urls]
+                result['results'] = enriched + remaining
+        except Exception as e:
+            logger.warning(f"专业博客深度抓取失败: {e}")
+
         return result
     
     def _search_general(self, query: str, max_results: int) -> Dict[str, Any]:
@@ -460,13 +600,18 @@ class SmartSearchService:
             return result
         return {'success': False, 'results': [], 'error': '搜索服务不可用'}
     
-    def _search_google(self, query: str, max_results: int) -> Dict[str, Any]:
+    def _search_google(
+        self,
+        query: str,
+        max_results: int,
+        recency_window: str = '',
+    ) -> Dict[str, Any]:
         """Google 搜索（通过 Serper API，75.02）"""
         from .serper_search_service import get_serper_service
         serper = get_serper_service()
         if not serper or not serper.is_available():
             return {'success': False, 'results': [], 'error': 'Serper 服务不可用'}
-        return serper.search(query, max_results)
+        return serper.search(query, max_results, recency_window=recency_window or self.default_recency_window)
 
     def _search_sogou(self, query: str, max_results: int) -> Dict[str, Any]:
         """搜狗搜索（通过腾讯云 SearchPro API，75.07）"""

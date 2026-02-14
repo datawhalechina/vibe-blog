@@ -5,6 +5,7 @@ import json
 from unittest.mock import patch, MagicMock
 
 from services.blog_generator.services.serper_search_service import SerperSearchService
+from services.blog_generator.services.recency_utils import normalize_recency_window_optional
 
 
 class TestSerperSearchService:
@@ -42,6 +43,32 @@ class TestSerperSearchService:
         assert len(result["results"]) == 2
         assert result["results"][0]["title"] == "Result 1"
         assert result["results"][0]["source"] == "Google"
+
+    @patch("services.blog_generator.services.serper_search_service.requests.post")
+    def test_search_with_recency_1m_sets_tbs(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"organic": []}
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        svc = SerperSearchService(api_key="test-key")
+        svc.search("AI news", recency_window="1m")
+
+        kwargs = mock_post.call_args.kwargs
+        assert kwargs["json"]["tbs"] == "qdr:m"
+
+    @patch("services.blog_generator.services.serper_search_service.requests.post")
+    def test_search_with_recency_3m_sets_tbs(self, mock_post):
+        mock_resp = MagicMock()
+        mock_resp.json.return_value = {"organic": []}
+        mock_resp.raise_for_status = MagicMock()
+        mock_post.return_value = mock_resp
+
+        svc = SerperSearchService(api_key="test-key")
+        svc.search("AI news", recency_window="3m")
+
+        kwargs = mock_post.call_args.kwargs
+        assert kwargs["json"]["tbs"] == "qdr:m3"
 
     @patch("services.blog_generator.services.serper_search_service.requests.post")
     def test_search_with_knowledge_graph(self, mock_post):
@@ -140,3 +167,8 @@ class TestSerperSearchService:
         summary = svc._generate_summary(results)
         assert "T1" in summary
         assert "C1" in summary
+
+    def test_normalize_recency_alias(self):
+        assert normalize_recency_window_optional("30d") == "1m"
+        assert normalize_recency_window_optional("three_month") == "3m"
+        assert normalize_recency_window_optional("unknown") is None

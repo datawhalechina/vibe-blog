@@ -1,4 +1,10 @@
-import { vi } from 'vitest'
+import { vi, beforeAll, afterEach, afterAll } from 'vitest'
+import { server } from './__tests__/__mocks__/server'
+
+// MSW Server lifecycle
+beforeAll(() => server.listen({ onUnhandledRequest: 'bypass' }))
+afterEach(() => server.resetHandlers())
+afterAll(() => server.close())
 
 // Mock window.matchMedia
 Object.defineProperty(window, 'matchMedia', {

@@ -17,7 +17,7 @@ class TemplateLoader:
     def __init__(self, templates_dir: str = ""):
         if not templates_dir:
             backend = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            templates_dir = os.path.join(backend, "workflow_configs", "templates")
+            templates_dir = os.path.join(backend, "configs", "writing", "templates")
         self.templates_dir = templates_dir
         self._cache: Dict[str, dict] = {}
 

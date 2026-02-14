@@ -250,8 +250,8 @@ class TestPresetFiles:
     """验证预置模板和风格 JSON 文件存在且可解析"""
 
     BACKEND_DIR = os.path.join(os.path.dirname(__file__), "..")
-    TEMPLATES_DIR = os.path.join(BACKEND_DIR, "workflow_configs", "templates")
-    STYLES_DIR = os.path.join(BACKEND_DIR, "workflow_configs", "styles")
+    TEMPLATES_DIR = os.path.join(BACKEND_DIR, "configs", "writing", "templates")
+    STYLES_DIR = os.path.join(BACKEND_DIR, "configs", "writing", "styles")
 
     EXPECTED_TEMPLATES = [
         "problem_solution", "tutorial", "comparison",

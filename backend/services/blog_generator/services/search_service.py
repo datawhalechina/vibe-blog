@@ -9,6 +9,8 @@ import logging
 import requests
 from typing import Dict, Any, List, Optional
 
+from .recency_utils import normalize_recency_window, apply_recency_hint, to_zai_recency_filter
+
 logger = logging.getLogger(__name__)
 
 # 全局搜索服务实例
@@ -85,6 +87,15 @@ class SearchService:
             max_count = int(self.config.get('ZAI_SEARCH_MAX_RESULTS') or os.environ.get('ZAI_SEARCH_MAX_RESULTS', '10'))
             content_size = self.config.get('ZAI_SEARCH_CONTENT_SIZE') or os.environ.get('ZAI_SEARCH_CONTENT_SIZE', 'medium')
             recency_filter = self.config.get('ZAI_SEARCH_RECENCY_FILTER') or os.environ.get('ZAI_SEARCH_RECENCY_FILTER', 'noLimit')
+            recency_window = normalize_recency_window(
+                self.config.get('SEARCH_RECENCY_WINDOW') or os.environ.get('SEARCH_RECENCY_WINDOW', '')
+            )
+
+            if recency_window:
+                query = apply_recency_hint(query, recency_window)
+                zai_recency = to_zai_recency_filter(recency_window)
+                if zai_recency:
+                    recency_filter = zai_recency
             
             headers = {
                 "Authorization": f"Bearer {self.api_key}",
@@ -145,7 +156,7 @@ class SearchService:
                 'summary': '',
                 'error': f'智谱 API 请求失败: {str(e)}'
             }
-    
+
     def _generate_summary(self, results: List[Dict[str, Any]]) -> str:
         """从搜索结果生成摘要"""
         if not results:

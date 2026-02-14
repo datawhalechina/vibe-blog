@@ -11,7 +11,10 @@ import os
 import re
 import time
 import requests
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any, Dict, List, Optional
+
+from .recency_utils import normalize_recency_window_optional, to_serper_tbs
 
 logger = logging.getLogger(__name__)
 
@@ -24,12 +27,14 @@ class SerperSearchService:
     BASE_URL = "https://google.serper.dev/search"
     MAX_RETRIES = 3
     RETRY_BASE_WAIT = 2
-
     def __init__(self, api_key: str, config: Dict[str, Any] = None):
         self.api_key = api_key
         self.config = config or {}
         self.timeout = int(self.config.get("SERPER_TIMEOUT", os.environ.get("SERPER_TIMEOUT", "10")))
         self.default_max = int(self.config.get("SERPER_MAX_RESULTS", os.environ.get("SERPER_MAX_RESULTS", "10")))
+        self.default_recency_window = self.config.get(
+            "SEARCH_RECENCY_WINDOW", os.environ.get("SEARCH_RECENCY_WINDOW", "")
+        )
 
     def is_available(self) -> bool:
         return bool(self.api_key)
@@ -42,6 +47,7 @@ class SerperSearchService:
         max_results: int = None,
         gl: str = None,
         hl: str = None,
+        recency_window: str = None,
     ) -> Dict[str, Any]:
         if not self.api_key:
             return {"success": False, "results": [], "summary": "", "error": "Serper API Key 未配置"}
@@ -52,11 +58,17 @@ class SerperSearchService:
             hl = hl or _hl
 
         max_results = max_results or self.default_max
+        recency_key = normalize_recency_window_optional(recency_window or self.default_recency_window)
 
         headers = {"X-API-KEY": self.api_key, "Content-Type": "application/json"}
         payload = {"q": query, "gl": gl, "hl": hl, "num": min(max_results, 20)}
+        tbs = to_serper_tbs(recency_key) if recency_key else None
+        if tbs:
+            payload["tbs"] = tbs
 
-        logger.info(f"Serper Google 搜索: {query} (gl={gl}, hl={hl})")
+        logger.info(
+            f"Serper Google 搜索: {query} (gl={gl}, hl={hl}, recency={recency_key or 'noLimit'})"
+        )
 
         # 重试
         last_err = None
@@ -134,6 +146,75 @@ class SerperSearchService:
         for item in results:
             parts.append(f"[{item.get('source', 'Google')}] {item.get('title', '')}\n{item.get('content', '')[:800]}")
         return "\n\n---\n\n".join(parts)
+
+    # ---- 批量搜索（75.08 P0-2）----
+
+    def batch_search(
+        self,
+        queries: List[str],
+        max_results_per_query: int = 5,
+        recency_window: str = None,
+        max_workers: int = 5,
+    ) -> Dict[str, Any]:
+        """批量并行搜索多个查询，自动去重
+
+        Args:
+            queries: 查询列表
+            max_results_per_query: 每个查询的最大结果数
+            recency_window: 时间窗口（1m/3m 等）
+            max_workers: 最大并行线程数
+
+        Returns:
+            合并去重后的搜索结果
+        """
+        if not self.api_key:
+            return {"success": False, "results": [], "summary": "", "error": "Serper API Key 未配置"}
+
+        if not queries:
+            return {"success": True, "results": [], "summary": "", "error": None}
+
+        workers = min(len(queries), max_workers)
+        all_results: List[Dict[str, Any]] = []
+        errors: List[str] = []
+
+        logger.info(f"Serper 批量搜索: {len(queries)} 个查询, 并行度={workers}")
+
+        with ThreadPoolExecutor(max_workers=workers) as executor:
+            futures = {
+                executor.submit(
+                    self.search, q, max_results_per_query, recency_window=recency_window
+                ): q
+                for q in queries
+            }
+            for future in as_completed(futures):
+                query = futures[future]
+                try:
+                    result = future.result()
+                    if result.get("success"):
+                        all_results.extend(result["results"])
+                    elif result.get("error"):
+                        errors.append(f"[{query}] {result['error']}")
+                except Exception as e:
+                    errors.append(f"[{query}] {e}")
+                    logger.error(f"批量搜索失败 [{query}]: {e}")
+
+        # 去重（按 URL）
+        seen_urls: set = set()
+        unique: List[Dict[str, Any]] = []
+        for item in all_results:
+            url = item.get("url", "")
+            if url and url not in seen_urls:
+                seen_urls.add(url)
+                unique.append(item)
+
+        logger.info(f"Serper 批量搜索完成: {len(all_results)} 条 → 去重后 {len(unique)} 条")
+
+        return {
+            "success": True,
+            "results": unique,
+            "summary": self._generate_summary(unique),
+            "error": "; ".join(errors) if errors else None,
+        }
 
     # ---- 工具方法 ----
 

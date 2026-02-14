@@ -103,3 +103,6 @@ backend/test_*.py
 backend/test_*.md
 backend/data/
 backend/outputs/
+
+.windsurf
+.shared

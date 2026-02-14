@@ -27,6 +27,26 @@ export interface Blog {
   wordCount: number
   // 封面视频
   coverVideo?: string
+  // Token 统计
+  tokenUsage?: TokenUsage | null
+  generationDuration?: number | null
+}
+
+/**
+ * Token 统计接口
+ */
+export interface TokenUsage {
+  total_input_tokens: number
+  total_output_tokens: number
+  total_cache_read_tokens: number
+  total_cache_write_tokens: number
+  total_tokens: number
+  total_calls: number
+  agent_breakdown?: Record<string, {
+    input: number
+    output: number
+    calls: number
+  }>
 }
 
 /**
@@ -156,6 +176,18 @@ export function useBlogDetail() {
           'custom': '自定义'
         }
 
+        // 解析 token_usage
+        let tokenUsage: TokenUsage | null = null
+        try {
+          if (record.token_usage) {
+            tokenUsage = typeof record.token_usage === 'string'
+              ? JSON.parse(record.token_usage)
+              : record.token_usage
+          }
+        } catch (e) {
+          // 忽略解析错误
+        }
+
         blog.value = {
           id: record.id,
           title: blogTitle,
@@ -178,7 +210,10 @@ export function useBlogDetail() {
           codeBlocksCount: codeBlocksCount,
           wordCount: wordCount,
           // 封面视频
-          coverVideo: record.cover_video || ''
+          coverVideo: record.cover_video || '',
+          // Token 统计
+          tokenUsage,
+          generationDuration: record.generation_duration_s || null,
         }
       } else {
         showToast('加载失败: ' + (result.error || '记录不存在'), 'error')

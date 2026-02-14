@@ -189,7 +189,9 @@ class DatabaseService:
                 'target_code_blocks_count': 'INTEGER',
                 'target_word_count': 'INTEGER',
                 'book_id': 'TEXT',
-                'summary': 'TEXT'  # 博客摘要
+                'summary': 'TEXT',  # 博客摘要
+                'token_usage': 'TEXT',  # Token 统计（JSON）
+                'generation_duration_s': 'REAL',  # 生成耗时（秒）
             }
             
             for col_name, col_type in new_columns.items():
@@ -576,20 +578,24 @@ class DatabaseService:
         target_sections_count: int = None,
         target_images_count: int = None,
         target_code_blocks_count: int = None,
-        target_word_count: int = None
+        target_word_count: int = None,
+        token_usage: str = None,
+        generation_duration_s: float = None
     ) -> Dict[str, Any]:
         """保存历史记录"""
         with self.get_connection() as conn:
             conn.execute('''
-                INSERT INTO history_records 
-                (id, topic, article_type, target_length, markdown_content, outline, 
+                INSERT INTO history_records
+                (id, topic, article_type, target_length, markdown_content, outline,
                  sections_count, code_blocks_count, images_count, review_score, cover_image, cover_video,
-                 target_sections_count, target_images_count, target_code_blocks_count, target_word_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 target_sections_count, target_images_count, target_code_blocks_count, target_word_count,
+                 token_usage, generation_duration_s)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 history_id, topic, article_type, target_length, markdown_content, outline,
                 sections_count, code_blocks_count, images_count, review_score, cover_image, cover_video,
-                target_sections_count, target_images_count, target_code_blocks_count, target_word_count
+                target_sections_count, target_images_count, target_code_blocks_count, target_word_count,
+                token_usage, generation_duration_s
             ))
         
         logger.info(f"保存历史记录: {history_id}, 主题: {topic}")

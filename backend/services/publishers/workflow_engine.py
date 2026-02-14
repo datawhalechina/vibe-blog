@@ -315,7 +315,7 @@ class WorkflowEngine:
     
     def __init__(self, config_dir: str = None):
         self.config_dir = config_dir or os.path.join(
-            os.path.dirname(__file__), 'configs'
+            os.path.dirname(__file__), '..', '..', 'configs', 'publishers'
         )
         self.configs: dict[str, dict] = {}
     

@@ -674,6 +674,7 @@ banana-blog/
 | `ZAI_SEARCH_MAX_RESULTS`    | 搜索最大结果数          | 5                                               |
 | `ZAI_SEARCH_CONTENT_SIZE`   | 搜索内容大小            | medium                                          |
 | `ZAI_SEARCH_RECENCY_FILTER` | 搜索时效过滤            | noLimit                                         |
+| `SEARCH_RECENCY_WINDOW`     | 统一搜索时间窗口        | 1m / 3m（留空不限制）                           |
 
 ### 多轮搜索配置
 

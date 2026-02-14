@@ -17,7 +17,7 @@ class StyleLoader:
     def __init__(self, styles_dir: str = ""):
         if not styles_dir:
             backend = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            styles_dir = os.path.join(backend, "workflow_configs", "styles")
+            styles_dir = os.path.join(backend, "configs", "writing", "styles")
         self.styles_dir = styles_dir
         self._cache: Dict[str, dict] = {}
 
