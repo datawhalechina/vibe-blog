@@ -36,7 +36,7 @@
       ref="progressContentRef"
     >
       <!-- 日志内容区 -->
-      <div class="progress-logs-container" ref="progressBodyRef">
+      <div class="progress-logs-container" ref="progressBodyRef" style="contain: content;">
         <!-- 任务启动信息 -->
         <div class="progress-task-header">
           <span class="progress-prompt">❯</span>
@@ -51,8 +51,9 @@
         <!-- 进度日志 -->
         <div class="progress-log-list">
           <div
-            v-for="(item, index) in progressItems"
+            v-for="(item, index) in visibleItems"
             :key="index"
+            v-memo="[item.message, item.type, item.detail]"
             class="progress-log-item"
             :class="item.type"
           >
@@ -78,8 +79,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick } from 'vue'
 import { Square, ChevronRight, X } from 'lucide-vue-next'
+
+const MAX_VISIBLE_LOGS = 100
 
 interface ProgressItem {
   time: string
@@ -111,6 +114,13 @@ const emit = defineEmits<Emits>()
 
 const progressContentRef = ref<HTMLElement | null>(null)
 const progressBodyRef = ref<HTMLElement | null>(null)
+
+const visibleItems = computed(() => {
+  const items = props.progressItems
+  return items.length > MAX_VISIBLE_LOGS
+    ? items.slice(items.length - MAX_VISIBLE_LOGS)
+    : items
+})
 
 // Auto-scroll to bottom when new items are added
 watch(
