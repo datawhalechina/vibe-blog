@@ -103,18 +103,8 @@
           <!-- 设置弹窗 -->
           <SettingsDialog v-model:open="settingsOpen" />
 
-          <!-- 居中 Tab（DeerFlow shadcn Tabs） -->
-          <Tabs v-model="activeTab" class="w-full">
-            <div class="flex items-center justify-center">
-              <TabsList>
-                <TabsTrigger value="report">报告</TabsTrigger>
-                <TabsTrigger value="activities">活动</TabsTrigger>
-              </TabsList>
-            </div>
-          </Tabs>
-
           <!-- 报告内容 -->
-          <div class="card-tab-content" v-show="activeTab === 'report'">
+          <div class="card-tab-content">
             <div class="report-scroll">
               <!-- DeerFlow ScrollContainer 滚动阴影 -->
               <div class="scroll-shadow scroll-shadow-top"></div>
@@ -140,30 +130,6 @@
             </div>
           </div>
 
-          <!-- 活动日志 Tab -->
-          <div class="card-tab-content" v-show="activeTab === 'activities'">
-            <div class="activities-scroll">
-              <ProgressDrawer
-                :visible="true"
-                :expanded="true"
-                :embedded="true"
-                :is-loading="isLoading"
-                :status-badge="statusBadge"
-                :progress-text="progressText"
-                :progress-items="progressItems"
-                :article-type="'blog'"
-                :target-length="''"
-                :task-id="currentTaskId"
-                :outline-data="outlineData"
-                :waiting-for-outline="waitingForOutline"
-                :preview-content="''"
-                @close="goBack"
-                @stop="stopGeneration"
-                @toggle="() => {}"
-                @confirm-outline="confirmOutline"
-              />
-            </div>
-          </div>
         </div>
       </div>
     </div>
@@ -210,7 +176,6 @@ import type { Citation } from '@/utils/citationMatcher'
 import { Square, Pencil, Undo2, Copy, Check, GraduationCap, Github, Settings as SettingsIcon, X as XIcon } from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import * as api from '@/services/api'
 import ProgressDrawer from '@/components/home/ProgressDrawer.vue'
 import ExportMenu from '@/components/generate/ExportMenu.vue'
@@ -225,7 +190,6 @@ const router = useRouter()
 const windowWidth = ref(window.innerWidth)
 const isMobile = computed(() => windowWidth.value < 768)
 const mobileTab = ref<'activity' | 'preview'>('activity')
-const activeTab = ref<'report' | 'activities'>('activities')
 const settingsOpen = ref(false)
 function onResize() { windowWidth.value = window.innerWidth }
 
@@ -395,10 +359,9 @@ watch([renderedHtml, citations], () => {
   nextTick(() => setupCitationHover())
 })
 
-// 对齐 DeerFlow: 预览内容首次出现时自动切换到 Report Tab
+// 对齐 DeerFlow: 预览内容首次出现时自动切换到移动端预览 Tab
 watch(previewContent, (val, oldVal) => {
   if (val && !oldVal) {
-    activeTab.value = 'report'
     if (isMobile.value) {
       mobileTab.value = 'preview'
     }
@@ -539,11 +502,6 @@ onUnmounted(() => {
   margin-top: -40px;
 }
 
-.activities-scroll {
-  height: 100%;
-  overflow-y: auto;
-  padding: 16px 32px;
-}
 
 /* === 移动端 Tab 栏 === */
 .mobile-tabs {
