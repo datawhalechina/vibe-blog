@@ -460,9 +460,9 @@ def enhance_topic():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
-@blog_bp.route('/api/tasks/<task_id>/confirm-outline', methods=['POST'])
-def confirm_outline(task_id):
-    """确认大纲（交互式模式）"""
+@blog_bp.route('/api/tasks/<task_id>/resume', methods=['POST'])
+def resume_task(task_id):
+    """恢复中断的任务（101.113 LangGraph interrupt 方案）"""
     try:
         data = request.get_json() or {}
         action = data.get('action', 'accept')
@@ -471,19 +471,28 @@ def confirm_outline(task_id):
         if action not in ('accept', 'edit'):
             return jsonify({'success': False, 'error': 'action 必须是 accept 或 edit'}), 400
 
+        if action == 'edit' and not outline:
+            return jsonify({'success': False, 'error': 'edit 操作需要提供 outline'}), 400
+
         blog_service = get_blog_service()
         if not blog_service:
             return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
 
-        success = blog_service.confirm_outline(task_id, action=action, outline=outline)
+        success = blog_service.resume_generation(task_id, action=action, outline=outline)
         if not success:
-            return jsonify({'success': False, 'error': '任务不存在或未在等待大纲确认'}), 404
+            return jsonify({'success': False, 'error': '任务不存在或未在等待确认'}), 404
 
-        return jsonify({'success': True, 'message': '大纲已确认'})
+        return jsonify({'success': True, 'message': '任务已恢复'})
 
     except Exception as e:
-        logger.error(f"大纲确认失败: {e}", exc_info=True)
+        logger.error(f"任务恢复失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@blog_bp.route('/api/tasks/<task_id>/confirm-outline', methods=['POST'])
+def confirm_outline(task_id):
+    """确认大纲 — 兼容旧接口，内部转发到 resume"""
+    return resume_task(task_id)
 
 
 @blog_bp.route('/api/blog/<blog_id>/evaluate', methods=['POST'])

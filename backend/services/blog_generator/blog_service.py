@@ -50,9 +50,8 @@ class BlogService:
         )
         self.generator.compile()
 
-        # 交互式模式：任务等待事件和确认数据
-        self._outline_events: Dict[str, threading.Event] = {}
-        self._outline_confirmations: Dict[str, Dict] = {}
+        # 101.113: 记录正在等待大纲确认的任务（用于 resume 时查找 config）
+        self._interrupted_tasks: Dict[str, Dict] = {}  # task_id -> {config, task_manager, ...}
 
     def enhance_topic(self, topic: str, timeout: float = 3.0) -> str:
         """
@@ -99,7 +98,7 @@ class BlogService:
 
     def confirm_outline(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
         """
-        确认大纲（交互式模式）
+        确认大纲（兼容旧接口，内部转发到 resume_generation）
 
         Args:
             task_id: 任务 ID
@@ -109,14 +108,66 @@ class BlogService:
         Returns:
             是否成功
         """
-        event = self._outline_events.get(task_id)
-        if not event:
+        return self.resume_generation(task_id, action=action, outline=outline)
+
+    def resume_generation(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
+        """
+        恢复中断的生成任务（101.113 LangGraph interrupt 方案）
+
+        在后台线程中使用 Command(resume=...) 恢复图执行。
+
+        Args:
+            task_id: 任务 ID
+            action: 'accept' 或 'edit'
+            outline: 修改后的大纲（仅 action='edit' 时需要）
+
+        Returns:
+            是否成功启动恢复
+        """
+        task_info = self._interrupted_tasks.get(task_id)
+        if not task_info:
+            logger.warning(f"resume_generation: 任务 {task_id} 不在中断列表中")
             return False
-        self._outline_confirmations[task_id] = {
-            'action': action,
-            'outline': outline,
-        }
-        event.set()
+
+        # 构建 resume 值
+        if action == 'edit' and outline:
+            resume_value = {"action": "edit", "outline": outline}
+        else:
+            resume_value = "accept"
+
+        # 在后台线程中恢复执行
+        def run_resume():
+            from langgraph.types import Command
+            token = task_id_context.set(task_id)
+            try:
+                config = task_info['config']
+                task_manager = task_info.get('task_manager')
+                app_ctx = task_info.get('app')
+
+                if app_ctx:
+                    with app_ctx.app_context():
+                        self._run_resume(
+                            task_id=task_id,
+                            resume_value=resume_value,
+                            config=config,
+                            task_manager=task_manager,
+                            task_info=task_info,
+                        )
+                else:
+                    self._run_resume(
+                        task_id=task_id,
+                        resume_value=resume_value,
+                        config=config,
+                        task_manager=task_manager,
+                        task_info=task_info,
+                    )
+            finally:
+                task_id_context.reset(token)
+                self._interrupted_tasks.pop(task_id, None)
+
+        ctx = copy_context()
+        thread = threading.Thread(target=ctx.run, args=(run_resume,), daemon=True)
+        thread.start()
         return True
 
     def evaluate_article(self, content: str, title: str = '', article_type: str = '') -> Dict[str, Any]:
@@ -566,6 +617,9 @@ class BlogService:
             
             self.generator._outline_stream_callback = on_outline_stream
             
+            # 101.113: 设置交互式标志，让 _planner_node 使用 interrupt()
+            self.generator._interactive = interactive
+            
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
             
             # 注入 Langfuse 追踪回调（如果已启用）
@@ -614,11 +668,7 @@ class BlogService:
                 # 检查任务是否被取消
                 if task_manager and task_manager.is_cancelled(task_id):
                     logger.info(f"任务已取消，停止生成: {task_id}")
-                    # 清理交互式模式等待事件，防止线程永久阻塞
-                    outline_event = self._outline_events.pop(task_id, None)
-                    if outline_event:
-                        outline_event.set()
-                    self._outline_confirmations.pop(task_id, None)
+                    self._interrupted_tasks.pop(task_id, None)
                     task_manager.send_event(task_id, 'cancelled', {
                         'task_id': task_id,
                         'message': '任务已被用户取消'
@@ -718,55 +768,8 @@ class BlogService:
                                 }
                             })
 
-                            # 交互式模式：暂停等待用户确认大纲
-                            if interactive:
-                                task_manager.send_event(task_id, 'outline_ready', {
-                                    'title': outline.get('title', ''),
-                                    'sections': sections,
-                                    'sections_titles': [s.get('title', '') for s in sections],
-                                })
-                                wait_event = threading.Event()
-                                self._outline_events[task_id] = wait_event
-                                logger.info(f"交互式模式：等待用户确认大纲 [{task_id}]")
-
-                                confirmed = wait_event.wait(timeout=600)  # 10 分钟超时
-                                del self._outline_events[task_id]
-
-                                if not confirmed:
-                                    logger.info(f"大纲确认超时，自动继续 [{task_id}]")
-                                    task_manager.send_event(task_id, 'progress', {
-                                        'stage': 'outline_timeout',
-                                        'message': '大纲确认超时，自动继续写作'
-                                    })
-                                else:
-                                    confirmation = self._outline_confirmations.pop(task_id, {})
-                                    action = confirmation.get('action', 'accept')
-                                    if action == 'edit' and confirmation.get('outline'):
-                                        # 用修改后的大纲替换 state
-                                        edited_outline = confirmation['outline']
-                                        state['outline'] = edited_outline
-                                        state['sections'] = []  # 清空已有章节，重新写作
-                                        completed_sections = 0
-                                        task_manager.send_event(task_id, 'progress', {
-                                            'stage': 'outline_edited',
-                                            'message': '大纲已修改，开始写作'
-                                        })
-                                        task_manager.send_event(task_id, 'result', {
-                                            'type': 'outline_complete',
-                                            'data': {
-                                                'title': edited_outline.get('title', ''),
-                                                'sections_count': len(edited_outline.get('sections', [])),
-                                                'sections': edited_outline.get('sections', []),
-                                                'sections_titles': [s.get('title', '') for s in edited_outline.get('sections', [])],
-                                                'message': f'大纲已修改: {edited_outline.get("title", "")}',
-                                                'interactive': interactive,
-                                            }
-                                        })
-                                    else:
-                                        task_manager.send_event(task_id, 'progress', {
-                                            'stage': 'outline_confirmed',
-                                            'message': '大纲已确认，开始写作'
-                                        })
+                            # 101.113: 交互式模式下，interrupt() 在 _planner_node 中触发
+                            # 图会自动暂停，stream 循环结束后在下方检测 interrupt 状态
                         
                         elif node_name == 'writer' and state.get('sections'):
                             # 章节撰写进度
@@ -899,8 +902,48 @@ class BlogService:
                                 }
                             })
             
+            # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认）
+            snapshot = self.generator.app.get_state(config)
+            if snapshot.next:  # 图还有未完成的节点 → 被 interrupt 暂停了
+                logger.info(f"图执行被 interrupt 暂停，等待用户确认大纲 [{task_id}]")
+                # 提取 interrupt 数据
+                interrupt_value = None
+                if snapshot.tasks:
+                    for task in snapshot.tasks:
+                        if hasattr(task, 'interrupts') and task.interrupts:
+                            interrupt_value = task.interrupts[0].value
+                            break
+
+                # 发送 outline_ready 事件
+                if task_manager and interrupt_value and interrupt_value.get('type') == 'confirm_outline':
+                    task_manager.send_event(task_id, 'outline_ready', {
+                        'title': interrupt_value.get('title', ''),
+                        'sections': interrupt_value.get('sections', []),
+                        'sections_titles': interrupt_value.get('sections_titles', []),
+                    })
+
+                # 保存任务信息，供 resume_generation 使用
+                self._interrupted_tasks[task_id] = {
+                    'config': config,
+                    'task_manager': task_manager,
+                    'app': None,  # Flask app context handled by generate_async
+                    'topic': topic,
+                    'article_type': article_type,
+                    'target_length': target_length,
+                    'interactive': interactive,
+                    'generate_cover_video': generate_cover_video,
+                    'video_aspect_ratio': video_aspect_ratio,
+                    'article_config': article_config,
+                    'token_tracker': token_tracker,
+                    'task_log': task_log,
+                    'sse_handler': sse_handler,
+                    'sse_logger_names': sse_logger_names,
+                }
+                # 不清理日志处理器，resume 时还需要
+                return
+
             # 获取最终状态
-            final_state = self.generator.app.get_state(config).values
+            final_state = snapshot.values
             
             # 生成封面架构图（基于全文内容）
             outline = final_state.get('outline') or {}
@@ -1121,6 +1164,364 @@ class BlogService:
                 for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
     
+    def _run_resume(
+        self,
+        task_id: str,
+        resume_value,
+        config: dict,
+        task_manager=None,
+        task_info: dict = None,
+    ):
+        """
+        101.113: 恢复中断的图执行（Command(resume=...)），然后执行后处理。
+
+        复用 _run_generation 中 stream 循环后的逻辑（封面图、保存历史等）。
+        """
+        import time
+        import logging
+        from langgraph.types import Command
+
+        task_info = task_info or {}
+        topic = task_info.get('topic', '')
+        article_type = task_info.get('article_type', 'tutorial')
+        target_length = task_info.get('target_length', 'medium')
+        interactive = task_info.get('interactive', False)
+        generate_cover_video = task_info.get('generate_cover_video', False)
+        video_aspect_ratio = task_info.get('video_aspect_ratio', '16:9')
+        article_config = task_info.get('article_config', {})
+        token_tracker = task_info.get('token_tracker')
+        task_log = task_info.get('task_log')
+        sse_handler = task_info.get('sse_handler')
+        sse_logger_names = task_info.get('sse_logger_names', [])
+
+        # 发送确认事件
+        if task_manager:
+            if isinstance(resume_value, dict) and resume_value.get('action') == 'edit':
+                task_manager.send_event(task_id, 'progress', {
+                    'stage': 'outline_edited',
+                    'message': '大纲已修改，开始写作'
+                })
+            else:
+                task_manager.send_event(task_id, 'progress', {
+                    'stage': 'outline_confirmed',
+                    'message': '大纲已确认，开始写作'
+                })
+
+        # 阶段进度映射（复用）
+        stage_progress = {
+            'planner': (25, '正在生成大纲...'),
+            'writer': (45, '正在撰写内容...'),
+            'check_knowledge': (52, '正在检查知识空白...'),
+            'refine_search': (54, '正在补充搜索...'),
+            'enhance_with_knowledge': (56, '正在增强内容...'),
+            'questioner': (60, '正在检查内容深度...'),
+            'deepen_content': (65, '正在深化内容...'),
+            'coder': (75, '正在生成代码示例...'),
+            'artist': (85, '正在生成配图...'),
+            'reviewer': (90, '正在审核质量...'),
+            'humanizer': (93, '正在优化文风...'),
+            'revision': (95, '正在修订内容...'),
+            'fact_checker': (96, '正在事实核查...'),
+            'consistency_check': (97, '正在一致性检查...'),
+            'assembler': (98, '正在组装文档...'),
+        }
+
+        completed_sections = 0
+
+        try:
+            # 使用 Command(resume=...) 恢复图执行
+            for event in self.generator.app.stream(Command(resume=resume_value), config):
+                # 检查任务是否被取消
+                if task_manager and task_manager.is_cancelled(task_id):
+                    logger.info(f"任务已取消，停止生成: {task_id}")
+                    task_manager.send_event(task_id, 'cancelled', {
+                        'task_id': task_id,
+                        'message': '任务已被用户取消'
+                    })
+                    return
+
+                for node_name, state in event.items():
+                    progress_info = stage_progress.get(node_name, (50, f'正在执行 {node_name}...'))
+
+                    if task_manager:
+                        task_manager.send_event(task_id, 'progress', {
+                            'stage': node_name,
+                            'progress': progress_info[0],
+                            'message': progress_info[1]
+                        })
+                        update_queue_progress(
+                            task_id, progress_info[0],
+                            stage=progress_info[1],
+                            detail=node_name,
+                        )
+
+                        # 如果是 edit，planner 会重新执行并输出新大纲
+                        if node_name == 'planner' and state.get('outline'):
+                            outline = state.get('outline', {})
+                            sections = outline.get('sections', [])
+                            task_manager.send_event(task_id, 'result', {
+                                'type': 'outline_complete',
+                                'data': {
+                                    'title': outline.get('title', ''),
+                                    'sections_count': len(sections),
+                                    'sections': sections,
+                                    'sections_titles': [s.get('title', '') for s in sections],
+                                    'message': f'大纲已确认: {outline.get("title", "")} ({len(sections)} 章节)',
+                                    'interactive': interactive,
+                                }
+                            })
+
+                        elif node_name == 'writer' and state.get('sections'):
+                            sections = state.get('sections', [])
+                            new_count = len(sections)
+                            if new_count > completed_sections:
+                                for i in range(completed_sections, new_count):
+                                    section = sections[i]
+                                    task_manager.send_event(task_id, 'result', {
+                                        'type': 'section_complete',
+                                        'data': {
+                                            'section_index': i + 1,
+                                            'title': section.get('title', ''),
+                                            'content': section.get('content', ''),
+                                            'content_length': len(section.get('content', '')),
+                                            'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
+                                        }
+                                    })
+                                    accumulated_md = ''
+                                    for j in range(i + 1):
+                                        s = sections[j]
+                                        accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                                    task_manager.send_event(task_id, 'writing_chunk', {
+                                        'section_index': i + 1,
+                                        'delta': section.get('content', ''),
+                                        'accumulated': accumulated_md.strip(),
+                                    })
+                                completed_sections = new_count
+
+                        elif node_name == 'reviewer':
+                            review_score = state.get('review_score', 0)
+                            review_passed = state.get('review_passed', False)
+                            task_manager.send_event(task_id, 'result', {
+                                'type': 'reviewer_complete',
+                                'data': {
+                                    'score': review_score,
+                                    'passed': review_passed,
+                                    'message': f'质量审核完成: {review_score} 分 {"✅ 通过" if review_passed else "❌ 需修订"}'
+                                }
+                            })
+
+                        elif node_name == 'assembler':
+                            markdown = state.get('final_markdown', '')
+                            task_manager.send_event(task_id, 'result', {
+                                'type': 'assembler_complete',
+                                'data': {
+                                    'markdown_length': len(markdown),
+                                    'message': f'文档组装完成: {len(markdown)} 字'
+                                }
+                            })
+
+            # 获取最终状态
+            final_state = self.generator.app.get_state(config).values
+
+            # 封面图 + 保存历史 + 完成事件（复用 _run_generation 逻辑）
+            outline = final_state.get('outline') or {}
+            markdown_content = final_state.get('final_markdown', '')
+            image_style = final_state.get('image_style', '')
+            cover_image_result = self._generate_cover_image(
+                title=outline.get('title', topic),
+                topic=topic,
+                full_content=markdown_content,
+                task_manager=task_manager,
+                task_id=task_id,
+                image_style=image_style,
+                video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
+            )
+            cover_image_url = cover_image_result[0] if cover_image_result else None
+            cover_image_path = cover_image_result[1] if cover_image_result else None
+            article_summary = cover_image_result[2] if cover_image_result and len(cover_image_result) > 2 else None
+
+            markdown_with_cover = markdown_content
+            if cover_image_path and markdown_content:
+                title_str = outline.get('title', topic)
+                if cover_image_path.startswith('http'):
+                    cover_image_ref = cover_image_path
+                else:
+                    cover_filename = os.path.basename(cover_image_path)
+                    cover_image_ref = f"./images/{cover_filename}"
+                cover_section = f"\n![{title_str} - 架构图]({cover_image_ref})\n\n---\n\n"
+                lines = markdown_content.split('\n')
+                insert_idx = 0
+                for i, line in enumerate(lines):
+                    if line.startswith('## ') and i > 0:
+                        insert_idx = i
+                        break
+                if insert_idx > 0:
+                    lines.insert(insert_idx, cover_section)
+                    markdown_with_cover = '\n'.join(lines)
+                else:
+                    markdown_with_cover = cover_section + markdown_content
+
+            saved_path = None
+            if markdown_content:
+                saved_path = self._save_markdown(
+                    task_id=task_id,
+                    markdown=markdown_content,
+                    outline=outline,
+                    cover_image_path=cover_image_path
+                )
+
+            # 封面动画
+            cover_video_path = None
+            cover_video_enabled = os.environ.get('COVER_VIDEO_ENABLED', 'true').lower() == 'true'
+            if generate_cover_video and cover_image_url and cover_video_enabled:
+                section_images = final_state.get('section_images', [])
+                cover_video_path = self._generate_cover_video(
+                    history_id=task_id,
+                    cover_image_url=cover_image_url,
+                    video_aspect_ratio=video_aspect_ratio,
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    section_images=section_images
+                )
+
+            # 保存历史记录
+            try:
+                from services.database_service import get_db_service
+                import json
+                db_service = get_db_service()
+                db_service.save_history(
+                    history_id=task_id,
+                    topic=topic,
+                    article_type=article_type,
+                    target_length=target_length,
+                    markdown_content=markdown_with_cover,
+                    outline=json.dumps(final_state.get('outline') or {}, ensure_ascii=False),
+                    sections_count=len(final_state.get('sections', [])),
+                    code_blocks_count=len(final_state.get('code_blocks', [])),
+                    images_count=len(final_state.get('images', [])),
+                    review_score=final_state.get('review_score', 0),
+                    cover_image=cover_image_path,
+                    cover_video=cover_video_path,
+                    target_sections_count=article_config.get('sections_count'),
+                    target_images_count=article_config.get('images_count'),
+                    target_code_blocks_count=article_config.get('code_blocks_count'),
+                    target_word_count=article_config.get('target_word_count'),
+                )
+                logger.info(f"历史记录已保存: {task_id}")
+
+                # 保存博客摘要
+                try:
+                    summary_to_save = article_summary
+                    if not summary_to_save:
+                        summary_to_save = extract_article_summary(
+                            llm_client=self.generator.llm,
+                            title=topic,
+                            content=markdown_with_cover,
+                            max_length=500
+                        )
+                    if summary_to_save:
+                        summary_to_save = summary_to_save[:500]
+                        db_service.update_history_summary(task_id, summary_to_save)
+                except Exception as e:
+                    logger.warning(f"保存博客摘要失败: {e}")
+            except Exception as e:
+                logger.warning(f"保存历史记录失败: {e}")
+
+            # Token 追踪
+            token_summary = None
+            if token_tracker:
+                try:
+                    logger.info(token_tracker.format_summary())
+                    token_summary = token_tracker.get_summary()
+                except Exception as e:
+                    logger.warning(f"Token 摘要生成失败: {e}")
+
+            # 任务日志
+            if task_log:
+                try:
+                    task_log.complete(
+                        score=final_state.get('review_score', 0),
+                        word_count=len(final_state.get('final_markdown', '')),
+                        revision_rounds=final_state.get('revision_count', 0),
+                    )
+                    if token_summary:
+                        task_log.token_summary = token_summary
+                    task_log.save()
+                    logger.info(task_log.get_summary())
+                except Exception as e:
+                    logger.warning(f"任务日志保存失败: {e}")
+
+            # 构建 citations
+            citations = []
+            seen_urls = set()
+            for src_list_key in ('search_results', 'top_references'):
+                for r in (final_state.get(src_list_key) or []):
+                    url = r.get('url') or r.get('source', '')
+                    if not url or url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    try:
+                        from urllib.parse import urlparse
+                        domain = urlparse(url).hostname or ''
+                    except Exception:
+                        domain = ''
+                    citations.append({
+                        'url': url,
+                        'title': r.get('title', ''),
+                        'domain': domain,
+                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
+                    })
+
+            # 发送完成事件
+            if task_manager:
+                complete_data = {
+                    'success': True,
+                    'id': task_id,
+                    'markdown': markdown_with_cover,
+                    'outline': final_state.get('outline') or {},
+                    'sections_count': len(final_state.get('sections', [])),
+                    'images_count': len(final_state.get('images', [])),
+                    'code_blocks_count': len(final_state.get('code_blocks', [])),
+                    'review_score': final_state.get('review_score', 0),
+                    'saved_path': saved_path,
+                    'cover_video': cover_video_path,
+                    'citations': citations
+                }
+                if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':
+                    try:
+                        llm = self.generator.llm
+                        if hasattr(llm, 'token_tracker') and llm.token_tracker:
+                            complete_data['token_usage'] = llm.token_tracker.get_summary()
+                    except Exception:
+                        pass
+                task_manager.send_event(task_id, 'complete', complete_data)
+
+            logger.info(f"博客生成完成（resume）: {task_id}, 保存到: {saved_path}")
+            update_queue_status(
+                task_id, "completed",
+                word_count=len(final_state.get('final_markdown', '')),
+                image_count=len(final_state.get('images', [])),
+            )
+
+        except Exception as e:
+            logger.error(f"博客生成失败（resume）[{task_id}]: {e}", exc_info=True)
+            if task_log:
+                try:
+                    task_log.fail(str(e))
+                    task_log.save()
+                except Exception:
+                    pass
+            if task_manager:
+                task_manager.send_event(task_id, 'error', {
+                    'message': str(e),
+                    'recoverable': False
+                })
+            update_queue_status(task_id, "failed", error_msg=str(e))
+        finally:
+            if sse_handler:
+                for logger_name in sse_logger_names:
+                    logging.getLogger(logger_name).removeHandler(sse_handler)
+
     def _generate_cover_image(
         self,
         title: str,
