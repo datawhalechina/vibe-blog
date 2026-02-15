@@ -96,6 +96,14 @@ class BlogService:
             logger.warning(f"主题优化失败，返回原始主题: {e}")
         return topic
 
+    def _get_flask_app(self):
+        """安全获取当前 Flask app 引用（用于 resume 线程）"""
+        try:
+            from flask import current_app
+            return current_app._get_current_object()
+        except Exception:
+            return None
+
     def confirm_outline(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
         """
         确认大纲（兼容旧接口，内部转发到 resume_generation）
@@ -926,7 +934,7 @@ class BlogService:
                 self._interrupted_tasks[task_id] = {
                     'config': config,
                     'task_manager': task_manager,
-                    'app': None,  # Flask app context handled by generate_async
+                    'app': self._get_flask_app(),  # Flask app 引用，供 resume 线程使用
                     'topic': topic,
                     'article_type': article_type,
                     'target_length': target_length,
