@@ -327,6 +327,14 @@ watch(
   }
 )
 
+// DeerFlow ThoughtBlock: 从日志中提取思考过程
+const thoughtLogs = computed(() => {
+  return props.progressItems
+    .filter(item => item.type === 'info' || item.type === 'stream' || item.type === 'warning')
+    .map(item => item.message)
+    .filter(msg => msg && !msg.startsWith('✅'))
+})
+
 // ThoughtBlock: auto-scroll to bottom
 const thoughtScrollRef = ref<HTMLElement | null>(null)
 watch(thoughtLogs, async () => {
@@ -341,14 +349,6 @@ watch(() => props.outlineData, (val) => {
   if (val && thoughtExpanded.value) {
     thoughtExpanded.value = false
   }
-})
-
-// DeerFlow ThoughtBlock: 从日志中提取思考过程
-const thoughtLogs = computed(() => {
-  return props.progressItems
-    .filter(item => item.type === 'info' || item.type === 'stream' || item.type === 'warning')
-    .map(item => item.message)
-    .filter(msg => msg && !msg.startsWith('✅'))
 })
 
 // DeerFlow ResearchCard: 研究状态文字（RollingText 效果）
