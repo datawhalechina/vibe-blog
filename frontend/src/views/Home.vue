@@ -497,6 +497,8 @@ const handleGenerate = async () => {
 
 // 流式预览节流（100ms）
 let accumulatedPreview = ''
+let completedSectionsContent = ''  // 已完成章节的累积内容
+let currentSectionTitle = ''       // 当前正在写的章节标题
 let previewTimer: ReturnType<typeof setTimeout> | null = null
 const throttledUpdatePreview = (content: string) => {
   if (previewTimer) return
@@ -508,6 +510,8 @@ const throttledUpdatePreview = (content: string) => {
 
 const connectSSE = (taskId: string) => {
   accumulatedPreview = ''
+  completedSectionsContent = ''
+  currentSectionTitle = ''
   eventSource = api.createTaskStream(taskId)
 
   eventSource.addEventListener('connected', () => {
@@ -557,7 +561,20 @@ const connectSSE = (taskId: string) => {
   // 流式写作内容（两种模式都有）
   eventSource.addEventListener('writing_chunk', (e: MessageEvent) => {
     const d = JSON.parse(e.data)
-    if (d.delta) {
+    const sectionTitle = d.section_title || ''
+    // 检测章节切换：把之前章节的内容存入已完成缓冲区
+    if (sectionTitle && sectionTitle !== currentSectionTitle) {
+      if (currentSectionTitle) {
+        completedSectionsContent = accumulatedPreview
+      }
+      currentSectionTitle = sectionTitle
+    }
+    if (d.accumulated) {
+      accumulatedPreview = completedSectionsContent
+        ? completedSectionsContent + '\n\n' + d.accumulated
+        : d.accumulated
+      throttledUpdatePreview(accumulatedPreview)
+    } else if (d.delta) {
       accumulatedPreview += d.delta
       throttledUpdatePreview(accumulatedPreview)
     }
@@ -569,32 +586,77 @@ const connectSSE = (taskId: string) => {
 
     switch (d.type) {
       case 'search_started':
-        addProgressItem(`🔍 搜索: ${data.query || ''}`, 'info')
-        break
-
-      case 'search_results':
         progressItems.value.push({
           time: new Date().toLocaleTimeString(),
-          message: `🔍 ${data.query || '搜索结果'}`,
+          message: `🔍 搜索: ${data.query || ''}`,
           type: 'search',
-          data: data,
+          data: { query: data.query, searching: true },
         })
         break
+
+      case 'search_results': {
+        let idx = -1
+        for (let si = progressItems.value.length - 1; si >= 0; si--) {
+          const it = progressItems.value[si]
+          if (it.type === 'search' && it.data?.searching) {
+            if (it.data?.query === data.query) { idx = si; break }
+            if (idx < 0) idx = si
+          }
+        }
+        if (idx >= 0) {
+          progressItems.value[idx] = {
+            time: new Date().toLocaleTimeString(),
+            message: `🔍 ${data.query || '搜索结果'}`,
+            type: 'search',
+            data: data,
+          }
+        } else {
+          progressItems.value.push({
+            time: new Date().toLocaleTimeString(),
+            message: `🔍 ${data.query || '搜索结果'}`,
+            type: 'search',
+            data: data,
+          })
+        }
+        break
+      }
 
       case 'crawl_completed':
-        progressItems.value.push({
-          time: new Date().toLocaleTimeString(),
-          message: `📖 已抓取 ${data.count || 0} 篇`,
-          type: 'crawl',
-          data: data,
-        })
+        if (data.url) {
+          progressItems.value.push({
+            time: new Date().toLocaleTimeString(),
+            message: `📖 正在阅读: ${data.title || data.url}`,
+            type: 'crawl',
+            data: data,
+          })
+        } else if (data.count) {
+          addProgressItem(`📖 深度抓取完成: ${data.count} 篇高质量素材`, 'success')
+        }
         break
 
       case 'search_completed':
+        // 将残留的 searching 骨架屏转换为完成状态（不删除，保留动画体验）
+        for (let ci = progressItems.value.length - 1; ci >= 0; ci--) {
+          const it = progressItems.value[ci]
+          if (it.type === 'search' && it.data?.searching) {
+            progressItems.value[ci] = {
+              time: new Date().toLocaleTimeString(),
+              message: `✅ 搜索完成: ${it.data?.query || ''}`,
+              type: 'success',
+            }
+          }
+        }
         addProgressItem(`✅ ${data.message || '搜索完成'}`, 'success')
         break
 
       case 'researcher_complete':
+        // 兜底：清除所有残留的 searching 骨架屏
+        for (let ci = progressItems.value.length - 1; ci >= 0; ci--) {
+          const it = progressItems.value[ci]
+          if (it.type === 'search' && it.data?.searching) {
+            progressItems.value.splice(ci, 1)
+          }
+        }
         if (data.document_count > 0 || data.web_count > 0) {
           addProgressItem(`📊 知识来源: 文档 ${data.document_count} 条, 网络 ${data.web_count} 条`, 'info')
         }

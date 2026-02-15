@@ -35,8 +35,8 @@
       class="progress-content"
       ref="progressContentRef"
     >
-      <!-- Tab 栏 -->
-      <div class="progress-tabs">
+      <!-- Tab 栏（embedded 模式下隐藏，右侧 Card 已有报告面板） -->
+      <div v-if="!embedded" class="progress-tabs">
         <button
           class="progress-tab"
           :class="{ active: activeTab === 'logs' }"
@@ -57,6 +57,9 @@
 
       <!-- 活动日志 Tab -->
       <div v-show="activeTab === 'logs'" class="progress-logs-container" ref="progressBodyRef" style="contain: content;">
+        <!-- DeerFlow ScrollContainer 滚动阴影 -->
+        <div class="scroll-shadow scroll-shadow-top"></div>
+        <div class="scroll-shadow scroll-shadow-bottom"></div>
         <!-- 任务启动信息 -->
         <div class="progress-task-header">
           <span class="progress-prompt">❯</span>
@@ -68,85 +71,141 @@
           <span v-if="taskId" class="progress-task-id">{{ taskId }}</span>
         </div>
 
-        <!-- 大纲审批卡片（交互式模式） -->
-        <div v-if="outlineData && waitingForOutline" class="outline-approval-card">
-          <div class="outline-card-header">
-            <span class="outline-card-title">📋 {{ outlineData.title }}</span>
-            <span class="outline-card-badge">待确认</span>
-          </div>
-          <div class="outline-card-sections">
-            <div
-              v-for="(title, i) in outlineData.sections_titles"
-              :key="i"
-              class="outline-section-item"
+        <!-- DeerFlow ThoughtBlock：shadcn-vue Collapsible -->
+        <Collapsible v-if="thoughtLogs.length > 0" v-model:open="thoughtExpanded" class="mb-4">
+          <CollapsibleTrigger as-child>
+            <Button
+              variant="ghost"
+              class="w-full justify-start rounded-xl border px-6 py-4 text-left transition-all duration-200 h-auto"
+              :class="isLoading && !outlineData ? 'border-primary/20 bg-primary/5 shadow-sm' : 'border-border bg-card'"
             >
-              <span class="outline-section-num">{{ i + 1 }}.</span>
-              <span class="outline-section-title">{{ title }}</span>
-            </div>
-          </div>
-          <div class="outline-card-actions">
-            <span class="outline-prompt">?</span>
-            <span class="outline-hint">confirm outline</span>
-            <button class="outline-btn outline-btn-accept" @click="$emit('confirmOutline', 'accept')">
-              (Y) 开始写作
-            </button>
-            <button class="outline-btn outline-btn-edit" @click="$emit('confirmOutline', 'edit')">
-              (e) 修改
-            </button>
-          </div>
-        </div>
-
-        <!-- 大纲已确认状态 -->
-        <div v-else-if="outlineData && !waitingForOutline" class="outline-confirmed-card">
-          <span class="outline-confirmed-icon">✓</span>
-          <span class="outline-confirmed-text">大纲已确认: {{ outlineData.title }}</span>
-        </div>
-
-        <!-- 进度日志 -->
-        <div class="progress-log-list">
-          <template
-            v-for="(item, index) in visibleItems"
-            :key="index"
-          >
-            <!-- 搜索结果卡片 -->
-            <div v-if="item.type === 'search' && item.data?.results" class="progress-log-item search">
-              <div class="search-results-block">
-                <div class="search-query">$ search "{{ item.data.query }}"</div>
-                <div class="search-tree">
-                  <a
-                    v-for="(r, ri) in item.data.results.slice(0, 8)"
-                    :key="ri"
-                    class="search-card"
-                    :href="r.url"
-                    target="_blank"
-                    rel="noopener"
-                    :style="ri < 6 ? `animation: card-in 0.2s ease-out both; animation-delay: ${Math.min(ri * 50, 300)}ms` : 'animation: none'"
-                  >
-                    <span class="search-card-index">[{{ ri + 1 }}]</span>
-                    <img class="search-card-favicon" :src="`https://www.google.com/s2/favicons?domain=${r.domain}&sz=16`" :alt="r.domain" width="16" height="16" />
-                    <span class="search-card-domain">{{ r.domain }}</span>
-                    <span class="search-card-title">{{ r.title }}</span>
-                  </a>
+              <div class="flex w-full items-center gap-3">
+                <Lightbulb :size="18" class="shrink-0 transition-colors duration-200" :class="isLoading && !outlineData ? 'text-primary' : 'text-muted-foreground'" />
+                <span class="font-semibold leading-none transition-colors duration-200" :class="isLoading && !outlineData ? 'text-primary' : 'text-foreground'">深度思考</span>
+                <div v-if="isLoading && !outlineData" class="deer-loading-dots" style="transform: scale(0.75)">
+                  <div></div><div></div><div></div>
                 </div>
+                <div class="flex-grow" />
+                <ChevronDown v-if="thoughtExpanded" :size="16" class="text-muted-foreground transition-transform duration-200" />
+                <ChevronRight v-else :size="16" class="text-muted-foreground transition-transform duration-200" />
               </div>
+            </Button>
+          </CollapsibleTrigger>
+          <CollapsibleContent class="mt-3">
+            <Card :class="isLoading && !outlineData ? 'border-primary/20 bg-primary/5' : 'border-border'">
+              <CardContent class="p-0">
+                <div class="flex h-40 w-full overflow-y-auto">
+                  <div class="w-full px-4 py-3">
+                    <div
+                      v-for="(log, i) in thoughtLogs"
+                      :key="'thought-' + i"
+                      class="text-xs leading-relaxed"
+                      :class="i === thoughtLogs.length - 1 && isLoading ? 'text-primary' : 'text-muted-foreground opacity-80'"
+                    >{{ log }}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </CollapsibleContent>
+        </Collapsible>
+
+        <!-- DeerFlow PlanCard：shadcn-vue Card -->
+        <Card v-if="outlineData && waitingForOutline" class="mb-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CardHeader>
+            <CardTitle>
+              <span class="search-query-animated">{{ outlineData.title || '深度研究' }}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ul class="my-2 flex list-decimal flex-col gap-4 border-l-2 pl-8">
+              <li
+                v-for="(title, i) in outlineData.sections_titles"
+                :key="i"
+                class="text-sm"
+              >
+                <h4 class="text-sm font-medium">{{ title }}</h4>
+              </li>
+            </ul>
+          </CardContent>
+          <CardFooter class="flex justify-end gap-2">
+            <Button @click="$emit('confirmOutline', 'accept')">开始写作</Button>
+            <Button variant="outline" @click="$emit('confirmOutline', 'edit')">修改大纲</Button>
+          </CardFooter>
+        </Card>
+
+        <!-- DeerFlow ResearchCard：shadcn-vue Card -->
+        <Card v-else-if="outlineData && !waitingForOutline" class="mb-4 animate-in fade-in slide-in-from-bottom-4 duration-300">
+          <CardHeader>
+            <CardTitle>
+              <span :class="isLoading ? 'search-query-animated' : ''">{{ outlineData.title || '深度研究' }}</span>
+            </CardTitle>
+          </CardHeader>
+          <CardFooter>
+            <span class="research-status-text">
+              <span :key="researchStatusText" class="rolling-text-inner text-sm text-muted-foreground">{{ researchStatusText }}</span>
+            </span>
+          </CardFooter>
+        </Card>
+
+        <!-- 进度日志（framer-motion 风格入场动画） -->
+        <TransitionGroup name="log-item" tag="div" class="progress-log-list">
+          <div
+            v-for="(item, index) in visibleItems"
+            :key="'log-' + index + '-' + item.type + '-' + (item.data?.query || item.message || index)"
+          >
+            <!-- 搜索骨架屏（搜索中）：shadcn-vue Skeleton -->
+            <div v-if="item.type === 'search' && item.data?.searching" class="activity-section">
+              <div class="activity-label search-query-animated">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="activity-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <span>搜索&nbsp;</span>
+                <span class="activity-query">{{ item.data.query }}</span>
+              </div>
+              <div class="flex gap-2 mt-2">
+                <Skeleton v-for="si in 2" :key="`skeleton-${si}`" class="h-16 w-40 rounded-md" />
+              </div>
+            </div>
+
+            <!-- 搜索结果卡片（DeerFlow 风格方形卡片） -->
+            <div v-else-if="item.type === 'search' && item.data?.results" class="activity-section">
+              <div class="activity-label">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="activity-icon"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+                <span>搜索&nbsp;</span>
+                <span class="activity-query">{{ item.data.query }}</span>
+              </div>
+              <ul class="card-grid">
+                <li
+                  v-for="(r, ri) in item.data.results.slice(0, 8)"
+                  :key="'result-' + ri"
+                  class="search-result-card"
+                  :style="`animation: card-in 0.15s ease-out both; animation-delay: ${Math.min(ri * 50, 300)}ms`"
+                >
+                  <a class="search-result-card-inner" :href="r.url" target="_blank" rel="noopener">
+                    <img class="card-tile-favicon" :src="`https://www.google.com/s2/favicons?domain=${r.domain}&sz=16`" :alt="r.domain" width="16" height="16" />
+                    <span class="search-result-card-title">{{ r.title }}</span>
+                  </a>
+                </li>
+              </ul>
             </div>
 
             <!-- 爬取完成卡片 -->
-            <div v-else-if="item.type === 'crawl' && item.data" class="progress-log-item crawl">
-              <div class="crawl-block">
-                <span class="crawl-prefix">$ crawl</span>
-                <a class="crawl-link" :href="item.data.url || '#'" target="_blank" rel="noopener">
-                  {{ item.data.title || item.data.url || '未知页面' }}
-                </a>
-                <span v-if="item.data.contentLength" class="crawl-size">→ {{ (item.data.contentLength / 1024).toFixed(1) }}KB ✓</span>
-                <span v-else-if="item.data.count" class="crawl-size">→ {{ item.data.count }} 篇 ✓</span>
+            <div v-else-if="item.type === 'crawl' && item.data" class="activity-section">
+              <div class="activity-label search-query-animated">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="activity-icon"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                <span>正在阅读</span>
               </div>
+              <ul class="card-grid">
+                <li class="card-tile" style="animation: card-in 0.15s ease-out both">
+                  <a class="card-tile-inner" :href="item.data.url || '#'" target="_blank" rel="noopener">
+                    <img v-if="item.data.url" class="card-tile-favicon" :src="`https://www.google.com/s2/favicons?domain=${new URL(item.data.url).hostname}&sz=16`" width="16" height="16" />
+                    <span class="card-tile-title">{{ item.data.title || item.data.url || '未知页面' }}</span>
+                  </a>
+                </li>
+              </ul>
             </div>
 
             <!-- 普通日志 -->
             <div
               v-else
-              v-memo="[item.message, item.type, item.detail]"
               class="progress-log-item"
               :class="item.type"
             >
@@ -159,13 +218,15 @@
                 <pre>{{ item.detail }}</pre>
               </div>
             </div>
-          </template>
-
-          <!-- 加载动画 -->
-          <div v-if="isLoading" class="progress-loading-line">
-            <span class="progress-spinner"></span>
-            <span class="progress-loading-text">{{ progressText }}</span>
           </div>
+        </TransitionGroup>
+
+        <!-- DeerFlow LoadingAnimation：三点弹跳 -->
+        <div v-if="isLoading" class="progress-loading-line">
+          <div class="deer-loading-dots">
+            <div></div><div></div><div></div>
+          </div>
+          <span class="progress-loading-text">{{ progressText }}</span>
         </div>
       </div>
 
@@ -180,7 +241,11 @@
 
 <script setup lang="ts">
 import { ref, computed, watch, nextTick } from 'vue'
-import { Square, ChevronRight, X } from 'lucide-vue-next'
+import { Square, ChevronRight, ChevronDown, X, Lightbulb } from 'lucide-vue-next'
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { Skeleton } from '@/components/ui/skeleton'
 
 const MAX_VISIBLE_LOGS = 100
 
@@ -245,6 +310,32 @@ watch(
     }
   }
 )
+
+// DeerFlow ThoughtBlock: 从日志中提取思考过程
+const thoughtLogs = computed(() => {
+  return props.progressItems
+    .filter(item => item.type === 'info' || item.type === 'stream' || item.type === 'warning')
+    .map(item => item.message)
+    .filter(msg => msg && !msg.startsWith('✅'))
+})
+
+// DeerFlow ResearchCard: 研究状态文字（RollingText 效果）
+const researchStatusText = computed(() => {
+  if (!props.outlineData || props.waitingForOutline) return ''
+  if (!props.isLoading) return '报告已生成'
+  // 根据最新日志判断当前阶段
+  const lastItem = props.progressItems[props.progressItems.length - 1]
+  if (!lastItem) return '正在研究...'
+  if (lastItem.type === 'search' && lastItem.data?.searching) return '正在搜索...'
+  if (lastItem.type === 'search' && lastItem.data?.results) return '搜索完成，正在分析...'
+  if (lastItem.type === 'crawl') return '正在阅读网页...'
+  if (lastItem.message?.includes('写作')) return '正在生成报告...'
+  if (lastItem.message?.includes('审阅') || lastItem.message?.includes('review')) return '正在审阅报告...'
+  return '正在研究...'
+})
+
+// DeerFlow ThoughtBlock: 折叠状态
+const thoughtExpanded = ref(false)
 
 const getLogIcon = (type: string) => {
   const icons: Record<string, string> = {
@@ -473,125 +564,29 @@ const getLogIcon = (type: string) => {
   user-select: none;
 }
 
-/* 大纲审批卡片 */
-.outline-approval-card {
-  margin-bottom: var(--space-md);
-  padding: var(--space-md);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-primary-light);
-  border-radius: var(--radius-md);
-}
+/* ThoughtBlock / PlanCard / ResearchCard 已由 shadcn-vue 组件 + Tailwind 类替代 */
 
-.outline-card-header {
+.research-status-text {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  margin-bottom: var(--space-sm);
-}
-
-.outline-card-title {
+  height: 2em;
+  overflow: hidden;
   font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-text-primary);
-}
-
-.outline-card-badge {
-  font-size: var(--font-size-xs);
-  padding: 2px var(--space-sm);
-  background: var(--color-warning-light);
-  color: var(--color-warning);
-  border-radius: var(--radius-sm);
-  font-weight: var(--font-weight-medium);
-}
-
-.outline-card-sections {
-  margin-bottom: var(--space-md);
-}
-
-.outline-section-item {
-  display: flex;
-  align-items: baseline;
-  gap: var(--space-sm);
-  padding: 2px 0;
-  font-size: var(--font-size-xs);
-}
-
-.outline-section-num {
-  color: var(--color-text-muted);
-  min-width: 20px;
-}
-
-.outline-section-title {
-  color: var(--color-terminal-keyword, var(--color-primary));
-}
-
-.outline-card-actions {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  padding-top: var(--space-sm);
-  border-top: 1px solid var(--color-border);
-  font-size: var(--font-size-xs);
-}
-
-.outline-prompt {
-  color: var(--color-warning);
-  font-weight: var(--font-weight-bold);
-}
-
-.outline-hint {
   color: var(--color-text-muted);
 }
 
-.outline-btn {
-  padding: var(--space-xs) var(--space-sm);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-sm);
-  background: transparent;
-  font-size: var(--font-size-xs);
-  font-family: var(--font-mono);
-  cursor: pointer;
-  transition: var(--transition-all);
+.rolling-text-inner {
+  display: block;
+  animation: rolling-in 0.3s ease-in-out;
 }
 
-.outline-btn-accept {
-  color: var(--color-success);
-  border-color: var(--color-success);
+@keyframes rolling-in {
+  from { opacity: 0; transform: translateY(100%); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.outline-btn-accept:hover {
-  background: var(--color-success-light);
-}
-
-.outline-btn-edit {
-  color: var(--color-text-secondary);
-}
-
-.outline-btn-edit:hover {
-  background: var(--color-bg-input);
-}
-
-/* 大纲已确认 */
-.outline-confirmed-card {
-  display: flex;
-  align-items: center;
-  gap: var(--space-sm);
-  margin-bottom: var(--space-md);
-  padding: var(--space-sm) var(--space-md);
-  background: var(--color-bg-elevated);
-  border: 1px solid var(--color-success-light);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-xs);
-}
-
-.outline-confirmed-icon {
-  color: var(--color-success);
-  font-weight: var(--font-weight-bold);
-}
-
-.outline-confirmed-text {
-  color: var(--color-text-secondary);
-}
+/* （旧大纲样式已被 PlanCard / ResearchCard 替代） */
 
 /* 文章预览 */
 .progress-preview-container {
@@ -619,6 +614,7 @@ const getLogIcon = (type: string) => {
 }
 
 .progress-logs-container {
+  position: relative;
   height: 100%;
   max-height: 400px;
   overflow-y: auto;
@@ -752,21 +748,33 @@ const getLogIcon = (type: string) => {
   font-size: var(--font-size-xs);
 }
 
-.progress-spinner {
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--color-border);
-  border-top-color: var(--color-primary);
-  border-radius: var(--radius-full);
-  animation: spin 0.8s linear infinite;
+/* DeerFlow LoadingAnimation：三点弹跳 */
+.deer-loading-dots {
+  display: flex;
 }
 
-@keyframes spin {
-  from {
-    transform: rotate(0deg);
-  }
+.deer-loading-dots > div {
+  width: 8px;
+  height: 8px;
+  margin: 2px 4px;
+  border-radius: 50%;
+  background-color: #a3a1a1;
+  opacity: 1;
+  animation: deer-bounce 0.5s infinite alternate;
+}
+
+.deer-loading-dots > div:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.deer-loading-dots > div:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes deer-bounce {
   to {
-    transform: rotate(360deg);
+    opacity: 0.1;
+    transform: translateY(-8px);
   }
 }
 
@@ -824,6 +832,28 @@ const getLogIcon = (type: string) => {
   }
 }
 
+/* DeerFlow ScrollContainer 滚动阴影 */
+.scroll-shadow {
+  position: sticky;
+  left: 0;
+  right: 0;
+  height: 40px;
+  z-index: 10;
+  pointer-events: none;
+}
+
+.scroll-shadow-top {
+  top: 0;
+  background: linear-gradient(to top, transparent, var(--color-bg-base));
+  margin-bottom: -40px;
+}
+
+.scroll-shadow-bottom {
+  bottom: 0;
+  background: linear-gradient(to bottom, transparent, var(--color-bg-base));
+  margin-top: -40px;
+}
+
 /* Scrollbar styling */
 .progress-logs-container::-webkit-scrollbar {
   width: 8px;
@@ -842,91 +872,180 @@ const getLogIcon = (type: string) => {
   background: var(--color-border-hover);
 }
 
-/* 搜索结果卡片 */
-.search-results-block {
-  padding: var(--space-xs) 0;
+/* === DeerFlow 风格活动区块 === */
+.activity-section {
+  margin-top: var(--space-md);
+  padding-left: var(--space-md);
 }
 
-.search-query {
-  font-size: var(--font-size-xs);
-  color: var(--color-terminal-keyword, var(--color-primary));
-  margin-bottom: var(--space-xs);
+.activity-section + .activity-section {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-lg);
+  margin-top: var(--space-lg);
 }
 
-.search-tree {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-left: var(--space-sm);
-  border-left: 1px solid var(--color-text-muted, var(--color-border));
-}
-
-.search-card {
+.activity-label {
   display: flex;
   align-items: center;
-  gap: var(--space-xs);
-  padding: 3px var(--space-xs);
-  font-size: var(--font-size-xs);
-  color: var(--color-text-secondary);
-  text-decoration: none;
-  border-radius: var(--radius-sm);
-  transition: background 0.15s;
-  overflow: hidden;
-}
-
-.search-card:hover {
-  background: var(--color-bg-input);
+  font-weight: 500;
+  font-style: italic;
+  font-size: var(--font-size-sm);
   color: var(--color-text-primary);
+  margin-bottom: var(--space-sm);
 }
 
-.search-card-index {
-  color: var(--color-text-muted, var(--color-border));
+.activity-icon {
+  margin-right: var(--space-sm);
   flex-shrink: 0;
-  width: 24px;
 }
 
-.search-card-favicon {
-  flex-shrink: 0;
-  border-radius: 2px;
-}
-
-.search-card-domain {
-  color: var(--color-terminal-string, var(--color-success));
-  flex-shrink: 0;
-  min-width: 80px;
-}
-
-.search-card-title {
+.activity-query {
+  max-width: 300px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-@keyframes card-in {
-  from {
-    opacity: 0;
-    transform: translateY(4px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-/* 爬取卡片 */
-.crawl-block {
+/* 方形卡片网格（对齐 DeerFlow h-40 w-40 flex-wrap gap-4） */
+.card-grid {
   display: flex;
-  align-items: center;
-  gap: var(--space-xs);
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  padding-right: var(--space-md);
+}
+
+.card-tile {
+  width: 160px;
+  height: 160px;
+}
+
+.card-tile-inner {
+  display: flex;
+  gap: var(--space-sm);
+  width: 100%;
+  height: 100%;
+  padding: var(--space-sm);
+  background: var(--color-muted);
+  border-radius: var(--radius-md);
   font-size: var(--font-size-xs);
-  padding: var(--space-xs) 0;
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  overflow: hidden;
+  transition: background 0.15s;
 }
 
-.crawl-prefix {
-  color: var(--color-terminal-keyword, var(--color-primary));
+.card-tile-inner:hover {
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+}
+
+.card-tile-favicon {
   flex-shrink: 0;
+  margin-top: 2px;
+  border-radius: 2px;
 }
 
+.card-tile-title {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* 骨架屏已由 shadcn-vue Skeleton 替代 */
+
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* framer-motion 风格：TransitionGroup 入场/退场动画 */
+.log-item-enter-active {
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+.log-item-leave-active {
+  transition: opacity 0.15s ease-in, transform 0.15s ease-in;
+}
+
+.log-item-enter-from {
+  opacity: 0;
+  transform: translateY(12px);
+}
+
+.log-item-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.log-item-move {
+  transition: transform 0.2s ease;
+}
+
+@keyframes skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* DeerFlow RainbowText：明暗闪烁（textShine） */
+.search-query-animated {
+  background: linear-gradient(
+    to right,
+    rgba(var(--color-text-rgb, 100, 100, 100), 0.3) 15%,
+    rgba(var(--color-text-rgb, 100, 100, 100), 0.75) 35%,
+    rgba(var(--color-text-rgb, 100, 100, 100), 0.75) 65%,
+    rgba(var(--color-text-rgb, 100, 100, 100), 0.3) 85%
+  );
+  background-size: 500% auto;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  animation: text-shine 2s ease-in-out infinite alternate;
+}
+
+@keyframes text-shine {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+
+/* DeerFlow 风格：搜索结果方形卡片 */
+.search-result-card {
+  max-width: 160px;
+}
+
+.search-result-card-inner {
+  display: flex;
+  gap: var(--space-sm);
+  width: 100%;
+  padding: var(--space-sm);
+  background: var(--color-muted);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  text-decoration: none;
+  transition: background 0.15s;
+}
+
+.search-result-card-inner:hover {
+  background: var(--color-bg-input);
+  color: var(--color-text-primary);
+}
+
+.search-result-card-title {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+/* 保留旧爬取样式兼容 */
 .crawl-link {
   color: var(--color-terminal-string, var(--color-success));
   text-decoration: none;

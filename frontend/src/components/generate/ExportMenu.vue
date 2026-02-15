@@ -61,6 +61,8 @@ const formats = [
   { id: 'markdown', label: 'Markdown', ext: '.md' },
   { id: 'html', label: 'HTML', ext: '.html' },
   { id: 'text', label: '纯文本', ext: '.txt' },
+  { id: 'pdf', label: 'PDF', ext: '.pdf' },
+  { id: 'word', label: 'Word', ext: '.docx' },
 ]
 
 const toggleMenu = () => {
