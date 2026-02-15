@@ -940,6 +940,7 @@ class BlogService:
                     'sse_logger_names': sse_logger_names,
                 }
                 # 不清理日志处理器，resume 时还需要
+                _interrupted = True
                 return
 
             # 获取最终状态
@@ -1159,8 +1160,8 @@ class BlogService:
                 })
             update_queue_status(task_id, "failed", error_msg=str(e))
         finally:
-            # 清理日志处理器
-            if sse_handler:
+            # 清理日志处理器（interrupt 暂停时不清理，留给 _run_resume）
+            if sse_handler and not locals().get('_interrupted'):
                 for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
     
