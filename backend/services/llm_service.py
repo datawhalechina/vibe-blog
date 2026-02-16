@@ -8,6 +8,8 @@ import threading
 import time
 from typing import Optional, List, Dict, Any
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 # 全局请求限流器：防止并发请求触发 API 速率限制
@@ -106,6 +108,10 @@ class LLMService:
                 )
             elif self._openai_api_key:
                 from langchain_openai import ChatOpenAI
+                no_proxy_client = httpx.Client(
+                    proxy=None,
+                    timeout=httpx.Timeout(timeout=300.0, connect=10.0),
+                )
                 return ChatOpenAI(
                     model=model_name,
                     api_key=self._openai_api_key,
@@ -113,6 +119,7 @@ class LLMService:
                     temperature=0.7,
                     max_tokens=self.max_tokens,
                     max_retries=6,
+                    http_client=no_proxy_client,
                 )
             else:
                 logger.warning(f"未配置有效的 API Key，无法创建模型: {model_name}")
