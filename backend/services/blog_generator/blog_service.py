@@ -868,6 +868,20 @@ class BlogService:
                                 }
                             })
                         
+                        elif node_name == 'deepen_content' and state.get('sections'):
+                            # 内容深化完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',  # 深化是整体更新，不是增量
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'deepen_complete',
+                                'message': f'内容深化完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
                         elif node_name == 'coder' and state.get('code_blocks'):
                             # 代码生成结果
                             code_blocks = state.get('code_blocks', [])
@@ -888,6 +902,34 @@ class BlogService:
                                     'images_count': len(images),
                                     'message': f'配图描述生成完成: {len(images)} 张'
                                 }
+                            })
+                        
+                        elif node_name == 'revision' and state.get('sections'):
+                            # 修订完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'revision_complete',
+                                'message': f'内容修订完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
+                        elif node_name == 'humanizer' and state.get('sections'):
+                            # 去 AI 味完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'humanizer_complete',
+                                'message': f'文风优化完成，当前总字数: {len(accumulated_md)}'
                             })
                         
                         elif node_name == 'reviewer':
@@ -1311,6 +1353,48 @@ class BlogService:
                                     })
                                 completed_sections = new_count
 
+                        elif node_name == 'deepen_content' and state.get('sections'):
+                            # 内容深化完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',  # 深化是整体更新，不是增量
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'deepen_complete',
+                                'message': f'内容深化完成，当前总字数: {len(accumulated_md)}'
+                            })
+
+                        elif node_name == 'revision' and state.get('sections'):
+                            # 修订完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'revision_complete',
+                                'message': f'内容修订完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
+                        elif node_name == 'humanizer' and state.get('sections'):
+                            # 去 AI 味完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'humanizer_complete',
+                                'message': f'文风优化完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
                         elif node_name == 'reviewer':
                             review_score = state.get('review_score', 0)
                             review_passed = state.get('review_passed', False)
