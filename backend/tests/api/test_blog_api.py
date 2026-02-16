@@ -592,7 +592,7 @@ class TestConfirmOutlineAPI:
 
     def test_confirm_outline_accept(self, client, mock_blog_service):
         """测试接受大纲"""
-        mock_blog_service.confirm_outline.return_value = True
+        mock_blog_service.resume_generation.return_value = True
 
         response = client.post('/api/tasks/task-123/confirm-outline', json={
             'action': 'accept'
@@ -601,13 +601,13 @@ class TestConfirmOutlineAPI:
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
-        mock_blog_service.confirm_outline.assert_called_once_with(
+        mock_blog_service.resume_generation.assert_called_once_with(
             'task-123', action='accept', outline=None
         )
 
     def test_confirm_outline_edit(self, client, mock_blog_service):
         """测试编辑大纲"""
-        mock_blog_service.confirm_outline.return_value = True
+        mock_blog_service.resume_generation.return_value = True
         modified_outline = {
             'sections': [
                 {'title': 'Section 1', 'description': 'Desc 1'},
@@ -623,7 +623,7 @@ class TestConfirmOutlineAPI:
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
-        mock_blog_service.confirm_outline.assert_called_once_with(
+        mock_blog_service.resume_generation.assert_called_once_with(
             'task-123', action='edit', outline=modified_outline
         )
 
@@ -639,7 +639,7 @@ class TestConfirmOutlineAPI:
 
     def test_confirm_outline_task_not_found(self, client, mock_blog_service):
         """测试任务不存在返回 404"""
-        mock_blog_service.confirm_outline.return_value = False
+        mock_blog_service.resume_generation.return_value = False
 
         response = client.post('/api/tasks/nonexistent/confirm-outline', json={
             'action': 'accept'
