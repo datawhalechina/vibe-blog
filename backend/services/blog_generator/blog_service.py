@@ -423,6 +423,10 @@ class BlogService:
                 
             def emit(self, record):
                 if self.task_manager and record.name.startswith('services.blog_generator'):
+                    # 队列已销毁则自动移除自身，防止 handler 泄漏
+                    if not self.task_manager.get_queue(self.task_id):
+                        logging.getLogger(record.name).removeHandler(self)
+                        return
                     msg = self.format(record)
                     self.task_manager.send_event(self.task_id, 'log', {
                         'level': record.levelname,

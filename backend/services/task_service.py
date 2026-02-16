@@ -92,7 +92,7 @@ class TaskManager:
             })
             logger.debug(f"SSE 事件已入队 [{task_id}]: {event}")
         else:
-            logger.warning(f"SSE 队列不存在 [{task_id}]: {event}")
+            logger.debug(f"SSE 队列不存在 [{task_id}]: {event}")
     
     def send_progress(self, task_id: str, stage: str, progress: int, message: str, **extra):
         """发送进度更新"""
