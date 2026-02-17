@@ -204,7 +204,7 @@
               <ul class="flex flex-wrap gap-4 list-none p-0 m-0">
                 <li class="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <a class="flex gap-2 h-40 w-40 p-3 bg-accent rounded-xl text-xs text-muted-foreground no-underline overflow-hidden transition-colors hover:bg-muted hover:text-foreground" :href="item.data.url || '#'" target="_blank" rel="noopener">
-                    <img v-if="item.data.url" class="shrink-0 mt-0.5 rounded-sm" :src="`https://www.google.com/s2/favicons?domain=${new URL(item.data.url).hostname}&sz=16`" width="16" height="16" />
+                    <img v-if="item.data.url && getHostname(item.data.url)" class="shrink-0 mt-0.5 rounded-sm" :src="`https://www.google.com/s2/favicons?domain=${getHostname(item.data.url)}&sz=16`" width="16" height="16" />
                     <span class="overflow-hidden line-clamp-6 leading-relaxed break-words">{{ item.data.title || item.data.url || '未知页面' }}</span>
                   </a>
                 </li>
@@ -378,6 +378,18 @@ const getLogIcon = (type: string) => {
     'warning': '⚠'
   }
   return icons[type] || '○'
+}
+
+const getHostname = (url: string): string | null => {
+  try {
+    if (typeof URL !== 'undefined') {
+      return new URL(url).hostname
+    }
+    const match = url.match(/^https?:\/\/([^\/]+)/)
+    return match ? match[1] : null
+  } catch {
+    return null
+  }
 }
 </script>
 
