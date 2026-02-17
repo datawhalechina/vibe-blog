@@ -30,9 +30,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': path.resolve(__dirname, 'src'),
-      'jspdf': path.resolve(__dirname, '__tests__/__mocks__/jspdf.ts'),
-      'html2canvas': path.resolve(__dirname, '__tests__/__mocks__/html2canvas.ts'),
+      '@': path.resolve(__dirname, './src'),
+      'jspdf': path.resolve(__dirname, './__tests__/__mocks__/jspdf.ts'),
+      'html2canvas': path.resolve(__dirname, './__tests__/__mocks__/html2canvas.ts'),
     },
   },
 })
