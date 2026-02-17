@@ -6,13 +6,11 @@ import { describe, it, expect, vi, beforeAll, afterAll, afterEach } from 'vitest
 import { http, HttpResponse } from 'msw'
 import { setupServer } from 'msw/node'
 
-const API_BASE = 'http://localhost:5000'
-
 // 捕获请求
 let capturedRequest: any = null
 
 const handlers = [
-  http.post(`${API_BASE}/api/blog/enhance-topic`, async ({ request }) => {
+  http.post('/api/blog/enhance-topic', async ({ request }) => {
     capturedRequest = await request.json()
     return HttpResponse.json({
       success: true,
@@ -33,7 +31,7 @@ afterEach(() => {
 
 describe('Home.vue — enhance topic 流程', () => {
   it('should call enhance-topic API with topic string', async () => {
-    const response = await fetch(`${API_BASE}/api/blog/enhance-topic`, {
+    const response = await fetch('/api/blog/enhance-topic', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic: 'LangGraph' }),
@@ -47,7 +45,7 @@ describe('Home.vue — enhance topic 流程', () => {
   })
 
   it('should return enhanced topic different from original', async () => {
-    const response = await fetch(`${API_BASE}/api/blog/enhance-topic`, {
+    const response = await fetch('/api/blog/enhance-topic', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic: '简单主题' }),
@@ -60,7 +58,7 @@ describe('Home.vue — enhance topic 流程', () => {
 
   it('should handle API failure gracefully', async () => {
     server.use(
-      http.post(`${API_BASE}/api/blog/enhance-topic`, () => {
+      http.post('/api/blog/enhance-topic', () => {
         return HttpResponse.json(
           { success: false, error: 'LLM 调用失败' },
           { status: 500 }
@@ -68,7 +66,7 @@ describe('Home.vue — enhance topic 流程', () => {
       })
     )
 
-    const response = await fetch(`${API_BASE}/api/blog/enhance-topic`, {
+    const response = await fetch('/api/blog/enhance-topic', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ topic: 'test' }),
