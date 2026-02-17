@@ -66,6 +66,8 @@ class WriterAgent:
             llm_client: LLM 客户端
         """
         self.llm = llm_client
+        self.task_manager = None
+        self.task_id = None
 
         # 37.13 写作模板体系（可选）
         self._prompt_composer = None
@@ -171,9 +173,28 @@ class WriterAgent:
         logger.info(f"[Writer] ========== Prompt 结束 ==========")
         
         try:
-            response = self.llm.chat(
-                messages=[{"role": "user", "content": prompt}]
-            )
+            # 流式写作回调：当 task_manager 存在且 LLM 支持 chat_stream 时
+            has_stream = hasattr(self.llm, 'chat_stream') and self.task_manager and self.task_id
+            if has_stream:
+                section_title = section_outline.get('title', '')
+                accumulated = ""
+                def on_writing_chunk(delta, acc):
+                    nonlocal accumulated
+                    accumulated = acc
+                    self.task_manager.send_event(self.task_id, 'writing_chunk', {
+                        'section_title': section_title,
+                        'delta': delta,
+                        'accumulated': acc,
+                    })
+
+                response = self.llm.chat_stream(
+                    messages=[{"role": "user", "content": prompt}],
+                    on_chunk=on_writing_chunk,
+                )
+            else:
+                response = self.llm.chat(
+                    messages=[{"role": "user", "content": prompt}]
+                )
             
             return {
                 "id": section_outline.get('id', ''),

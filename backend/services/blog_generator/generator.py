@@ -15,6 +15,7 @@ def _should_use_parallel():
 
 from langgraph.graph import StateGraph, START, END
 from langgraph.checkpoint.memory import MemorySaver
+from langgraph.types import interrupt
 
 from .schemas.state import SharedState, create_initial_state
 from .style_profile import StyleProfile
@@ -247,6 +248,9 @@ class BlogGenerator:
     
     def _researcher_node(self, state: SharedState) -> SharedState:
         """素材收集节点"""
+        if state.get('skip_researcher'):
+            logger.info("=== Step 1: 素材收集（已跳过） ===")
+            return state
         logger.info("=== Step 1: 素材收集 ===")
         self._validate_layer("research", state)
         return self.researcher.run(state)
@@ -257,7 +261,33 @@ class BlogGenerator:
         self._validate_layer("structure", state)
         # 使用实例变量中的流式回调
         on_stream = getattr(self, '_outline_stream_callback', None)
-        return self.planner.run(state, on_stream=on_stream)
+        result = self.planner.run(state, on_stream=on_stream)
+
+        # 交互式模式：使用 LangGraph 原生 interrupt 暂停图执行
+        outline = result.get('outline') if isinstance(result, dict) else None
+        if outline and getattr(self, '_interactive', False):
+            sections = outline.get('sections', [])
+            interrupt_data = {
+                "type": "confirm_outline",
+                "title": outline.get("title", ""),
+                "sections": sections,
+                "sections_titles": [s.get("title", "") for s in sections],
+                "narrative_mode": outline.get("narrative_mode", ""),
+                "narrative_flow": outline.get("narrative_flow", {}),
+                "sections_narrative_roles": [s.get("narrative_role", "") for s in sections],
+            }
+            user_decision = interrupt(interrupt_data)
+
+            # 处理用户决策
+            if isinstance(user_decision, dict) and user_decision.get("action") == "edit":
+                edited_outline = user_decision.get("outline", outline)
+                logger.info(f"大纲已被用户修改: {edited_outline.get('title', '')}")
+                result['outline'] = edited_outline
+                result['sections'] = []  # 清空已有章节，重新写作
+            else:
+                logger.info("大纲已被用户确认")
+
+        return result
     
     def _writer_node(self, state: SharedState) -> SharedState:
         """内容撰写节点"""

@@ -49,7 +49,218 @@ class BlogService:
             knowledge_service=knowledge_service
         )
         self.generator.compile()
-    
+
+        # 101.113: 记录正在等待大纲确认的任务（用于 resume 时查找 config）
+        self._interrupted_tasks: Dict[str, Dict] = {}  # task_id -> {config, task_manager, ...}
+
+    def enhance_topic(self, topic: str, timeout: float = 3.0) -> str:
+        """
+        使用 LLM 优化用户输入的主题
+
+        Args:
+            topic: 用户原始输入
+            timeout: 超时秒数（超时则返回原始 topic）
+
+        Returns:
+            优化后的主题字符串
+        """
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "你是一个技术博客主题优化助手。用户会给你一个简短的技术主题，"
+                    "请将其优化为一个更具体、更有吸引力的博客标题。\n"
+                    "要求：\n"
+                    "1. 保留用户的核心意图\n"
+                    "2. 补充具体的技术细节或应用场景\n"
+                    "3. 使标题更适合作为一篇深度技术博客的标题\n"
+                    "4. 只返回优化后的标题文本，不要加引号或其他格式"
+                ),
+            },
+            {
+                "role": "user",
+                "content": topic,
+            },
+        ]
+        try:
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+                future = executor.submit(self.generator.llm.chat, messages, None, "enhance_topic")
+                result = future.result(timeout=timeout)
+            if result and result.strip():
+                enhanced = result.strip().strip('"\'《》「」')
+                return enhanced
+        except concurrent.futures.TimeoutError:
+            logger.warning(f"主题优化超时({timeout}s)，返回原始主题")
+        except Exception as e:
+            logger.warning(f"主题优化失败，返回原始主题: {e}")
+        return topic
+
+    def _get_flask_app(self):
+        """安全获取当前 Flask app 引用（用于 resume 线程）"""
+        try:
+            from flask import current_app
+            return current_app._get_current_object()
+        except Exception:
+            return None
+
+    def confirm_outline(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
+        """
+        确认大纲（兼容旧接口，内部转发到 resume_generation）
+
+        Args:
+            task_id: 任务 ID
+            action: 'accept' 或 'edit'
+            outline: 修改后的大纲（仅 action='edit' 时需要）
+
+        Returns:
+            是否成功
+        """
+        return self.resume_generation(task_id, action=action, outline=outline)
+
+    def resume_generation(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
+        """
+        恢复中断的生成任务（101.113 LangGraph interrupt 方案）
+
+        在后台线程中使用 Command(resume=...) 恢复图执行。
+
+        Args:
+            task_id: 任务 ID
+            action: 'accept' 或 'edit'
+            outline: 修改后的大纲（仅 action='edit' 时需要）
+
+        Returns:
+            是否成功启动恢复
+        """
+        task_info = self._interrupted_tasks.get(task_id)
+        if not task_info:
+            logger.warning(f"resume_generation: 任务 {task_id} 不在中断列表中")
+            return False
+
+        # 构建 resume 值
+        if action == 'edit' and outline:
+            resume_value = {"action": "edit", "outline": outline}
+        else:
+            resume_value = "accept"
+
+        # 在后台线程中恢复执行
+        def run_resume():
+            from langgraph.types import Command
+            token = task_id_context.set(task_id)
+            try:
+                config = task_info['config']
+                task_manager = task_info.get('task_manager')
+                app_ctx = task_info.get('app')
+
+                if app_ctx:
+                    with app_ctx.app_context():
+                        self._run_resume(
+                            task_id=task_id,
+                            resume_value=resume_value,
+                            config=config,
+                            task_manager=task_manager,
+                            task_info=task_info,
+                        )
+                else:
+                    self._run_resume(
+                        task_id=task_id,
+                        resume_value=resume_value,
+                        config=config,
+                        task_manager=task_manager,
+                        task_info=task_info,
+                    )
+            finally:
+                task_id_context.reset(token)
+                self._interrupted_tasks.pop(task_id, None)
+
+        ctx = copy_context()
+        thread = threading.Thread(target=ctx.run, args=(run_resume,), daemon=True)
+        thread.start()
+        return True
+
+    def evaluate_article(self, content: str, title: str = '', article_type: str = '') -> Dict[str, Any]:
+        """
+        评估文章质量（基础统计 + LLM 评分）
+
+        Args:
+            content: 文章 Markdown 内容
+            title: 文章标题
+            article_type: 文章类型
+
+        Returns:
+            评估结果字典
+        """
+        import re
+
+        # 基础统计（不依赖 LLM）
+        word_count = len(content)
+        citation_count = len(re.findall(r'\[.*?\]\(https?://.*?\)', content))
+        image_count = len(re.findall(r'!\[.*?\]\(.*?\)', content))
+        code_block_count = len(re.findall(r'```[\s\S]*?```', content))
+
+        base_result = {
+            'word_count': word_count,
+            'citation_count': citation_count,
+            'image_count': image_count,
+            'code_block_count': code_block_count,
+        }
+
+        # LLM 评估
+        try:
+            messages = [
+                {"role": "system", "content": "你是一个专业的文章质量评估专家。请对以下文章进行评估，返回 JSON 格式结果。"},
+                {"role": "user", "content": f"""请评估以下文章的质量，返回严格 JSON 格式：
+
+标题：{title}
+类型：{article_type}
+
+文章内容（前 3000 字）：
+{content[:3000]}
+
+请返回以下 JSON 格式（不要包含 markdown 代码块标记）：
+{{
+  "overall_score": 0-100 的整数,
+  "grade": "A+/A/A-/B+/B/B-/C+/C/C-/D/F 之一",
+  "scores": {{
+    "factual_accuracy": 0-100,
+    "completeness": 0-100,
+    "coherence": 0-100,
+    "relevance": 0-100,
+    "citation_quality": 0-100,
+    "writing_quality": 0-100
+  }},
+  "strengths": ["优点1", "优点2"],
+  "weaknesses": ["不足1"],
+  "suggestions": ["建议1"],
+  "summary": "一句话总结"
+}}"""},
+            ]
+            import json
+            result = self.generator.llm.chat(
+                messages,
+                response_format={"type": "json_object"},
+                caller="evaluate_article"
+            )
+            if result:
+                evaluation = json.loads(result)
+                evaluation.update(base_result)
+                return evaluation
+        except Exception as e:
+            logger.warning(f"LLM 评估失败，降级为基础统计: {e}")
+
+        # 降级结果
+        return {
+            **base_result,
+            'grade': 'N/A',
+            'overall_score': 0,
+            'scores': {
+                'factual_accuracy': 0, 'completeness': 0, 'coherence': 0,
+                'relevance': 0, 'citation_quality': 0, 'writing_quality': 0,
+            },
+            'strengths': [], 'weaknesses': [], 'suggestions': [],
+            'summary': 'LLM 评估不可用，仅提供基础统计',
+        }
+
     def generate_sync(
         self,
         topic: str,
@@ -94,6 +305,9 @@ class BlogService:
         generate_cover_video: bool = False,
         video_aspect_ratio: str = "16:9",
         custom_config: dict = None,
+        deep_thinking: bool = False,
+        background_investigation: bool = True,
+        interactive: bool = False,
         task_manager=None,
         app=None
     ):
@@ -113,6 +327,9 @@ class BlogService:
             image_style: 图片风格 ID
             generate_cover_video: 是否生成封面动画
             custom_config: 自定义配置（仅当 target_length='custom' 时使用）
+            deep_thinking: 是否启用深度思考模式
+            background_investigation: 是否启用背景调查（搜索）
+            interactive: 是否交互式模式（大纲确认后再写作）
             task_manager: 任务管理器
             app: Flask 应用实例
         """
@@ -137,6 +354,9 @@ class BlogService:
                             generate_cover_video=generate_cover_video,
                             video_aspect_ratio=video_aspect_ratio,
                             custom_config=custom_config,
+                            deep_thinking=deep_thinking,
+                            background_investigation=background_investigation,
+                            interactive=interactive,
                             task_manager=task_manager
                         )
                 else:
@@ -154,6 +374,9 @@ class BlogService:
                         generate_cover_video=generate_cover_video,
                         video_aspect_ratio=video_aspect_ratio,
                         custom_config=custom_config,
+                        deep_thinking=deep_thinking,
+                        background_investigation=background_investigation,
+                        interactive=interactive,
                         task_manager=task_manager
                     )
             finally:
@@ -180,6 +403,9 @@ class BlogService:
         generate_cover_video: bool = False,
         video_aspect_ratio: str = "16:9",
         custom_config: dict = None,
+        deep_thinking: bool = False,
+        background_investigation: bool = True,
+        interactive: bool = False,
         task_manager=None
     ):
         """
@@ -197,12 +423,62 @@ class BlogService:
                 
             def emit(self, record):
                 if self.task_manager and record.name.startswith('services.blog_generator'):
+                    # 队列已销毁则自动移除自身，防止 handler 泄漏
+                    if not self.task_manager.get_queue(self.task_id):
+                        logging.getLogger(record.name).removeHandler(self)
+                        return
                     msg = self.format(record)
                     self.task_manager.send_event(self.task_id, 'log', {
                         'level': record.levelname,
                         'logger': record.name.split('.')[-1],
                         'message': msg
                     })
+                    # 识别搜索日志，额外推送结构化 result 事件
+                    self._emit_structured_search_event(msg, record)
+
+            def _emit_structured_search_event(self, msg, record):
+                """从日志中识别搜索/爬取模式，推送结构化 result 事件"""
+                import re
+                import json as _json
+                try:
+                    # 搜索开始: "使用智谱 Web Search 搜索: xxx" 或 "启动智能知识源搜索"
+                    m = re.search(r'(?:Web Search 搜索|智能.*搜索)[：:]\s*(.+)', msg)
+                    if m:
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'search_started',
+                            'data': {'query': m.group(1).strip()}
+                        })
+                        return
+                    # 搜索请求参数: 包含 search_query 的 JSON
+                    if '请求参数' in msg and 'search_query' in msg:
+                        m2 = re.search(r'\{.*\}', msg)
+                        if m2:
+                            try:
+                                payload = _json.loads(m2.group(0))
+                                self.task_manager.send_event(self.task_id, 'result', {
+                                    'type': 'search_started',
+                                    'data': {'query': payload.get('search_query', '')}
+                                })
+                            except _json.JSONDecodeError:
+                                pass
+                        return
+                    # 深度抓取完成: "深度抓取完成: N 篇高质量素材"
+                    m3 = re.search(r'深度抓取完成[：:]\s*(\d+)', msg)
+                    if m3:
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'crawl_completed',
+                            'data': {'count': int(m3.group(1))}
+                        })
+                        return
+                    # 智能搜索完成: "智能搜索完成，使用搜索源: [...]"
+                    if '智能搜索完成' in msg:
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'search_completed',
+                            'data': {'message': msg}
+                        })
+                        return
+                except Exception:
+                    pass
         
         # 添加日志处理器
         sse_handler = None
@@ -238,6 +514,24 @@ class BlogService:
                 llm = self.generator.llm
                 llm.task_manager = task_manager
                 llm.task_id = task_id
+            except Exception:
+                pass
+
+        # 注入 task_manager 到 researcher、search_service、writer（101.03 SSE 事件推送）
+        if task_manager:
+            try:
+                researcher = self.generator.researcher
+                researcher.task_manager = task_manager
+                researcher.task_id = task_id
+                if researcher.search_service:
+                    researcher.search_service.task_manager = task_manager
+                    researcher.search_service.task_id = task_id
+            except Exception:
+                pass
+            try:
+                writer = self.generator.writer
+                writer.task_manager = task_manager
+                writer.task_id = task_id
             except Exception:
                 pass
 
@@ -305,6 +599,25 @@ class BlogService:
             # 注意：不要将函数放入 state，会导致 LangGraph checkpoint 序列化失败
             # 取消检查已在主循环中处理 (line 272)
             
+            # deep_thinking: 设置 LLM thinking mode（更深入推理，生成时间更长）
+            if deep_thinking:
+                try:
+                    self.generator.llm.thinking_enabled = True
+                    logger.info(f"深度思考模式已启用 [{task_id}]")
+                except Exception:
+                    logger.warning("LLM 不支持 thinking mode，忽略 deep_thinking 参数")
+            
+            # background_investigation=false: 跳过 researcher，直接从 planner 开始
+            if not background_investigation:
+                initial_state['skip_researcher'] = True
+                if task_manager:
+                    task_manager.send_event(task_id, 'progress', {
+                        'stage': 'researcher_skipped',
+                        'progress': 15,
+                        'message': '已跳过背景调查，直接开始规划'
+                    })
+                logger.info(f"背景调查已跳过 [{task_id}]")
+            
             # 设置大纲流式回调到 generator 实例
             def on_outline_stream(delta, accumulated):
                 if task_manager:
@@ -315,6 +628,9 @@ class BlogService:
                     })
             
             self.generator._outline_stream_callback = on_outline_stream
+            
+            # 101.113: 设置交互式标志，让 _planner_node 使用 interrupt()
+            self.generator._interactive = interactive
             
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
             
@@ -364,6 +680,7 @@ class BlogService:
                 # 检查任务是否被取消
                 if task_manager and task_manager.is_cancelled(task_id):
                     logger.info(f"任务已取消，停止生成: {task_id}")
+                    self._interrupted_tasks.pop(task_id, None)
                     task_manager.send_event(task_id, 'cancelled', {
                         'task_id': task_id,
                         'message': '任务已被用户取消'
@@ -406,6 +723,32 @@ class BlogService:
                                     'total_length': len(content)
                                 })
                             
+                            # 推送搜索结果卡片数据
+                            raw_results = state.get('search_results', [])
+                            if raw_results:
+                                from urllib.parse import urlparse
+                                card_results = []
+                                for r in raw_results[:10]:
+                                    url = r.get('url', '')
+                                    domain = ''
+                                    try:
+                                        domain = urlparse(url).hostname or ''
+                                    except Exception:
+                                        pass
+                                    card_results.append({
+                                        'url': url,
+                                        'title': r.get('title', ''),
+                                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:120],
+                                        'domain': domain,
+                                    })
+                                task_manager.send_event(task_id, 'result', {
+                                    'type': 'search_results',
+                                    'data': {
+                                        'query': state.get('topic', ''),
+                                        'results': card_results,
+                                    }
+                                })
+
                             task_manager.send_event(task_id, 'result', {
                                 'type': 'researcher_complete',
                                 'data': {
@@ -432,9 +775,13 @@ class BlogService:
                                     'narrative_mode': outline.get('narrative_mode', ''),
                                     'narrative_flow': outline.get('narrative_flow', {}),
                                     'sections_narrative_roles': [s.get('narrative_role', '') for s in sections],
-                                    'message': f'大纲生成完成: {outline.get("title", "")} ({len(sections)} 章节)'
+                                    'message': f'大纲生成完成: {outline.get("title", "")} ({len(sections)} 章节)',
+                                    'interactive': interactive,
                                 }
                             })
+
+                            # 101.113: 交互式模式下，interrupt() 在 _planner_node 中触发
+                            # 图会自动暂停，stream 循环结束后在下方检测 interrupt 状态
                         
                         elif node_name == 'writer' and state.get('sections'):
                             # 章节撰写进度
@@ -453,6 +800,16 @@ class BlogService:
                                             'content_length': len(section.get('content', '')),
                                             'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
                                         }
+                                    })
+                                    # 发送 writing_chunk 事件：累积所有已完成章节的 markdown
+                                    accumulated_md = ''
+                                    for j in range(i + 1):
+                                        s = sections[j]
+                                        accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                                    task_manager.send_event(task_id, 'writing_chunk', {
+                                        'section_index': i + 1,
+                                        'delta': section.get('content', ''),
+                                        'accumulated': accumulated_md.strip(),
                                     })
                                 completed_sections = new_count
                         
@@ -511,6 +868,20 @@ class BlogService:
                                 }
                             })
                         
+                        elif node_name == 'deepen_content' and state.get('sections'):
+                            # 内容深化完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',  # 深化是整体更新，不是增量
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'deepen_complete',
+                                'message': f'内容深化完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
                         elif node_name == 'coder' and state.get('code_blocks'):
                             # 代码生成结果
                             code_blocks = state.get('code_blocks', [])
@@ -531,6 +902,34 @@ class BlogService:
                                     'images_count': len(images),
                                     'message': f'配图描述生成完成: {len(images)} 张'
                                 }
+                            })
+                        
+                        elif node_name == 'revision' and state.get('sections'):
+                            # 修订完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'revision_complete',
+                                'message': f'内容修订完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
+                        elif node_name == 'humanizer' and state.get('sections'):
+                            # 去 AI 味完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'humanizer_complete',
+                                'message': f'文风优化完成，当前总字数: {len(accumulated_md)}'
                             })
                         
                         elif node_name == 'reviewer':
@@ -557,8 +956,49 @@ class BlogService:
                                 }
                             })
             
+            # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认）
+            snapshot = self.generator.app.get_state(config)
+            if snapshot.next:  # 图还有未完成的节点 → 被 interrupt 暂停了
+                logger.info(f"图执行被 interrupt 暂停，等待用户确认大纲 [{task_id}]")
+                # 提取 interrupt 数据
+                interrupt_value = None
+                if snapshot.tasks:
+                    for task in snapshot.tasks:
+                        if hasattr(task, 'interrupts') and task.interrupts:
+                            interrupt_value = task.interrupts[0].value
+                            break
+
+                # 发送 outline_ready 事件
+                if task_manager and interrupt_value and interrupt_value.get('type') == 'confirm_outline':
+                    task_manager.send_event(task_id, 'outline_ready', {
+                        'title': interrupt_value.get('title', ''),
+                        'sections': interrupt_value.get('sections', []),
+                        'sections_titles': interrupt_value.get('sections_titles', []),
+                    })
+
+                # 保存任务信息，供 resume_generation 使用
+                self._interrupted_tasks[task_id] = {
+                    'config': config,
+                    'task_manager': task_manager,
+                    'app': self._get_flask_app(),  # Flask app 引用，供 resume 线程使用
+                    'topic': topic,
+                    'article_type': article_type,
+                    'target_length': target_length,
+                    'interactive': interactive,
+                    'generate_cover_video': generate_cover_video,
+                    'video_aspect_ratio': video_aspect_ratio,
+                    'article_config': article_config,
+                    'token_tracker': token_tracker,
+                    'task_log': task_log,
+                    'sse_handler': sse_handler,
+                    'sse_logger_names': sse_logger_names,
+                }
+                # 不清理日志处理器，resume 时还需要
+                _interrupted = True
+                return
+
             # 获取最终状态
-            final_state = self.generator.app.get_state(config).values
+            final_state = snapshot.values
             
             # 生成封面架构图（基于全文内容）
             outline = final_state.get('outline') or {}
@@ -632,6 +1072,27 @@ class BlogService:
                     section_images=section_images
                 )
             
+            # 构建 citations 列表（合并 search_results + top_references，URL 去重）
+            citations = []
+            seen_urls = set()
+            for src_list_key in ('search_results', 'top_references'):
+                for r in (final_state.get(src_list_key) or []):
+                    url = r.get('url') or r.get('source', '')
+                    if not url or url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    try:
+                        from urllib.parse import urlparse
+                        domain = urlparse(url).hostname or ''
+                    except Exception:
+                        domain = ''
+                    citations.append({
+                        'url': url,
+                        'title': r.get('title', ''),
+                        'domain': domain,
+                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
+                    })
+
             # 保存历史记录（使用包含封面图的 markdown）
             try:
                 from services.database_service import get_db_service
@@ -653,7 +1114,8 @@ class BlogService:
                     target_sections_count=article_config.get('sections_count'),
                     target_images_count=article_config.get('images_count'),
                     target_code_blocks_count=article_config.get('code_blocks_count'),
-                    target_word_count=article_config.get('target_word_count')
+                    target_word_count=article_config.get('target_word_count'),
+                    citations=json.dumps(citations, ensure_ascii=False) if citations else None
                 )
                 logger.info(f"历史记录已保存: {task_id}")
                 
@@ -716,7 +1178,8 @@ class BlogService:
                     'code_blocks_count': len(final_state.get('code_blocks', [])),
                     'review_score': final_state.get('review_score', 0),
                     'saved_path': saved_path,
-                    'cover_video': cover_video_path
+                    'cover_video': cover_video_path,
+                    'citations': citations
                 }
                 # 注入 token 用量摘要（37.34 + 37.31）
                 if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':
@@ -751,11 +1214,434 @@ class BlogService:
                 })
             update_queue_status(task_id, "failed", error_msg=str(e))
         finally:
-            # 清理日志处理器
-            if sse_handler:
+            # 清理日志处理器（interrupt 暂停时不清理，留给 _run_resume）
+            if sse_handler and not locals().get('_interrupted'):
                 for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
     
+    def _run_resume(
+        self,
+        task_id: str,
+        resume_value,
+        config: dict,
+        task_manager=None,
+        task_info: dict = None,
+    ):
+        """
+        101.113: 恢复中断的图执行（Command(resume=...)），然后执行后处理。
+
+        复用 _run_generation 中 stream 循环后的逻辑（封面图、保存历史等）。
+        """
+        import time
+        import logging
+        from langgraph.types import Command
+
+        task_info = task_info or {}
+        topic = task_info.get('topic', '')
+        article_type = task_info.get('article_type', 'tutorial')
+        target_length = task_info.get('target_length', 'medium')
+        interactive = task_info.get('interactive', False)
+        generate_cover_video = task_info.get('generate_cover_video', False)
+        video_aspect_ratio = task_info.get('video_aspect_ratio', '16:9')
+        article_config = task_info.get('article_config', {})
+        token_tracker = task_info.get('token_tracker')
+        task_log = task_info.get('task_log')
+        sse_handler = task_info.get('sse_handler')
+        sse_logger_names = task_info.get('sse_logger_names', [])
+
+        # 发送确认事件
+        if task_manager:
+            if isinstance(resume_value, dict) and resume_value.get('action') == 'edit':
+                task_manager.send_event(task_id, 'progress', {
+                    'stage': 'outline_edited',
+                    'message': '大纲已修改，开始写作'
+                })
+            else:
+                task_manager.send_event(task_id, 'progress', {
+                    'stage': 'outline_confirmed',
+                    'message': '大纲已确认，开始写作'
+                })
+
+        # 阶段进度映射（复用）
+        stage_progress = {
+            'planner': (25, '正在生成大纲...'),
+            'writer': (45, '正在撰写内容...'),
+            'check_knowledge': (52, '正在检查知识空白...'),
+            'refine_search': (54, '正在补充搜索...'),
+            'enhance_with_knowledge': (56, '正在增强内容...'),
+            'questioner': (60, '正在检查内容深度...'),
+            'deepen_content': (65, '正在深化内容...'),
+            'coder': (75, '正在生成代码示例...'),
+            'artist': (85, '正在生成配图...'),
+            'reviewer': (90, '正在审核质量...'),
+            'humanizer': (93, '正在优化文风...'),
+            'revision': (95, '正在修订内容...'),
+            'fact_checker': (96, '正在事实核查...'),
+            'consistency_check': (97, '正在一致性检查...'),
+            'assembler': (98, '正在组装文档...'),
+        }
+
+        completed_sections = 0
+
+        try:
+            # 使用 Command(resume=...) 恢复图执行
+            for event in self.generator.app.stream(Command(resume=resume_value), config):
+                # 检查任务是否被取消
+                if task_manager and task_manager.is_cancelled(task_id):
+                    logger.info(f"任务已取消，停止生成: {task_id}")
+                    task_manager.send_event(task_id, 'cancelled', {
+                        'task_id': task_id,
+                        'message': '任务已被用户取消'
+                    })
+                    return
+
+                for node_name, state in event.items():
+                    progress_info = stage_progress.get(node_name, (50, f'正在执行 {node_name}...'))
+
+                    if task_manager:
+                        task_manager.send_event(task_id, 'progress', {
+                            'stage': node_name,
+                            'progress': progress_info[0],
+                            'message': progress_info[1]
+                        })
+                        update_queue_progress(
+                            task_id, progress_info[0],
+                            stage=progress_info[1],
+                            detail=node_name,
+                        )
+
+                        # 如果是 edit，planner 会重新执行并输出新大纲
+                        if node_name == 'planner' and state.get('outline'):
+                            outline = state.get('outline', {})
+                            sections = outline.get('sections', [])
+                            task_manager.send_event(task_id, 'result', {
+                                'type': 'outline_complete',
+                                'data': {
+                                    'title': outline.get('title', ''),
+                                    'sections_count': len(sections),
+                                    'sections': sections,
+                                    'sections_titles': [s.get('title', '') for s in sections],
+                                    'message': f'大纲已确认: {outline.get("title", "")} ({len(sections)} 章节)',
+                                    'interactive': interactive,
+                                }
+                            })
+
+                        elif node_name == 'writer' and state.get('sections'):
+                            sections = state.get('sections', [])
+                            new_count = len(sections)
+                            if new_count > completed_sections:
+                                for i in range(completed_sections, new_count):
+                                    section = sections[i]
+                                    task_manager.send_event(task_id, 'result', {
+                                        'type': 'section_complete',
+                                        'data': {
+                                            'section_index': i + 1,
+                                            'title': section.get('title', ''),
+                                            'content': section.get('content', ''),
+                                            'content_length': len(section.get('content', '')),
+                                            'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
+                                        }
+                                    })
+                                    accumulated_md = ''
+                                    for j in range(i + 1):
+                                        s = sections[j]
+                                        accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                                    task_manager.send_event(task_id, 'writing_chunk', {
+                                        'section_index': i + 1,
+                                        'delta': section.get('content', ''),
+                                        'accumulated': accumulated_md.strip(),
+                                    })
+                                completed_sections = new_count
+
+                        elif node_name == 'deepen_content' and state.get('sections'):
+                            # 内容深化完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',  # 深化是整体更新，不是增量
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'deepen_complete',
+                                'message': f'内容深化完成，当前总字数: {len(accumulated_md)}'
+                            })
+
+                        elif node_name == 'revision' and state.get('sections'):
+                            # 修订完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'revision_complete',
+                                'message': f'内容修订完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
+                        elif node_name == 'humanizer' and state.get('sections'):
+                            # 去 AI 味完成后，发送更新后的章节内容
+                            sections = state.get('sections', [])
+                            accumulated_md = ''
+                            for i, s in enumerate(sections):
+                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
+                            task_manager.send_event(task_id, 'writing_chunk', {
+                                'section_index': len(sections),
+                                'delta': '',
+                                'accumulated': accumulated_md.strip(),
+                                'stage': 'humanizer_complete',
+                                'message': f'文风优化完成，当前总字数: {len(accumulated_md)}'
+                            })
+                        
+                        elif node_name == 'reviewer':
+                            review_score = state.get('review_score', 0)
+                            review_passed = state.get('review_passed', False)
+                            task_manager.send_event(task_id, 'result', {
+                                'type': 'reviewer_complete',
+                                'data': {
+                                    'score': review_score,
+                                    'passed': review_passed,
+                                    'message': f'质量审核完成: {review_score} 分 {"✅ 通过" if review_passed else "❌ 需修订"}'
+                                }
+                            })
+
+                        elif node_name == 'assembler':
+                            markdown = state.get('final_markdown', '')
+                            task_manager.send_event(task_id, 'result', {
+                                'type': 'assembler_complete',
+                                'data': {
+                                    'markdown_length': len(markdown),
+                                    'message': f'文档组装完成: {len(markdown)} 字'
+                                }
+                            })
+
+            # 获取最终状态
+            final_state = self.generator.app.get_state(config).values
+
+            # 封面图 + 保存历史 + 完成事件（复用 _run_generation 逻辑）
+            outline = final_state.get('outline') or {}
+            markdown_content = final_state.get('final_markdown', '')
+            image_style = final_state.get('image_style', '')
+            cover_image_result = self._generate_cover_image(
+                title=outline.get('title', topic),
+                topic=topic,
+                full_content=markdown_content,
+                task_manager=task_manager,
+                task_id=task_id,
+                image_style=image_style,
+                video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
+            )
+            cover_image_url = cover_image_result[0] if cover_image_result else None
+            cover_image_path = cover_image_result[1] if cover_image_result else None
+            article_summary = cover_image_result[2] if cover_image_result and len(cover_image_result) > 2 else None
+
+            markdown_with_cover = markdown_content
+            if cover_image_path and markdown_content:
+                title_str = outline.get('title', topic)
+                if cover_image_path.startswith('http'):
+                    cover_image_ref = cover_image_path
+                else:
+                    cover_filename = os.path.basename(cover_image_path)
+                    cover_image_ref = f"./images/{cover_filename}"
+                cover_section = f"\n![{title_str} - 架构图]({cover_image_ref})\n\n---\n\n"
+                lines = markdown_content.split('\n')
+                insert_idx = 0
+                for i, line in enumerate(lines):
+                    if line.startswith('## ') and i > 0:
+                        insert_idx = i
+                        break
+                if insert_idx > 0:
+                    lines.insert(insert_idx, cover_section)
+                    markdown_with_cover = '\n'.join(lines)
+                else:
+                    markdown_with_cover = cover_section + markdown_content
+
+            saved_path = None
+            if markdown_content:
+                saved_path = self._save_markdown(
+                    task_id=task_id,
+                    markdown=markdown_content,
+                    outline=outline,
+                    cover_image_path=cover_image_path
+                )
+
+            # 封面动画
+            cover_video_path = None
+            cover_video_enabled = os.environ.get('COVER_VIDEO_ENABLED', 'true').lower() == 'true'
+            if generate_cover_video and cover_image_url and cover_video_enabled:
+                section_images = final_state.get('section_images', [])
+                cover_video_path = self._generate_cover_video(
+                    history_id=task_id,
+                    cover_image_url=cover_image_url,
+                    video_aspect_ratio=video_aspect_ratio,
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    section_images=section_images
+                )
+
+            # 保存历史记录
+            try:
+                from services.database_service import get_db_service
+                import json
+                db_service = get_db_service()
+                
+                # 构建 citations（复用 _run_generation 逻辑）
+                citations = []
+                seen_urls = set()
+                for src_list_key in ('search_results', 'top_references'):
+                    for r in (final_state.get(src_list_key) or []):
+                        url = r.get('url') or r.get('source', '')
+                        if not url or url in seen_urls:
+                            continue
+                        seen_urls.add(url)
+                        try:
+                            from urllib.parse import urlparse
+                            domain = urlparse(url).hostname or ''
+                        except Exception:
+                            domain = ''
+                        citations.append({
+                            'url': url,
+                            'title': r.get('title', ''),
+                            'domain': domain,
+                            'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
+                        })
+                
+                db_service.save_history(
+                    history_id=task_id,
+                    topic=topic,
+                    article_type=article_type,
+                    target_length=target_length,
+                    markdown_content=markdown_with_cover,
+                    outline=json.dumps(final_state.get('outline') or {}, ensure_ascii=False),
+                    sections_count=len(final_state.get('sections', [])),
+                    code_blocks_count=len(final_state.get('code_blocks', [])),
+                    images_count=len(final_state.get('images', [])),
+                    review_score=final_state.get('review_score', 0),
+                    cover_image=cover_image_path,
+                    cover_video=cover_video_path,
+                    target_sections_count=article_config.get('sections_count'),
+                    target_images_count=article_config.get('images_count'),
+                    target_code_blocks_count=article_config.get('code_blocks_count'),
+                    target_word_count=article_config.get('target_word_count'),
+                    citations=json.dumps(citations, ensure_ascii=False) if citations else None
+                )
+                logger.info(f"历史记录已保存: {task_id}")
+
+                # 保存博客摘要
+                try:
+                    summary_to_save = article_summary
+                    if not summary_to_save:
+                        summary_to_save = extract_article_summary(
+                            llm_client=self.generator.llm,
+                            title=topic,
+                            content=markdown_with_cover,
+                            max_length=500
+                        )
+                    if summary_to_save:
+                        summary_to_save = summary_to_save[:500]
+                        db_service.update_history_summary(task_id, summary_to_save)
+                except Exception as e:
+                    logger.warning(f"保存博客摘要失败: {e}")
+            except Exception as e:
+                logger.warning(f"保存历史记录失败: {e}")
+
+            # Token 追踪
+            token_summary = None
+            if token_tracker:
+                try:
+                    logger.info(token_tracker.format_summary())
+                    token_summary = token_tracker.get_summary()
+                except Exception as e:
+                    logger.warning(f"Token 摘要生成失败: {e}")
+
+            # 任务日志
+            if task_log:
+                try:
+                    task_log.complete(
+                        score=final_state.get('review_score', 0),
+                        word_count=len(final_state.get('final_markdown', '')),
+                        revision_rounds=final_state.get('revision_count', 0),
+                    )
+                    if token_summary:
+                        task_log.token_summary = token_summary
+                    task_log.save()
+                    logger.info(task_log.get_summary())
+                except Exception as e:
+                    logger.warning(f"任务日志保存失败: {e}")
+
+            # 构建 citations
+            citations = []
+            seen_urls = set()
+            for src_list_key in ('search_results', 'top_references'):
+                for r in (final_state.get(src_list_key) or []):
+                    url = r.get('url') or r.get('source', '')
+                    if not url or url in seen_urls:
+                        continue
+                    seen_urls.add(url)
+                    try:
+                        from urllib.parse import urlparse
+                        domain = urlparse(url).hostname or ''
+                    except Exception:
+                        domain = ''
+                    citations.append({
+                        'url': url,
+                        'title': r.get('title', ''),
+                        'domain': domain,
+                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
+                    })
+
+            # 发送完成事件
+            if task_manager:
+                complete_data = {
+                    'success': True,
+                    'id': task_id,
+                    'markdown': markdown_with_cover,
+                    'outline': final_state.get('outline') or {},
+                    'sections_count': len(final_state.get('sections', [])),
+                    'images_count': len(final_state.get('images', [])),
+                    'code_blocks_count': len(final_state.get('code_blocks', [])),
+                    'review_score': final_state.get('review_score', 0),
+                    'saved_path': saved_path,
+                    'cover_video': cover_video_path,
+                    'citations': citations
+                }
+                if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':
+                    try:
+                        llm = self.generator.llm
+                        if hasattr(llm, 'token_tracker') and llm.token_tracker:
+                            complete_data['token_usage'] = llm.token_tracker.get_summary()
+                    except Exception:
+                        pass
+                task_manager.send_event(task_id, 'complete', complete_data)
+
+            logger.info(f"博客生成完成（resume）: {task_id}, 保存到: {saved_path}")
+            update_queue_status(
+                task_id, "completed",
+                word_count=len(final_state.get('final_markdown', '')),
+                image_count=len(final_state.get('images', [])),
+            )
+
+        except Exception as e:
+            logger.error(f"博客生成失败（resume）[{task_id}]: {e}", exc_info=True)
+            if task_log:
+                try:
+                    task_log.fail(str(e))
+                    task_log.save()
+                except Exception:
+                    pass
+            if task_manager:
+                task_manager.send_event(task_id, 'error', {
+                    'message': str(e),
+                    'recoverable': False
+                })
+            update_queue_status(task_id, "failed", error_msg=str(e))
+        finally:
+            if sse_handler:
+                for logger_name in sse_logger_names:
+                    logging.getLogger(logger_name).removeHandler(sse_handler)
+
     def _generate_cover_image(
         self,
         title: str,

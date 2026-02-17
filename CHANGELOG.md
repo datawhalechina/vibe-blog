@@ -4,9 +4,69 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-16
+
+### Added
+- 📋 **101.11 DeerFlow 前端交互全面对齐方案** — 系统梳理 DeerFlow vs vibe-blog 前端差异
+  - 宏观交互差异 8 维度对比（InputBox / ConversationStarter / 工具栏 / 多轮对话 / Settings / Replay / 主题 / 微交互）
+  - 深度研究推送样式差异 11 项（搜索骨架屏 / 搜索卡片 / 爬取卡片 / ThoughtBlock / PlanCard / ResearchCard / 活动排版 / 日志行 / 右栏工具栏 / QualityDialog / Tab）
+  - vibe-blog 优势特性 9 项保留清单（终端任务头 / 时间戳 / 最小化栏 / 章节颜色标记 / 引用悬浮 / 移动端响应 / prose 排版 / 6 维评估 / 前端导出）
+  - 可复用组件盘点（shadcn-vue 对照表 / 自定义组件 / Magic UI / lucide 图标 / Zustand→Pinia 映射）
+  - P0/P1/P2 实施清单（9 + 6 + 4 = 19 项）
+- 📋 **103.00 Vue → Next.js 改造成本评估** — 评估前端框架迁移成本（~19,766 行业务代码，6-10 天工时）
+
+---
+
 ## 2026-02-14
 
 ### Added
+- ✨ **后端 deep_thinking / background_investigation 逻辑** — `BlogService` 支持深度思考模式（LLM thinking mode）和跳过背景调查（skip_researcher）
+- ✨ **writing_chunk SSE 事件** — 章节写完后推送累积 markdown，前端可实时预览
+- ✨ **citations 字段持久化** — 合并 search_results + top_references（URL 去重），保存到历史记录
+- ✨ **Word 导出 API** — `POST /api/export/word`，Markdown → Word(.docx) 转换，支持标题/列表/引用/段落
+- ✨ **Generate 页面** — `/generate/:taskId` 路由 + `Generate.vue` 页面，集成 ProgressDrawer 实时预览
+- ✨ **useTaskStream composable** — SSE 连接 + 事件处理 + 大纲确认 + 预览节流
+- ✨ **useExport composable** — 多格式导出（Markdown/HTML/TXT/Word）
+- ✨ **citationMatcher 工具** — 前端引用链接匹配工具函数
+- ✨ **ProgressDrawer 搜索/爬取卡片** — 搜索结果卡片（favicon + 域名 + 标题，限 8 条）+ 爬取完成卡片（标题/URL/大小）+ 动画控制（前 6 张有动画，延迟上限 300ms）
+
+### Changed
+- 🔧 **enhance-topic 响应增加 original 字段** — `blog_routes.py` 返回原始 topic 便于前端对比
+- 🔧 **enhance_topic 3 秒超时保护** — `blog_service.py` 用 `concurrent.futures.ThreadPoolExecutor` + `future.result(timeout=3)` 防止 LLM 阻塞
+- 🔧 **enhance_topic 返回值去除引号/书名号** — `.strip('"\'《》「」')` 清理 LLM 输出格式
+- 🔧 **AdvancedOptionsPanel isLoading disabled** — 所有 select/checkbox 加 `:disabled="isLoading"` 防止生成中修改参数
+- 🔧 **ExportMenu 点击外部关闭菜单** — `onClickOutside` + `document.addEventListener('click')` 实现
+- 🔧 **CitationTooltip Teleport + 移动端隐藏** — 渲染到 body 避免 overflow 裁剪，移动端 `< 768px` 自动隐藏
+- 🔧 **CitationTooltip hover 延迟** — 200ms 延迟显示 + 100ms 延迟隐藏 + keep-visible/request-hide 事件
+- 🔧 **Generate.vue 移动端 Tab 栏** — 活动日志/文章预览 Tab 切换，`< 768px` 自适应
+- 🔧 **Generate.vue 双栏宽度比例** — 左栏 40% / 右栏 60%（原为固定 420px）
+- 🔧 **useExport 新增 PDF/Image 导出** — 动态 `import('jspdf')` + `import('html2canvas')` + `windowHeight` 长文章支持
+- 🔧 **Researcher SSE 事件推送** — `search_started`/`search_results`/`crawl_completed` 事件实时推送到前端
+- 🔧 **Writer 流式写作** — `chat_stream` + `writing_chunk` SSE 事件实时推送章节内容
+- 🔧 **大纲编辑确认** — `confirm_outline(action='edit')` 支持修改后大纲替换 state 重新写作
+- 🔧 **任务取消清理** — 取消时清理 `_outline_events`/`_outline_confirmations` 防止线程永久阻塞
+- 🔧 **Home.vue 导航** — 博客/Mini 任务创建成功后跳转到 Generate 页面，绘本任务保持原有 SSE 逻辑
+- 🔧 **vite.config.ts / tsconfig.json** — 添加 `@/` 路径别名
+- 🔧 **env.d.ts** — 添加 `.vue` 模块类型声明
+
+### Tests
+- ✅ **ProgressDrawer 搜索/爬取/动画测试** — 14 个新用例（搜索卡片 6 + 爬取卡片 4 + 混合渲染 1 + 动画控制 3）
+- ✅ **api.test.ts** — 3 个新用例（confirmOutline accept/edit + interactive 参数传递）
+- ✅ **AdvancedOptionsPanel interactive 测试** — 2 个新用例（checkbox 渲染 + emit）
+- ✅ **Home.toggles.test.ts** — 2 个新用例（deepThinking/backgroundInvestigation 参数传递到 API 请求体）
+- ✅ **后端 test_blog_api.py** — 新增 deep_thinking/background_investigation/interactive/confirm-outline/Word 导出测试
+- ✅ **Home.enhance.test.ts** — 3 个新用例（enhance-topic API 调用/成功替换/失败处理）
+- ✅ **citationMatcher.test.ts** — 引用匹配工具函数测试
+- ✅ **inlineParser.test.ts** — 4 个新用例（粗体/斜体/行内代码/链接解析）
+- ✅ **markdownParser.test.ts** — 5 个新用例（h1/h2/h3/列表/段落+空行跳过）
+- ✅ **useExport.test.ts** — 4 个新用例（Markdown/HTML/TXT 导出 + isDownloading 状态锁）
+- ✅ **throttle.test.ts** — 2 个新用例（100ms 节流 + 窗口内中间调用丢弃）
+- ✅ **sse-events.test.ts** — 5 个新用例（SSE 事件解析）
+- ✅ **useTaskStream.test.ts** — SSE 连接流程测试
+- ✅ **AdvancedOptionsPanel isLoading 测试** — 2 个新用例（disabled/not disabled）
+- ✅ **全量测试** — 26 文件 / 362 用例全部通过
+
+### Added (Cron 调度器重构)
 - ✨ **Cron 调度器重构** — 纯 Python 自驱动调度器替换 APScheduler，移植 OpenClaw 设计
   - `CronScheduler`：asyncio.call_later 自驱动循环，三种调度类型（cron/at/every）
   - `CronTimer`：最大 60s 唤醒间隔，卡死检测（>2h 自动清除）
@@ -27,7 +87,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **Dashboard 增强** — 定时任务卡片显示错误状态 + 重试按钮
 - ✅ 103 个单元测试全部通过（backoff 9 + models 10 + db 12 + schedule_calc 17 + timer 13 + executor 17 + scheduler 20 + migration 5）
 
-### Changed
+### Changed (Cron 调度器重构)
 - 🔄 `app.py` — SchedulerService → CronScheduler
 - 🔄 `scheduler_routes.py` — 适配新 CronScheduler API，响应包含 next_run_at/last_status/consecutive_errors
 - 🔄 `requirements.txt` — 新增 croniter>=6.0.0

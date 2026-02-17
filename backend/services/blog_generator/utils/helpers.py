@@ -223,7 +223,8 @@ def replace_placeholders(
             elif render_method == 'ai_image':
                 rendered_path = img.get('rendered_path') or 'placeholder.png'
                 caption = img.get('caption', '')
-                replacement = f"![{caption}]({rendered_path})\n\n*{caption}*"
+                # 只用 alt text，不再额外输出斜体 caption，避免与章节标题视觉重复
+                replacement = f"![{caption}]({rendered_path})"
             else:
                 rendered_path = img.get('rendered_path') or 'placeholder.png'
                 replacement = f"![{img.get('caption', '')}]({rendered_path})"

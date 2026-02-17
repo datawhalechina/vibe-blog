@@ -29,12 +29,23 @@
         <span class="code-prompt">$</span>
         <span class="code-command">find</span>
       </div>
-      <textarea
+      <TipTapEditor
         v-model="localTopic"
         class="code-input-textarea"
         placeholder="输入技术主题，如：LangGraph 入门教程、Redis 性能优化、Vue3 最佳实践..."
-        @keydown.enter.ctrl="handleGenerate"
-      ></textarea>
+        :disabled="isLoading"
+        @submit="handleGenerate"
+      />
+      <button
+        class="enhance-btn"
+        :class="{ enhancing: isEnhancing }"
+        :disabled="isEnhancing || !localTopic.trim() || isLoading"
+        @click="$emit('enhanceTopic')"
+        title="优化主题"
+      >
+        <Wand2 v-if="!isEnhancing" :size="16" />
+        <Loader v-else :size="16" class="enhance-spinner" />
+      </button>
       <button
         class="code-generate-btn"
         :disabled="isLoading || !localTopic.trim()"
@@ -46,6 +57,14 @@
         <span class="btn-text">{{ isLoading ? '生成中' : 'execute' }}</span>
       </button>
     </div>
+
+    <!-- Prompt 增强动画（对齐 DeerFlow input-box.tsx:156-200） -->
+    <Transition name="enhance-fade">
+      <div v-if="isEnhancing" class="enhance-overlay">
+        <div class="enhance-glow"></div>
+        <span v-for="i in 6" :key="i" class="enhance-particle" :style="`--delay: ${i * 0.2}s; --left: ${20 + i * 12}%`"></span>
+      </div>
+    </Transition>
 
     <!-- 已上传文档列表 -->
     <div v-if="uploadedDocuments.length > 0" class="code-input-docs">
@@ -110,7 +129,8 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { FileText, FileCheck, Loader, X, Rocket } from 'lucide-vue-next'
+import { FileText, FileCheck, Loader, X, Rocket, Wand2 } from 'lucide-vue-next'
+import TipTapEditor from './TipTapEditor.vue'
 
 interface UploadedDocument {
   id: string
@@ -125,6 +145,7 @@ interface Props {
   topic: string
   uploadedDocuments: UploadedDocument[]
   isLoading: boolean
+  isEnhancing: boolean
   showAdvancedOptions: boolean
 }
 
@@ -132,6 +153,7 @@ interface Emits {
   (e: 'update:topic', value: string): void
   (e: 'update:showAdvancedOptions', value: boolean): void
   (e: 'generate'): void
+  (e: 'enhanceTopic'): void
   (e: 'fileUpload', files: FileList): void
   (e: 'removeDocument', docId: string): void
 }
@@ -351,26 +373,6 @@ const isSpinningStatus = (status: string) => {
 .code-input-textarea {
   flex: 1;
   min-height: 80px;
-  padding: var(--space-sm) var(--space-md);
-  background: var(--color-muted);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  outline: none;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-base);
-  color: var(--color-foreground);
-  resize: none;
-  line-height: var(--line-height-relaxed);
-  transition: border-color 0.2s ease;
-}
-
-.code-input-textarea:focus {
-  border-color: var(--color-primary);
-  box-shadow: 0 0 0 3px var(--color-primary-light);
-}
-
-.code-input-textarea::placeholder {
-  color: var(--color-text-muted);
 }
 
 /* 已上传文档列表 */
@@ -516,6 +518,93 @@ const isSpinningStatus = (status: string) => {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   color: var(--color-text-muted);
+}
+
+/* Prompt 增强动画（对齐 DeerFlow） */
+.enhance-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  border-radius: inherit;
+  overflow: hidden;
+}
+
+.enhance-glow {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(45deg, rgba(59,130,246,0.1), rgba(147,51,234,0.1), rgba(59,130,246,0.1));
+  background-size: 200% 200%;
+  animation: glow-shift 2s linear infinite;
+  border-radius: inherit;
+}
+
+@keyframes glow-shift {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 200% 50%; }
+}
+
+.enhance-particle {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #60a5fa;
+  left: var(--left);
+  top: 40%;
+  animation: particle-float 1.5s ease-in-out infinite;
+  animation-delay: var(--delay);
+}
+
+@keyframes particle-float {
+  0%, 100% { transform: translateY(0); opacity: 0; scale: 0.5; }
+  50% { transform: translateY(-20px); opacity: 1; scale: 1; }
+}
+
+.enhance-fade-enter-active,
+.enhance-fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+.enhance-fade-enter-from,
+.enhance-fade-leave-to {
+  opacity: 0;
+}
+
+/* 魔法棒按钮 */
+.enhance-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  transition: var(--transition-all);
+}
+
+.enhance-btn:hover:not(:disabled) {
+  border-color: var(--color-terminal-keyword);
+  color: var(--color-terminal-keyword);
+  background: var(--color-primary-light);
+}
+
+.enhance-btn:disabled {
+  opacity: var(--opacity-disabled);
+  cursor: not-allowed;
+}
+
+.enhance-btn.enhancing {
+  border-color: var(--color-terminal-keyword);
+  color: var(--color-terminal-keyword);
+}
+
+.enhance-spinner {
+  animation: spin 1s linear infinite;
 }
 
 .code-generate-btn {

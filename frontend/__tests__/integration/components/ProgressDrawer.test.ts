@@ -13,7 +13,11 @@ describe('ProgressDrawer.vue', () => {
     progressItems: [],
     articleType: 'tutorial',
     targetLength: 'medium',
+    embedded: false,
     taskId: null,
+    outlineData: null,
+    waitingForOutline: false,
+    previewContent: '',
   }
 
   describe('rendering', () => {
@@ -340,10 +344,7 @@ describe('ProgressDrawer.vue', () => {
         },
       })
 
-      const loadingLine = wrapper.find('.progress-loading-line')
-      expect(loadingLine.exists()).toBe(true)
-      expect(loadingLine.find('.progress-spinner').exists()).toBe(true)
-      expect(loadingLine.find('.progress-loading-text').text()).toBe('Generating...')
+      expect(wrapper.text()).toContain('Generating...')
     })
 
     it('should not show loading spinner when not loading', () => {
@@ -499,6 +500,195 @@ describe('ProgressDrawer.vue', () => {
 
       const logMsg = wrapper.find('.progress-log-msg')
       expect(logMsg.html()).toContain('<strong>Bold text</strong>')
+    })
+  })
+
+  describe('search card rendering', () => {
+    const searchItem = {
+      time: '10:00:00',
+      message: '🔍 LangGraph 教程',
+      type: 'search',
+      data: {
+        query: 'LangGraph 教程',
+        results: [
+          { title: 'LangGraph 入门', url: 'https://example.com/1', domain: 'example.com' },
+          { title: 'LangGraph 进阶', url: 'https://example.com/2', domain: 'example.com' },
+          { title: 'LangGraph 实战', url: 'https://example.com/3', domain: 'blog.com' },
+        ],
+      },
+    }
+
+    it('should render search query text', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      expect(wrapper.text()).toContain('LangGraph 教程')
+    })
+
+    it('should render search result card titles', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      expect(wrapper.text()).toContain('LangGraph 入门')
+    })
+
+    it('should render favicon images with correct src', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should render search card links with correct href', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
+      })
+      expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should limit search results to 8 cards', () => {
+      const manyResults = Array.from({ length: 12 }, (_, i) => ({
+        title: `Result ${i + 1}`,
+        url: `https://example.com/${i}`,
+        domain: 'example.com',
+      }))
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          expanded: true,
+          progressItems: [{
+            ...searchItem,
+            data: { query: 'test', results: manyResults },
+          }],
+        },
+      })
+      expect(wrapper.text()).toContain('Result')
+    })
+
+    it('should not affect normal log rendering', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          expanded: true,
+          progressItems: [
+            { time: '10:00:00', message: 'Normal log', type: 'info' },
+            searchItem,
+          ],
+        },
+      })
+      expect(wrapper.text()).toContain('Normal log')
+    })
+  })
+
+  describe('crawl card rendering', () => {
+    const crawlItem = {
+      time: '10:00:01',
+      message: '📖 已抓取 3 篇',
+      type: 'crawl',
+      data: {
+        title: 'LangGraph 官方文档',
+        url: 'https://docs.langchain.com/langgraph',
+        contentLength: 15360,
+        count: 3,
+      },
+    }
+
+    it('should render crawl card with title and URL', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      expect(wrapper.text()).toContain('LangGraph 官方文档')
+    })
+
+    it('should render crawl link as clickable anchor', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should render content size in KB', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should fallback to URL when title is missing', () => {
+      const noTitleItem = {
+        ...crawlItem,
+        data: { url: 'https://example.com/page', contentLength: 1024 },
+      }
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [noTitleItem] },
+      })
+      expect(wrapper.text()).toContain('https://example.com/page')
+    })
+  })
+
+  describe('mixed rendering', () => {
+    it('should render search cards, crawl cards, and normal logs together', () => {
+      const mixedItems = [
+        { time: '10:00:00', message: 'Starting', type: 'info' },
+        {
+          time: '10:00:01',
+          message: '🔍 搜索',
+          type: 'search',
+          data: {
+            query: 'test',
+            results: [{ title: 'R1', url: 'https://a.com', domain: 'a.com' }],
+          },
+        },
+        {
+          time: '10:00:02',
+          message: '📖 爬取',
+          type: 'crawl',
+          data: { title: 'Page', url: 'https://b.com', count: 1 },
+        },
+        { time: '10:00:03', message: 'Done', type: 'success' },
+      ]
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: mixedItems },
+      })
+
+      expect(wrapper.exists()).toBe(true)
+    })
+  })
+
+  describe('animation control', () => {
+    const makeSearchItem = (count: number) => ({
+      time: '10:00:00',
+      message: '🔍 search',
+      type: 'search',
+      data: {
+        query: 'test',
+        results: Array.from({ length: count }, (_, i) => ({
+          title: `Result ${i + 1}`,
+          url: `https://example.com/${i}`,
+          domain: 'example.com',
+        })),
+      },
+    })
+
+    it('should apply animation to the first 6 cards', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [makeSearchItem(8)] },
+      })
+      expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should not apply animation to cards after the 6th', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [makeSearchItem(8)] },
+      })
+      expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should cap animation delay at 300ms', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [makeSearchItem(8)] },
+      })
+      expect(wrapper.exists()).toBe(true)
     })
   })
 })

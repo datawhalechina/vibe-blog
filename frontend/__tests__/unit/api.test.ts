@@ -6,6 +6,7 @@ import {
   createMiniBlogTask,
   createStorybookTask,
   cancelTask,
+  confirmOutline,
   getHistory,
   getHistoryRecord,
   deleteHistory,
@@ -103,6 +104,8 @@ const server = setupServer(
   http.post('/api/blog/generate/mini', () => HttpResponse.json(mockTaskResponse)),
   http.post('/api/generate', () => HttpResponse.json(mockTaskResponse)),
   http.post('/api/tasks/:taskId/cancel', () => HttpResponse.json({ success: true })),
+  http.post('/api/tasks/:taskId/confirm-outline', () => HttpResponse.json({ success: true })),
+  http.post('/api/tasks/:taskId/resume', () => HttpResponse.json({ success: true })),
   http.get('/api/history', () => HttpResponse.json(mockHistoryResponse)),
   http.get('/api/history/:id', () => HttpResponse.json(mockHistoryRecordResponse)),
   http.delete('/api/history/:id', () => HttpResponse.json({ success: true })),
@@ -194,6 +197,30 @@ describe('api.ts', () => {
     it('should delete history record', async () => {
       const result = await deleteHistory('blog-1')
       expect(result.success).toBe(true)
+    })
+
+    it('should confirm outline with accept action', async () => {
+      const result = await confirmOutline('task-123', 'accept')
+      expect(result.success).toBe(true)
+    })
+
+    it('should confirm outline with edit action', async () => {
+      const result = await confirmOutline('task-123', 'edit')
+      expect(result.success).toBe(true)
+    })
+
+    it('should pass interactive parameter in createBlogTask', async () => {
+      let capturedBody: any = null
+      server.use(
+        http.post('/api/blog/generate', async ({ request }) => {
+          capturedBody = await request.json()
+          return HttpResponse.json(mockTaskResponse)
+        })
+      )
+
+      await createBlogTask({ topic: 'Test', interactive: true })
+      expect(capturedBody).toBeTruthy()
+      expect(capturedBody.interactive).toBe(true)
     })
   })
 

@@ -14,6 +14,9 @@ export interface BlogGenerateParams {
   image_style?: string
   generate_cover_video?: boolean
   video_aspect_ratio?: string
+  deep_thinking?: boolean
+  background_investigation?: boolean
+  interactive?: boolean
   custom_config?: {
     sections_count?: number
     images_count?: number
@@ -53,6 +56,40 @@ export async function createBlogTask(params: BlogGenerateParams): Promise<{ succ
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(params)
+  })
+  return response.json()
+}
+
+// 优化主题（Prompt 增强）
+export async function enhanceTopic(topic: string): Promise<{ success: boolean; enhanced_topic?: string; error?: string }> {
+  const response = await fetch(`${API_BASE}/api/blog/enhance-topic`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ topic })
+  })
+  return response.json()
+}
+
+// 恢复中断的任务（101.113 LangGraph interrupt 方案）
+export async function resumeTask(taskId: string, action: 'accept' | 'edit' = 'accept', outline?: any): Promise<{ success: boolean; error?: string }> {
+  const response = await fetch(`${API_BASE}/api/tasks/${taskId}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, outline })
+  })
+  return response.json()
+}
+
+// 确认大纲（兼容旧接口，内部调用 resumeTask）
+export async function confirmOutline(taskId: string, action: 'accept' | 'edit' = 'accept', outline?: any): Promise<{ success: boolean; error?: string }> {
+  return resumeTask(taskId, action, outline)
+}
+
+// 评估文章质量
+export async function evaluateArticle(blogId: string): Promise<{ success: boolean; evaluation?: any; error?: string }> {
+  const response = await fetch(`${API_BASE}/api/blog/${blogId}/evaluate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
   })
   return response.json()
 }

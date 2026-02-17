@@ -24,7 +24,9 @@
                   v-model:show-advanced-options="showAdvancedOptions"
                   :uploaded-documents="uploadedDocuments"
                   :is-loading="isLoading"
+                  :is-enhancing="isEnhancing"
                   @generate="handleGenerate"
+                  @enhance-topic="handleEnhanceTopic"
                   @file-upload="handleFileUpload"
                   @remove-document="removeDocument"
                 />
@@ -38,6 +40,9 @@
                       v-model:image-style="imageStyle"
                       v-model:generate-cover-video="generateCoverVideo"
                       v-model:video-aspect-ratio="videoAspectRatio"
+                      v-model:deep-thinking="deepThinking"
+                      v-model:background-investigation="backgroundInvestigation"
+                      v-model:interactive="interactive"
                       v-model:custom-config="customConfig"
                       :image-styles="imageStyles"
                       :app-config="appConfig"
@@ -106,9 +111,13 @@
       :article-type="articleType"
       :target-length="targetLength"
       :task-id="currentTaskId"
+      :outline-data="outlineData"
+      :waiting-for-outline="waitingForOutline"
+      :preview-content="previewContent"
       @toggle="toggleTerminal"
       @close="closeProgress"
       @stop="stopGeneration"
+      @confirm-outline="handleConfirmOutline"
     />
 
     <!-- 发布弹窗 -->
@@ -217,6 +226,9 @@ const audienceAdaptation = ref('default')
 const imageStyle = ref('cartoon')
 const generateCoverVideo = ref(false)
 const videoAspectRatio = ref('16:9')
+const deepThinking = ref(false)
+const backgroundInvestigation = ref(true)
+const interactive = ref(true)
 const imageStyles = ref<Array<{ id: string; name: string; icon: string }>>([
   { id: 'cartoon', name: '默认风格', icon: '🎨' }
 ])
@@ -240,10 +252,16 @@ const uploadedDocuments = ref<UploadedDocument[]>([])
 
 // ========== 生成状态 ==========
 const isLoading = ref(false)
+const isEnhancing = ref(false)
 const showProgress = ref(false)
 const terminalExpanded = ref(true)
 const currentTaskId = ref<string | null>(null)
 let eventSource: EventSource | null = null
+
+// ========== 交互式模式状态 ==========
+const outlineData = ref<{ title: string; sections_titles: string[]; sections?: any[] } | null>(null)
+const waitingForOutline = ref(false)
+const previewContent = ref('')
 
 // ========== 进度面板 ==========
 interface ProgressItem {
@@ -360,6 +378,37 @@ const getReadyDocumentIds = () => {
   return uploadedDocuments.value.filter(d => d.status === 'ready').map(d => d.id)
 }
 
+// ========== 主题优化（Prompt 增强） ==========
+const handleEnhanceTopic = async () => {
+  if (!topic.value.trim() || isEnhancing.value || isLoading.value) return
+  isEnhancing.value = true
+  try {
+    const data = await api.enhanceTopic(topic.value)
+    if (data.success && data.enhanced_topic) {
+      topic.value = data.enhanced_topic
+    }
+  } catch (error: any) {
+    console.error('主题优化失败:', error)
+  } finally {
+    isEnhancing.value = false
+  }
+}
+
+// ========== 大纲确认（交互式模式） ==========
+const handleConfirmOutline = async (action: string) => {
+  if (!currentTaskId.value) return
+  waitingForOutline.value = false
+  try {
+    const data = await api.confirmOutline(currentTaskId.value, action as 'accept' | 'edit')
+    if (data.success) {
+      addProgressItem(action === 'accept' ? '✓ 大纲已确认，开始写作' : '✓ 大纲已修改，重新规划', 'success')
+      progressText.value = '写作中...'
+    }
+  } catch (error: any) {
+    addProgressItem(`✗ 大纲确认失败: ${error.message}`, 'error')
+  }
+}
+
 // ========== 生成博客 ==========
 const handleGenerate = async () => {
   if (!topic.value.trim() || isLoading.value) return
@@ -368,6 +417,9 @@ const handleGenerate = async () => {
   showProgress.value = true
   progressItems.value = []
   statusBadge.value = '准备中'
+  outlineData.value = null
+  waitingForOutline.value = false
+  previewContent.value = ''
 
   const isStorybook = articleType.value === 'storybook'
   const isMini = targetLength.value === 'mini'
@@ -402,7 +454,10 @@ const handleGenerate = async () => {
         document_ids: getReadyDocumentIds(),
         image_style: imageStyle.value,
         generate_cover_video: generateCoverVideo.value,
-        video_aspect_ratio: videoAspectRatio.value
+        video_aspect_ratio: videoAspectRatio.value,
+        deep_thinking: deepThinking.value,
+        background_investigation: backgroundInvestigation.value,
+        interactive: interactive.value,
       }
 
       if (targetLength.value === 'custom') {
@@ -419,8 +474,15 @@ const handleGenerate = async () => {
 
     if (data.success && data.task_id) {
       currentTaskId.value = data.task_id
-      addProgressItem(`✓ 任务创建成功 (ID: ${data.task_id})`, 'success')
-      connectSSE(data.task_id)
+      if (isStorybook) {
+        // 绘本任务保持原有 SSE 逻辑
+        addProgressItem(`✓ 任务创建成功 (ID: ${data.task_id})`, 'success')
+        connectSSE(data.task_id)
+      } else {
+        // 博客/Mini 任务跳转到 Generate 页面
+        router.push(`/generate/${data.task_id}`)
+        return
+      }
     } else {
       addProgressItem(`✗ 任务创建失败: ${data.error || '未知错误'}`, 'error')
       statusBadge.value = '错误'
@@ -433,7 +495,23 @@ const handleGenerate = async () => {
   }
 }
 
+// 流式预览节流（100ms）
+let accumulatedPreview = ''
+let completedSectionsContent = ''  // 已完成章节的累积内容
+let currentSectionTitle = ''       // 当前正在写的章节标题
+let previewTimer: ReturnType<typeof setTimeout> | null = null
+const throttledUpdatePreview = (content: string) => {
+  if (previewTimer) return
+  previewTimer = setTimeout(() => {
+    previewContent.value = content
+    previewTimer = null
+  }, 100)
+}
+
 const connectSSE = (taskId: string) => {
+  accumulatedPreview = ''
+  completedSectionsContent = ''
+  currentSectionTitle = ''
   eventSource = api.createTaskStream(taskId)
 
   eventSource.addEventListener('connected', () => {
@@ -467,16 +545,182 @@ const connectSSE = (taskId: string) => {
     if (d.stage === 'outline') updateStreamItem(d.accumulated)
   })
 
+  // 交互式模式：大纲待确认
+  eventSource.addEventListener('outline_ready', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    outlineData.value = {
+      title: d.title || '',
+      sections_titles: d.sections_titles || [],
+      sections: d.sections || [],
+    }
+    waitingForOutline.value = true
+    addProgressItem('📋 大纲已生成，等待确认...', 'info')
+    progressText.value = '等待大纲确认'
+  })
+
+  // 流式写作内容（两种模式都有）
+  eventSource.addEventListener('writing_chunk', (e: MessageEvent) => {
+    const d = JSON.parse(e.data)
+    const sectionTitle = d.section_title || ''
+    // 检测章节切换：把之前章节的内容存入已完成缓冲区
+    if (sectionTitle && sectionTitle !== currentSectionTitle) {
+      if (currentSectionTitle) {
+        completedSectionsContent = accumulatedPreview
+      }
+      currentSectionTitle = sectionTitle
+    }
+    if (d.accumulated) {
+      accumulatedPreview = completedSectionsContent
+        ? completedSectionsContent + '\n\n' + d.accumulated
+        : d.accumulated
+      throttledUpdatePreview(accumulatedPreview)
+    } else if (d.delta) {
+      accumulatedPreview += d.delta
+      throttledUpdatePreview(accumulatedPreview)
+    }
+  })
+
   eventSource.addEventListener('result', (e: MessageEvent) => {
     const d = JSON.parse(e.data)
-    if (d.type === 'researcher_complete') {
-      const data = d.data
-      if (data.document_count > 0 || data.web_count > 0) {
-        addProgressItem(`📊 知识来源: 文档 ${data.document_count} 条, 网络 ${data.web_count} 条`, 'info')
+    const data = d.data || {}
+
+    switch (d.type) {
+      case 'search_started':
+        progressItems.value.push({
+          time: new Date().toLocaleTimeString(),
+          message: `🔍 搜索: ${data.query || ''}`,
+          type: 'search',
+          data: { query: data.query, searching: true },
+        })
+        break
+
+      case 'search_results': {
+        let idx = -1
+        for (let si = progressItems.value.length - 1; si >= 0; si--) {
+          const it = progressItems.value[si]
+          if (it.type === 'search' && it.data?.searching) {
+            if (it.data?.query === data.query) { idx = si; break }
+            if (idx < 0) idx = si
+          }
+        }
+        if (idx >= 0) {
+          progressItems.value[idx] = {
+            time: new Date().toLocaleTimeString(),
+            message: `🔍 ${data.query || '搜索结果'}`,
+            type: 'search',
+            data: data,
+          }
+        } else {
+          progressItems.value.push({
+            time: new Date().toLocaleTimeString(),
+            message: `🔍 ${data.query || '搜索结果'}`,
+            type: 'search',
+            data: data,
+          })
+        }
+        break
       }
-      if (data.key_concepts?.length > 0) {
-        addProgressItem(`💡 核心概念: ${data.key_concepts.join(', ')}`, 'success')
-      }
+
+      case 'crawl_completed':
+        if (data.url) {
+          progressItems.value.push({
+            time: new Date().toLocaleTimeString(),
+            message: `📖 正在阅读: ${data.title || data.url}`,
+            type: 'crawl',
+            data: data,
+          })
+        } else if (data.count) {
+          addProgressItem(`📖 深度抓取完成: ${data.count} 篇高质量素材`, 'success')
+        }
+        break
+
+      case 'search_completed':
+        // 将残留的 searching 骨架屏转换为完成状态（不删除，保留动画体验）
+        for (let ci = progressItems.value.length - 1; ci >= 0; ci--) {
+          const it = progressItems.value[ci]
+          if (it.type === 'search' && it.data?.searching) {
+            progressItems.value[ci] = {
+              time: new Date().toLocaleTimeString(),
+              message: `✅ 搜索完成: ${it.data?.query || ''}`,
+              type: 'success',
+            }
+          }
+        }
+        addProgressItem(`✅ ${data.message || '搜索完成'}`, 'success')
+        break
+
+      case 'researcher_complete':
+        // 兜底：清除所有残留的 searching 骨架屏
+        for (let ci = progressItems.value.length - 1; ci >= 0; ci--) {
+          const it = progressItems.value[ci]
+          if (it.type === 'search' && it.data?.searching) {
+            progressItems.value.splice(ci, 1)
+          }
+        }
+        if (data.document_count > 0 || data.web_count > 0) {
+          addProgressItem(`📊 知识来源: 文档 ${data.document_count} 条, 网络 ${data.web_count} 条`, 'info')
+        }
+        if (data.key_concepts?.length > 0) {
+          addProgressItem(`💡 核心概念: ${data.key_concepts.join(', ')}`, 'success')
+        }
+        addProgressItem('素材收集阶段结束', 'divider')
+        break
+
+      case 'outline_complete':
+        if (data.sections_titles?.length > 0) {
+          const titles = data.sections_titles.map((t: string, i: number) => `${i + 1}. ${t}`).join('\n')
+          addProgressItem(`📋 大纲: ${data.title}`, 'success', titles)
+        }
+        addProgressItem('大纲规划阶段结束', 'divider')
+        break
+
+      case 'section_complete':
+        addProgressItem(`✍️ 章节 ${data.section_index} 完成: ${data.title} (${data.content_length} 字)`, 'success')
+        break
+
+      case 'check_knowledge_complete':
+        if (data.gaps_count > 0) {
+          addProgressItem(`🔎 知识空白: ${data.gaps_count} 个 (搜索 ${data.search_count}/${data.max_search_count})`, 'info',
+            data.gaps?.join('\n'))
+        }
+        break
+
+      case 'refine_search_complete':
+        addProgressItem(`🌐 第 ${data.round} 轮搜索: 获取 ${data.results_count} 条结果`, 'info')
+        break
+
+      case 'enhance_knowledge_complete':
+        addProgressItem(`📚 内容增强完成: 累积知识 ${data.knowledge_length} 字`, 'success')
+        break
+
+      case 'questioner_complete':
+        addProgressItem(data.needs_deepen ? '❓ 内容需要深化' : '✅ 内容深度检查通过',
+          data.needs_deepen ? 'info' : 'success')
+        break
+
+      case 'coder_complete':
+        addProgressItem(`💻 代码示例: ${data.code_blocks_count} 个代码块`, 'success')
+        break
+
+      case 'artist_complete':
+        addProgressItem(`🎨 配图描述: ${data.images_count} 张`, 'success')
+        break
+
+      case 'reviewer_complete':
+        addProgressItem(`✅ 质量审核: ${data.score} 分 ${data.passed ? '通过' : '需修订'}`,
+          data.passed ? 'success' : 'warning')
+        addProgressItem('内容审核阶段结束', 'divider')
+        break
+
+      case 'assembler_complete':
+        addProgressItem(`📦 文档组装完成: ${data.markdown_length} 字`, 'success')
+        addProgressItem('文档组装阶段结束', 'divider')
+        break
+
+      default:
+        if (data.message) {
+          addProgressItem(`📌 ${data.message}`, 'info')
+        }
     }
   })
 

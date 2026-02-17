@@ -7,11 +7,21 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
+from urllib.parse import urlparse
+
 from ..prompts import get_prompt_manager
 from ..services.smart_search_service import get_smart_search_service, init_smart_search_service
 from ..utils.cache_utils import get_cache_manager
 
 logger = logging.getLogger(__name__)
+
+
+def _extract_domain(url: str) -> str:
+    """从 URL 提取域名"""
+    try:
+        return urlparse(url).hostname or ''
+    except Exception:
+        return ''
 
 
 class ResearcherAgent:
@@ -32,6 +42,8 @@ class ResearcherAgent:
         self.llm = llm_client
         self.search_service = search_service
         self.knowledge_service = knowledge_service
+        self.task_manager = None
+        self.task_id = None
 
         # 初始化缓存管理器
         self.cache_enabled = os.environ.get('RESEARCHER_CACHE_ENABLED', 'true').lower() == 'true'
@@ -154,9 +166,30 @@ class ResearcherAgent:
 
         for query in queries:
             try:
+                # 推送 search_started 事件
+                if self.task_manager and self.task_id:
+                    self.task_manager.send_event(self.task_id, 'result', {
+                        'type': 'search_started',
+                        'data': {'query': query, 'engine': 'zhipu'}
+                    })
                 result = self.search_service.search(query, max_results=max_results // len(queries))
                 if result.get('success') and result.get('results'):
                     all_results.extend(result['results'])
+                    # 推送 search_results 事件
+                    if self.task_manager and self.task_id:
+                        card_results = []
+                        for r in result['results'][:10]:
+                            url = r.get('url', '')
+                            card_results.append({
+                                'url': url,
+                                'title': r.get('title', ''),
+                                'snippet': (r.get('content', '') or r.get('snippet', ''))[:120],
+                                'domain': _extract_domain(url),
+                            })
+                        self.task_manager.send_event(self.task_id, 'result', {
+                            'type': 'search_results',
+                            'data': {'query': query, 'results': card_results}
+                        })
             except Exception as e:
                 logger.error(f"搜索失败 [{query}]: {e}")
 
@@ -666,6 +699,19 @@ class ResearcherAgent:
                 deep_scraped = self._deep_scraper.scrape_top_n(search_results, topic)
                 if deep_scraped:
                     logger.info(f"🔗 深度抓取完成: {len(deep_scraped)} 篇高质量素材")
+                    # 推送 crawl_completed 事件
+                    if self.task_manager and self.task_id:
+                        for item in deep_scraped:
+                            url = item.get('url', '')
+                            self.task_manager.send_event(self.task_id, 'result', {
+                                'type': 'crawl_completed',
+                                'data': {
+                                    'url': url,
+                                    'title': item.get('title', ''),
+                                    'content_length': len(item.get('content', '') or item.get('summary', '')),
+                                    'domain': _extract_domain(url),
+                                }
+                            })
             except Exception as e:
                 logger.warning(f"深度抓取失败: {e}")
 

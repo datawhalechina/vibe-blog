@@ -8,6 +8,12 @@
     "esModuleInterop": true,
     "allowSyntheticDefaultImports": true,
 
+    /* Path aliases */
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["src/*"]
+    },
+
     /* Bundler mode */
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,

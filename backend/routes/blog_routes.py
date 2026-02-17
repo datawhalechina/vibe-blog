@@ -261,6 +261,9 @@ def generate_blog():
         generate_cover_video = data.get('generate_cover_video', False)
         video_aspect_ratio = data.get('video_aspect_ratio', '16:9')
         custom_config = data.get('custom_config', None)
+        deep_thinking = data.get('deep_thinking', False)
+        background_investigation = data.get('background_investigation', True)
+        interactive = data.get('interactive', False)
 
         if target_length == 'custom':
             if not custom_config:
@@ -313,6 +316,9 @@ def generate_blog():
             generate_cover_video=generate_cover_video,
             video_aspect_ratio=video_aspect_ratio,
             custom_config=custom_config,
+            deep_thinking=deep_thinking,
+            background_investigation=background_investigation,
+            interactive=interactive,
             task_manager=task_manager,
             app=current_app._get_current_object()
         )
@@ -422,4 +428,97 @@ def generate_blog_sync():
 
     except Exception as e:
         logger.error(f"博客生成失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@blog_bp.route('/api/blog/enhance-topic', methods=['POST'])
+def enhance_topic():
+    """优化用户输入的主题（Prompt 增强）"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '请提供 JSON 数据'}), 400
+
+        topic = data.get('topic', '').strip()
+        if not topic:
+            return jsonify({'success': False, 'error': '请提供 topic 参数'}), 400
+
+        blog_service = get_blog_service()
+        if not blog_service:
+            return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
+
+        enhanced = blog_service.enhance_topic(topic)
+
+        return jsonify({
+            'success': True,
+            'enhanced_topic': enhanced or topic,
+            'original': topic,
+        })
+
+    except Exception as e:
+        logger.error(f"主题优化失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@blog_bp.route('/api/tasks/<task_id>/resume', methods=['POST'])
+def resume_task(task_id):
+    """恢复中断的任务（101.113 LangGraph interrupt 方案）"""
+    try:
+        data = request.get_json() or {}
+        action = data.get('action', 'accept')
+        outline = data.get('outline', None)
+
+        if action not in ('accept', 'edit'):
+            return jsonify({'success': False, 'error': 'action 必须是 accept 或 edit'}), 400
+
+        if action == 'edit' and not outline:
+            return jsonify({'success': False, 'error': 'edit 操作需要提供 outline'}), 400
+
+        blog_service = get_blog_service()
+        if not blog_service:
+            return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
+
+        success = blog_service.resume_generation(task_id, action=action, outline=outline)
+        if not success:
+            return jsonify({'success': False, 'error': '任务不存在或未在等待确认'}), 404
+
+        return jsonify({'success': True, 'message': '任务已恢复'})
+
+    except Exception as e:
+        logger.error(f"任务恢复失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@blog_bp.route('/api/tasks/<task_id>/confirm-outline', methods=['POST'])
+def confirm_outline(task_id):
+    """确认大纲 — 兼容旧接口，内部转发到 resume"""
+    return resume_task(task_id)
+
+
+@blog_bp.route('/api/blog/<blog_id>/evaluate', methods=['POST'])
+def evaluate_article(blog_id):
+    """评估文章质量"""
+    try:
+        db_service = get_db_service()
+        blog = db_service.get_blog(blog_id)
+        if not blog:
+            return jsonify({'success': False, 'error': '文章不存在'}), 404
+
+        blog_service = get_blog_service()
+        if not blog_service:
+            return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
+
+        content = blog.get('markdown_content', '') or blog.get('content', '')
+        title = blog.get('topic', '') or blog.get('title', '')
+        article_type = blog.get('article_type', '')
+
+        evaluation = blog_service.evaluate_article(content, title=title, article_type=article_type)
+
+        return jsonify({
+            'success': True,
+            'evaluation': evaluation,
+        })
+
+    except Exception as e:
+        logger.error(f"文章评估失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500

@@ -11,6 +11,8 @@ import logging
 import os
 from typing import Dict, Any, List, Optional
 
+import httpx
+
 logger = logging.getLogger(__name__)
 
 # 延迟导入，避免未安装的包导致启动失败
@@ -143,6 +145,11 @@ def create_llm_client(
         )
     else:
         _ensure_openai()
+        # 使用不带代理的 httpx 客户端，避免系统代理干扰国内 API（如 dashscope）
+        no_proxy_client = httpx.Client(
+            proxy=None,
+            timeout=httpx.Timeout(timeout=300.0, connect=10.0),
+        )
         return ChatOpenAI(
             model=model_name,
             api_key=api_key,
@@ -150,6 +157,7 @@ def create_llm_client(
             temperature=temperature,
             max_tokens=max_tokens,
             max_retries=2,
+            http_client=no_proxy_client,
         )
 
 

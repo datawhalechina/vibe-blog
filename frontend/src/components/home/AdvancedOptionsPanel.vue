@@ -6,7 +6,7 @@
         <span class="option-label">
           <FileText :size="14" /> 文章类型:
         </span>
-        <select v-model="localArticleType">
+        <select v-model="localArticleType" :disabled="isLoading">
           <option value="tutorial">教程型</option>
           <option value="problem-solution">问题解决</option>
           <option value="comparison">对比分析</option>
@@ -19,7 +19,7 @@
         <span class="option-label">
           <File :size="14" /> 文章长度:
         </span>
-        <select v-model="localTargetLength">
+        <select v-model="localTargetLength" :disabled="isLoading">
           <option value="mini">快速 Mini</option>
           <option value="short">短文</option>
           <option value="medium">中等</option>
@@ -33,7 +33,7 @@
         <span class="option-label">
           <Users :size="14" /> 受众适配:
         </span>
-        <select v-model="localAudienceAdaptation">
+        <select v-model="localAudienceAdaptation" :disabled="isLoading">
           <option value="default">默认风格</option>
           <option value="high-school">高中生版</option>
           <option value="children">儿童版</option>
@@ -46,7 +46,7 @@
         <span class="option-label">
           <Palette :size="14" /> 配图风格:
         </span>
-        <select v-model="localImageStyle">
+        <select v-model="localImageStyle" :disabled="isLoading">
           <option v-for="style in imageStyles" :key="style.id" :value="style.id">
             {{ style.icon }} {{ style.name }}
           </option>
@@ -56,7 +56,7 @@
       <!-- 生成封面动画 -->
       <div v-if="appConfig.features?.cover_video" class="option-item checkbox-item">
         <label>
-          <input type="checkbox" v-model="localGenerateCoverVideo">
+          <input type="checkbox" v-model="localGenerateCoverVideo" :disabled="isLoading">
           <Video :size="14" />
           <span>生成封面动画</span>
         </label>
@@ -68,10 +68,40 @@
         <span class="option-label">
           <Monitor :size="14" /> 视频尺寸:
         </span>
-        <select v-model="localVideoAspectRatio">
+        <select v-model="localVideoAspectRatio" :disabled="isLoading">
           <option value="16:9">横屏(16:9)</option>
           <option value="9:16">竖屏(9:16)</option>
         </select>
+      </div>
+
+      <!-- 背景调查 -->
+      <div class="option-item checkbox-item">
+        <label>
+          <input type="checkbox" v-model="localBackgroundInvestigation" :disabled="isLoading">
+          <Search :size="14" />
+          <span>背景调查</span>
+        </label>
+        <span class="option-hint" title="生成前先搜索相关资料，关闭可加速但可能降低内容丰富度">ⓘ</span>
+      </div>
+
+      <!-- 深度思考 -->
+      <div class="option-item checkbox-item">
+        <label>
+          <input type="checkbox" v-model="localDeepThinking" :disabled="isLoading">
+          <Brain :size="14" />
+          <span>深度思考</span>
+        </label>
+        <span class="option-hint" title="启用后 LLM 会进行更深入的推理，生成时间约增加 2-3 倍">ⓘ</span>
+      </div>
+
+      <!-- 交互式生成 -->
+      <div class="option-item checkbox-item">
+        <label>
+          <input type="checkbox" v-model="localInteractive" :disabled="isLoading">
+          <MessageSquare :size="14" />
+          <span>交互式生成</span>
+        </label>
+        <span class="option-hint" title="大纲生成后暂停等待确认，可以审核和修改大纲后再开始写作">ⓘ</span>
       </div>
     </div>
 
@@ -125,7 +155,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { FileText, File, Users, Palette, Video, Monitor, Settings } from 'lucide-vue-next'
+import { FileText, File, Users, Palette, Video, Monitor, Settings, Search, Brain, MessageSquare } from 'lucide-vue-next'
 
 interface CustomConfig {
   sectionsCount: number
@@ -147,6 +177,10 @@ interface Props {
   imageStyle: string
   generateCoverVideo: boolean
   videoAspectRatio: string
+  deepThinking: boolean
+  backgroundInvestigation: boolean
+  interactive: boolean
+  isLoading?: boolean
   customConfig: CustomConfig
   imageStyles: ImageStyle[]
   appConfig: {
@@ -161,6 +195,9 @@ interface Emits {
   (e: 'update:imageStyle', value: string): void
   (e: 'update:generateCoverVideo', value: boolean): void
   (e: 'update:videoAspectRatio', value: string): void
+  (e: 'update:deepThinking', value: boolean): void
+  (e: 'update:backgroundInvestigation', value: boolean): void
+  (e: 'update:interactive', value: boolean): void
   (e: 'update:customConfig', value: CustomConfig): void
 }
 
@@ -196,6 +233,21 @@ const localGenerateCoverVideo = computed({
 const localVideoAspectRatio = computed({
   get: () => props.videoAspectRatio,
   set: (value) => emit('update:videoAspectRatio', value)
+})
+
+const localDeepThinking = computed({
+  get: () => props.deepThinking,
+  set: (value) => emit('update:deepThinking', value)
+})
+
+const localBackgroundInvestigation = computed({
+  get: () => props.backgroundInvestigation,
+  set: (value) => emit('update:backgroundInvestigation', value)
+})
+
+const localInteractive = computed({
+  get: () => props.interactive,
+  set: (value) => emit('update:interactive', value)
 })
 
 const localCustomConfig = computed({

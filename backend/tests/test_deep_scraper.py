@@ -24,8 +24,9 @@ class TestJinaReader:
         assert headers["Authorization"] == "Bearer jina_test123"
         assert "Accept" in headers
 
+    @patch.dict("os.environ", {"JINA_API_KEY": ""})
     def test_headers_without_api_key(self):
-        reader = JinaReader(api_key="")
+        reader = JinaReader(api_key=None)
         headers = reader._build_headers()
         assert "Authorization" not in headers
 

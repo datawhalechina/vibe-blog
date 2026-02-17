@@ -407,7 +407,7 @@ class ArtistAgent:
             return {
                 "render_method": render_method,
                 "content": content,
-                "caption": result.get("caption", "")
+                "caption": caption
             }
 
         except Exception as e:

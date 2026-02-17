@@ -124,6 +124,7 @@ class DatabaseService:
                     target_images_count INTEGER,
                     target_code_blocks_count INTEGER,
                     target_word_count INTEGER,
+                    citations TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 );
                 
@@ -189,7 +190,8 @@ class DatabaseService:
                 'target_code_blocks_count': 'INTEGER',
                 'target_word_count': 'INTEGER',
                 'book_id': 'TEXT',
-                'summary': 'TEXT'  # 博客摘要
+                'summary': 'TEXT',  # 博客摘要
+                'citations': 'TEXT',  # 引用来源（JSON）
             }
             
             for col_name, col_type in new_columns.items():
@@ -576,7 +578,8 @@ class DatabaseService:
         target_sections_count: int = None,
         target_images_count: int = None,
         target_code_blocks_count: int = None,
-        target_word_count: int = None
+        target_word_count: int = None,
+        citations: str = None
     ) -> Dict[str, Any]:
         """保存历史记录"""
         with self.get_connection() as conn:
@@ -584,12 +587,12 @@ class DatabaseService:
                 INSERT INTO history_records 
                 (id, topic, article_type, target_length, markdown_content, outline, 
                  sections_count, code_blocks_count, images_count, review_score, cover_image, cover_video,
-                 target_sections_count, target_images_count, target_code_blocks_count, target_word_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 target_sections_count, target_images_count, target_code_blocks_count, target_word_count, citations)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 history_id, topic, article_type, target_length, markdown_content, outline,
                 sections_count, code_blocks_count, images_count, review_score, cover_image, cover_video,
-                target_sections_count, target_images_count, target_code_blocks_count, target_word_count
+                target_sections_count, target_images_count, target_code_blocks_count, target_word_count, citations
             ))
         
         logger.info(f"保存历史记录: {history_id}, 主题: {topic}")

@@ -4,7 +4,7 @@
 """
 import pytest
 import json
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch, MagicMock, PropertyMock
 
 
 class TestBlogGenerateAPI:
@@ -521,3 +521,227 @@ class TestDocumentUploadAPI:
         result = response.get_json()
         assert result['success'] is False
         assert '不存在' in result['error']
+
+
+class TestEnhanceTopicAPI:
+    """测试主题优化 API (101.08)"""
+
+    def test_enhance_topic_success(self, client, mock_blog_service):
+        """测试成功优化主题"""
+        mock_blog_service.enhance_topic.return_value = 'LangGraph 入门教程：从零搭建多 Agent 协作工作流'
+
+        response = client.post('/api/blog/enhance-topic', json={
+            'topic': 'LangGraph 入门'
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert 'LangGraph' in data['enhanced_topic']
+        mock_blog_service.enhance_topic.assert_called_once_with('LangGraph 入门')
+
+    def test_enhance_topic_empty_topic(self, client):
+        """测试空 topic 返回 400"""
+        response = client.post('/api/blog/enhance-topic', json={
+            'topic': ''
+        })
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+        assert 'topic' in data['error']
+
+    def test_enhance_topic_missing_topic(self, client):
+        """测试缺少 topic 字段返回 400"""
+        response = client.post('/api/blog/enhance-topic', json={})
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+
+    def test_enhance_topic_service_unavailable(self, client, mock_blog_service):
+        """测试服务不可用时返回 500"""
+        # get_blog_service 返回 None 的情况需要 monkeypatch
+        # 这里测试 enhance_topic 抛异常的情况
+        mock_blog_service.enhance_topic.side_effect = Exception('LLM timeout')
+
+        response = client.post('/api/blog/enhance-topic', json={
+            'topic': 'test'
+        })
+
+        assert response.status_code == 500
+        data = response.get_json()
+        assert data['success'] is False
+
+    def test_enhance_topic_fallback(self, client, mock_blog_service):
+        """测试 LLM 失败时降级返回原始 topic"""
+        mock_blog_service.enhance_topic.return_value = None
+
+        response = client.post('/api/blog/enhance-topic', json={
+            'topic': '原始主题'
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['enhanced_topic'] == '原始主题'
+
+
+class TestConfirmOutlineAPI:
+    """测试大纲确认 API (Phase 2)"""
+
+    @patch('routes.blog_routes.get_blog_service')
+    def test_confirm_outline_accept(self, mock_get_svc, client):
+        """测试接受大纲"""
+        mock_svc = MagicMock()
+        mock_svc.resume_generation.return_value = True
+        mock_get_svc.return_value = mock_svc
+
+        response = client.post('/api/tasks/task-123/confirm-outline', json={
+            'action': 'accept'
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        mock_svc.resume_generation.assert_called_once_with(
+            'task-123', action='accept', outline=None
+        )
+
+    @patch('routes.blog_routes.get_blog_service')
+    def test_confirm_outline_edit(self, mock_get_svc, client):
+        """测试编辑大纲"""
+        mock_svc = MagicMock()
+        mock_svc.resume_generation.return_value = True
+        mock_get_svc.return_value = mock_svc
+
+        modified_outline = {
+            'sections': [
+                {'title': 'Section 1', 'description': 'Desc 1'},
+                {'title': 'Section 2', 'description': 'Desc 2'},
+            ]
+        }
+
+        response = client.post('/api/tasks/task-123/confirm-outline', json={
+            'action': 'edit',
+            'outline': modified_outline
+        })
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        mock_svc.resume_generation.assert_called_once_with(
+            'task-123', action='edit', outline=modified_outline
+        )
+
+    def test_confirm_outline_invalid_action(self, client):
+        """测试无效 action 返回 400"""
+        response = client.post('/api/tasks/task-123/confirm-outline', json={
+            'action': 'invalid'
+        })
+
+        assert response.status_code == 400
+        data = response.get_json()
+        assert data['success'] is False
+
+    @patch('routes.blog_routes.get_blog_service')
+    def test_confirm_outline_task_not_found(self, mock_get_svc, client):
+        """测试任务不存在返回 404"""
+        mock_svc = MagicMock()
+        mock_svc.resume_generation.return_value = False
+        mock_get_svc.return_value = mock_svc
+
+        response = client.post('/api/tasks/nonexistent/confirm-outline', json={
+            'action': 'accept'
+        })
+
+        assert response.status_code == 404
+        data = response.get_json()
+        assert data['success'] is False
+
+
+class TestEvaluateArticleAPI:
+    """测试文章评估 API (101.04)"""
+
+    @patch('routes.blog_routes.get_db_service')
+    @patch('routes.blog_routes.get_blog_service')
+    def test_evaluate_article_success(self, mock_get_blog_svc, mock_get_db, client):
+        """测试成功评估文章"""
+        mock_evaluation = {
+            'grade': 'A-',
+            'overall_score': 83,
+            'scores': {
+                'factual_accuracy': 85,
+                'completeness': 78,
+                'coherence': 92,
+                'relevance': 88,
+                'citation_quality': 70,
+                'writing_quality': 85,
+            },
+            'strengths': ['代码示例丰富'],
+            'weaknesses': ['引用偏少'],
+            'suggestions': ['补充引用'],
+            'summary': '文章结构清晰',
+            'word_count': 3500,
+            'citation_count': 8,
+            'image_count': 4,
+            'code_block_count': 6,
+        }
+        mock_blog_svc = MagicMock()
+        mock_blog_svc.evaluate_article.return_value = mock_evaluation
+        mock_get_blog_svc.return_value = mock_blog_svc
+
+        mock_db = MagicMock()
+        mock_db.get_blog.return_value = {
+            'id': 'blog-123',
+            'markdown_content': '# Test\n\nContent',
+            'topic': 'Test Topic',
+            'article_type': 'tutorial',
+        }
+        mock_get_db.return_value = mock_db
+
+        response = client.post('/api/blog/blog-123/evaluate')
+
+        assert response.status_code == 200
+        data = response.get_json()
+        assert data['success'] is True
+        assert data['evaluation']['grade'] == 'A-'
+        assert data['evaluation']['overall_score'] == 83
+        assert len(data['evaluation']['scores']) == 6
+
+    @patch('routes.blog_routes.get_db_service')
+    def test_evaluate_article_not_found(self, mock_get_db, client):
+        """测试文章不存在返回 404"""
+        mock_db = MagicMock()
+        mock_db.get_blog.return_value = None
+        mock_get_db.return_value = mock_db
+
+        response = client.post('/api/blog/nonexistent/evaluate')
+
+        assert response.status_code == 404
+        data = response.get_json()
+        assert data['success'] is False
+        assert '不存在' in data['error']
+
+    @patch('routes.blog_routes.get_db_service')
+    @patch('routes.blog_routes.get_blog_service')
+    def test_evaluate_article_service_error(self, mock_get_blog_svc, mock_get_db, client):
+        """测试评估服务异常"""
+        mock_blog_svc = MagicMock()
+        mock_blog_svc.evaluate_article.side_effect = Exception('LLM error')
+        mock_get_blog_svc.return_value = mock_blog_svc
+
+        mock_db = MagicMock()
+        mock_db.get_blog.return_value = {
+            'id': 'blog-123',
+            'markdown_content': '# Test',
+            'topic': 'Test',
+            'article_type': 'tutorial',
+        }
+        mock_get_db.return_value = mock_db
+
+        response = client.post('/api/blog/blog-123/evaluate')
+
+        assert response.status_code == 500
+        data = response.get_json()
+        assert data['success'] is False
