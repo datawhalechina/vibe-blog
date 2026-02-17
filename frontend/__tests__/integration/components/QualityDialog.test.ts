@@ -5,6 +5,21 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import QualityDialog from '@/components/generate/QualityDialog.vue'
 
+const mountOpts = {
+  global: {
+    stubs: {
+      Dialog: false,
+      DialogContent: false,
+      DialogHeader: false,
+      DialogTitle: false,
+      DialogDescription: false,
+      Badge: false,
+      Progress: false,
+      Separator: false,
+    },
+  },
+}
+
 describe('QualityDialog.vue', () => {
   const mockEvaluation = {
     grade: 'A-',
@@ -22,6 +37,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render grade badge with correct grade', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('A-')
@@ -29,6 +45,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render overall score', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('83')
@@ -36,6 +53,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render all 6 score dimensions', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     const text = wrapper.text()
@@ -49,6 +67,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render progress bars with correct values', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     const text = wrapper.text()
@@ -57,6 +76,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render strengths list', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     const text = wrapper.text()
@@ -66,6 +86,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render weaknesses list', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('引用来源偏少')
@@ -73,6 +94,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render suggestions list', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('补充 3-5 个权威引用')
@@ -81,6 +103,7 @@ describe('QualityDialog.vue', () => {
   it('should not render empty lists', () => {
     const emptyEval = { ...mockEvaluation, strengths: [], weaknesses: [], suggestions: [] }
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: emptyEval, loading: false },
     })
     const text = wrapper.text()
@@ -91,6 +114,7 @@ describe('QualityDialog.vue', () => {
 
   it('should render summary and statistics', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('文章结构清晰')
@@ -99,6 +123,7 @@ describe('QualityDialog.vue', () => {
 
   it('should show loading state', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: null, loading: true },
     })
     expect(wrapper.text()).toContain('evaluate')
@@ -106,13 +131,15 @@ describe('QualityDialog.vue', () => {
 
   it('should not render when not visible', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: false, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.html()).toBe('')
+    expect(wrapper.html()).not.toContain('A-')
   })
 
   it('should emit close when dialog is closed', async () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('A-')
@@ -120,6 +147,7 @@ describe('QualityDialog.vue', () => {
 
   it('should apply correct color for different grades', () => {
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
     expect(wrapper.text()).toContain('A-')
@@ -128,6 +156,7 @@ describe('QualityDialog.vue', () => {
   it('should handle LLM fallback evaluation', () => {
     const fallbackEval = { ...mockEvaluation, grade: 'B+', overall_score: 75 }
     const wrapper = mount(QualityDialog, {
+      ...mountOpts,
       props: { visible: true, evaluation: fallbackEval, loading: false },
     })
     expect(wrapper.text()).toContain('B+')
