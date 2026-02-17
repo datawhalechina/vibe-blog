@@ -66,6 +66,33 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✅ **AdvancedOptionsPanel isLoading 测试** — 2 个新用例（disabled/not disabled）
 - ✅ **全量测试** — 26 文件 / 362 用例全部通过
 
+### Added (Cron 调度器重构)
+- ✨ **Cron 调度器重构** — 纯 Python 自驱动调度器替换 APScheduler，移植 OpenClaw 设计
+  - `CronScheduler`：asyncio.call_later 自驱动循环，三种调度类型（cron/at/every）
+  - `CronTimer`：最大 60s 唤醒间隔，卡死检测（>2h 自动清除）
+  - `CronExecutor`：任务执行 + 指数退避（30s→1min→5min→15min→60min）
+  - `compute_next_run_at()`：croniter 解析 cron 表达式，EVERY 类型锚点对齐
+  - 启动恢复：清除残留 running_at + 补执行错过的任务
+  - 调度计算连续失败 3 次自动禁用
+  - 并发安全：asyncio.Lock 串行化 CRUD
+- ✨ **自然语言 LLM 解析** — cron_parser 新增 LLM fallback
+  - 正则快速路径（免费、0 延迟）+ LLM 兜底（覆盖任意自然语言）
+  - LLM 返回的 cron 表达式用 croniter 验证，无效自动丢弃
+  - LLM 不可用时静默降级，不影响正则路径
+- ✨ **新增 REST API** — retry/run/status 三个端点
+  - `POST /api/scheduler/tasks/<id>/retry` — 重置错误计数并立即重新调度
+  - `POST /api/scheduler/tasks/<id>/run` — 手动触发执行
+  - `GET /api/scheduler/status` — 调度器状态（总任务数/启用数/下次唤醒时间）
+- ✨ **数据迁移脚本** — `migrate_to_cron_jobs.py` 将 scheduled_tasks 迁移到 cron_jobs 表
+- ✨ **Dashboard 增强** — 定时任务卡片显示错误状态 + 重试按钮
+- ✅ 103 个单元测试全部通过（backoff 9 + models 10 + db 12 + schedule_calc 17 + timer 13 + executor 17 + scheduler 20 + migration 5）
+
+### Changed (Cron 调度器重构)
+- 🔄 `app.py` — SchedulerService → CronScheduler
+- 🔄 `scheduler_routes.py` — 适配新 CronScheduler API，响应包含 next_run_at/last_status/consecutive_errors
+- 🔄 `requirements.txt` — 新增 croniter>=6.0.0
+- 🔄 `Dashboard.vue` — trigger 字段适配新 API，新增错误状态和重试按钮
+
 ---
 
 ## 2026-02-13

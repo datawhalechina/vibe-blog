@@ -127,3 +127,63 @@ class SchedulerConfig(BaseModel):
     log_retention_days: int = 30
     max_execution_history: int = 100
     default_timezone: str = "Asia/Shanghai"
+
+
+# ── Cron 调度器模型（对应 OpenClaw src/cron/types.ts）──
+
+
+class CronScheduleKind(str, Enum):
+    AT = "at"          # 一次性：指定绝对时间
+    EVERY = "every"    # 固定间隔
+    CRON = "cron"      # cron 表达式
+
+
+class CronJobStatus(str, Enum):
+    OK = "ok"
+    ERROR = "error"
+    SKIPPED = "skipped"
+
+
+class CronSchedule(BaseModel):
+    """调度配置 — 对应 OpenClaw CronSchedule"""
+    kind: CronScheduleKind
+    at: Optional[datetime] = None              # kind="at"
+    every_seconds: Optional[int] = None        # kind="every"
+    anchor_at: Optional[datetime] = None       # kind="every"
+    expr: Optional[str] = None                 # kind="cron"
+    tz: str = "Asia/Shanghai"
+
+
+class CronJobState(BaseModel):
+    """运行时状态 — 对应 OpenClaw CronJobState"""
+    next_run_at: Optional[datetime] = None
+    running_at: Optional[datetime] = None
+    last_run_at: Optional[datetime] = None
+    last_status: Optional[CronJobStatus] = None
+    last_error: Optional[str] = None
+    last_duration_ms: Optional[int] = None
+    consecutive_errors: int = 0
+    schedule_error_count: int = 0
+
+
+class CronJob(BaseModel):
+    """定时任务 — 对应 OpenClaw CronJob"""
+    id: str = Field(default_factory=lambda: str(uuid.uuid4())[:8])
+    name: str
+    description: Optional[str] = None
+    enabled: bool = True
+    delete_after_run: bool = False
+
+    schedule: CronSchedule
+    generation: BlogGenerationConfig
+    publish: PublishConfig = Field(default_factory=PublishConfig)
+
+    timeout_seconds: int = 600
+
+    state: CronJobState = Field(default_factory=CronJobState)
+
+    created_at: datetime = Field(default_factory=datetime.now)
+    updated_at: datetime = Field(default_factory=datetime.now)
+
+    tags: list[str] = Field(default_factory=list)
+    user_id: Optional[str] = None

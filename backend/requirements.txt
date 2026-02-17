@@ -53,4 +53,5 @@ opentelemetry-instrumentation-threading>=0.48b0
 
 # ============ 任务排队 & 定时调度 ============
 aiosqlite>=0.19.0
-APScheduler>=3.10.0
+croniter>=6.0.0
+APScheduler>=3.10.0  # 保留兼容，渐进迁移后可移除

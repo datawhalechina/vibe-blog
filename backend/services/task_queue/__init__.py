@@ -7,6 +7,7 @@ from .models import (
     BlogTask, BlogGenerationConfig, PublishConfig, TriggerConfig,
     TriggerType, QueueStatus, TaskPriority, ExecutionRecord,
     SchedulerConfig,
+    CronJob, CronJobState, CronJobStatus, CronSchedule, CronScheduleKind,
 )
 from .manager import TaskQueueManager
 from .cron_parser import parse_schedule
@@ -18,4 +19,5 @@ __all__ = [
     'BlogTask', 'BlogGenerationConfig', 'PublishConfig', 'TriggerConfig',
     'TriggerType', 'QueueStatus', 'TaskPriority', 'ExecutionRecord',
     'SchedulerConfig',
+    'CronJob', 'CronJobState', 'CronJobStatus', 'CronSchedule', 'CronScheduleKind',
 ]
