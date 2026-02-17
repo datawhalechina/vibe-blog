@@ -7,6 +7,7 @@ describe('BlogInputCard.vue', () => {
     topic: '',
     uploadedDocuments: [],
     isLoading: false,
+    isEnhancing: false,
     showAdvancedOptions: false,
   }
 

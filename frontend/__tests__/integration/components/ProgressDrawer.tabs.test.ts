@@ -18,6 +18,7 @@ const baseProps = {
   outlineData: null as any,
   waitingForOutline: false,
   previewContent: '',
+  embedded: false,
 }
 
 describe('ProgressDrawer — Tab 切换', () => {

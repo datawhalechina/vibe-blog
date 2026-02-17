@@ -13,6 +13,7 @@ describe('ProgressDrawer.vue', () => {
     progressItems: [],
     articleType: 'tutorial',
     targetLength: 'medium',
+    embedded: false,
     taskId: null,
     outlineData: null,
     waitingForOutline: false,
