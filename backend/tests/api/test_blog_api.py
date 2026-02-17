@@ -590,9 +590,12 @@ class TestEnhanceTopicAPI:
 class TestConfirmOutlineAPI:
     """测试大纲确认 API (Phase 2)"""
 
-    def test_confirm_outline_accept(self, client, mock_blog_service):
+    @patch('routes.blog_routes.get_blog_service')
+    def test_confirm_outline_accept(self, mock_get_svc, client):
         """测试接受大纲"""
-        mock_blog_service.resume_generation.return_value = True
+        mock_svc = MagicMock()
+        mock_svc.resume_generation.return_value = True
+        mock_get_svc.return_value = mock_svc
 
         response = client.post('/api/tasks/task-123/confirm-outline', json={
             'action': 'accept'
@@ -601,13 +604,17 @@ class TestConfirmOutlineAPI:
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
-        mock_blog_service.resume_generation.assert_called_once_with(
+        mock_svc.resume_generation.assert_called_once_with(
             'task-123', action='accept', outline=None
         )
 
-    def test_confirm_outline_edit(self, client, mock_blog_service):
+    @patch('routes.blog_routes.get_blog_service')
+    def test_confirm_outline_edit(self, mock_get_svc, client):
         """测试编辑大纲"""
-        mock_blog_service.resume_generation.return_value = True
+        mock_svc = MagicMock()
+        mock_svc.resume_generation.return_value = True
+        mock_get_svc.return_value = mock_svc
+
         modified_outline = {
             'sections': [
                 {'title': 'Section 1', 'description': 'Desc 1'},
@@ -623,7 +630,7 @@ class TestConfirmOutlineAPI:
         assert response.status_code == 200
         data = response.get_json()
         assert data['success'] is True
-        mock_blog_service.resume_generation.assert_called_once_with(
+        mock_svc.resume_generation.assert_called_once_with(
             'task-123', action='edit', outline=modified_outline
         )
 
@@ -637,9 +644,12 @@ class TestConfirmOutlineAPI:
         data = response.get_json()
         assert data['success'] is False
 
-    def test_confirm_outline_task_not_found(self, client, mock_blog_service):
+    @patch('routes.blog_routes.get_blog_service')
+    def test_confirm_outline_task_not_found(self, mock_get_svc, client):
         """测试任务不存在返回 404"""
-        mock_blog_service.resume_generation.return_value = False
+        mock_svc = MagicMock()
+        mock_svc.resume_generation.return_value = False
+        mock_get_svc.return_value = mock_svc
 
         response = client.post('/api/tasks/nonexistent/confirm-outline', json={
             'action': 'accept'
@@ -653,8 +663,9 @@ class TestConfirmOutlineAPI:
 class TestEvaluateArticleAPI:
     """测试文章评估 API (101.04)"""
 
-    @patch('services.database_service.get_db_service')
-    def test_evaluate_article_success(self, mock_get_db, client, mock_blog_service):
+    @patch('routes.blog_routes.get_db_service')
+    @patch('routes.blog_routes.get_blog_service')
+    def test_evaluate_article_success(self, mock_get_blog_svc, mock_get_db, client):
         """测试成功评估文章"""
         mock_evaluation = {
             'grade': 'A-',
@@ -676,7 +687,9 @@ class TestEvaluateArticleAPI:
             'image_count': 4,
             'code_block_count': 6,
         }
-        mock_blog_service.evaluate_article.return_value = mock_evaluation
+        mock_blog_svc = MagicMock()
+        mock_blog_svc.evaluate_article.return_value = mock_evaluation
+        mock_get_blog_svc.return_value = mock_blog_svc
 
         mock_db = MagicMock()
         mock_db.get_blog.return_value = {
@@ -696,7 +709,7 @@ class TestEvaluateArticleAPI:
         assert data['evaluation']['overall_score'] == 83
         assert len(data['evaluation']['scores']) == 6
 
-    @patch('services.database_service.get_db_service')
+    @patch('routes.blog_routes.get_db_service')
     def test_evaluate_article_not_found(self, mock_get_db, client):
         """测试文章不存在返回 404"""
         mock_db = MagicMock()
@@ -710,10 +723,13 @@ class TestEvaluateArticleAPI:
         assert data['success'] is False
         assert '不存在' in data['error']
 
-    @patch('services.database_service.get_db_service')
-    def test_evaluate_article_service_error(self, mock_get_db, client, mock_blog_service):
+    @patch('routes.blog_routes.get_db_service')
+    @patch('routes.blog_routes.get_blog_service')
+    def test_evaluate_article_service_error(self, mock_get_blog_svc, mock_get_db, client):
         """测试评估服务异常"""
-        mock_blog_service.evaluate_article.side_effect = Exception('LLM error')
+        mock_blog_svc = MagicMock()
+        mock_blog_svc.evaluate_article.side_effect = Exception('LLM error')
+        mock_get_blog_svc.return_value = mock_blog_svc
 
         mock_db = MagicMock()
         mock_db.get_blog.return_value = {
