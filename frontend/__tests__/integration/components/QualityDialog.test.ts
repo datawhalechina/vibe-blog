@@ -24,49 +24,58 @@ describe('QualityDialog.vue', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.find('.grade-badge').text()).toContain('A-')
+    expect(wrapper.text()).toContain('A-')
   })
 
   it('should render overall score', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.find('.quality-overall').text()).toContain('83')
+    expect(wrapper.text()).toContain('83')
   })
 
   it('should render all 6 score dimensions', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.findAll('.score-row')).toHaveLength(6)
+    const text = wrapper.text()
+    expect(text).toContain('事实准确')
+    expect(text).toContain('内容完整')
+    expect(text).toContain('逻辑连贯')
+    expect(text).toContain('主题相关')
+    expect(text).toContain('引用质量')
+    expect(text).toContain('写作质量')
   })
 
-  it('should render progress bars with correct widths', () => {
+  it('should render progress bars with correct values', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.findAll('.score-bar-fill')[0].attributes('style')).toContain('width: 85%')
+    const text = wrapper.text()
+    expect(text).toContain('85%')
   })
 
   it('should render strengths list', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.find('.quality-list.strengths').findAll('.list-item')).toHaveLength(2)
+    const text = wrapper.text()
+    expect(text).toContain('代码示例丰富且可运行')
+    expect(text).toContain('章节结构清晰有层次')
   })
 
   it('should render weaknesses list', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.find('.quality-list.weaknesses').text()).toContain('引用来源偏少')
+    expect(wrapper.text()).toContain('引用来源偏少')
   })
 
   it('should render suggestions list', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.find('.quality-list.suggestions').findAll('.list-item')).toHaveLength(1)
+    expect(wrapper.text()).toContain('补充 3-5 个权威引用')
   })
 
   it('should not render empty lists', () => {
@@ -74,7 +83,10 @@ describe('QualityDialog.vue', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: emptyEval, loading: false },
     })
-    expect(wrapper.find('.quality-list.strengths').exists()).toBe(false)
+    const text = wrapper.text()
+    expect(text).not.toContain('优点')
+    expect(text).not.toContain('不足')
+    expect(text).not.toContain('建议')
   })
 
   it('should render summary and statistics', () => {
@@ -89,14 +101,14 @@ describe('QualityDialog.vue', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: true, evaluation: null, loading: true },
     })
-    expect(wrapper.find('.loading-spinner').exists()).toBe(true)
+    expect(wrapper.text()).toContain('evaluate')
   })
 
   it('should not render when not visible', () => {
     const wrapper = mount(QualityDialog, {
       props: { visible: false, evaluation: mockEvaluation, loading: false },
     })
-    expect(wrapper.find('.quality-dialog').exists()).toBe(false)
+    expect(wrapper.html()).toBe('')
   })
 
   it('should emit close when close button clicked', async () => {

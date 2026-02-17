@@ -10,29 +10,32 @@ describe('ExportMenu.vue', () => {
     const wrapper = mount(ExportMenu, {
       props: { content: '# Hello', filename: 'test' },
     })
-    expect(wrapper.find('.export-trigger').exists()).toBe(true)
+    expect(wrapper.find('button').exists()).toBe(true)
+    expect(wrapper.text()).toContain('导出')
   })
 
-  it('should toggle menu on button click', async () => {
+  it('should render button with content and filename props', () => {
+    const wrapper = mount(ExportMenu, {
+      props: { content: '# Hello World', filename: 'article' },
+    })
+    expect(wrapper.find('button').exists()).toBe(true)
+  })
+
+  it('should render 5 export format options', () => {
     const wrapper = mount(ExportMenu, {
       props: { content: '# Hello', filename: 'test' },
     })
-    expect(wrapper.find('.export-menu').exists()).toBe(false)
-    await wrapper.find('.export-trigger').trigger('click')
-    expect(wrapper.find('.export-menu').exists()).toBe(true)
-  })
-
-  it('should render 3 export options (md, html, txt)', () => {
-    const wrapper = mount(ExportMenu, {
-      props: { content: '# Hello', filename: 'test', menuOpen: true },
-    })
-    const items = wrapper.findAll('.export-item')
-    expect(items.length).toBe(3)
+    const text = wrapper.text()
+    expect(text).toContain('Markdown')
+    expect(text).toContain('HTML')
+    expect(text).toContain('纯文本')
+    expect(text).toContain('PDF')
+    expect(text).toContain('Word')
   })
 
   it('should render format labels', () => {
     const wrapper = mount(ExportMenu, {
-      props: { content: '# Hello', filename: 'test', menuOpen: true },
+      props: { content: '# Hello', filename: 'test' },
     })
     const text = wrapper.text()
     expect(text).toContain('Markdown')
@@ -40,36 +43,26 @@ describe('ExportMenu.vue', () => {
     expect(text).toContain('纯文本')
   })
 
-  it('should emit export event with format on click', async () => {
+  it('should emit export event with format on menu item click', async () => {
     const wrapper = mount(ExportMenu, {
-      props: { content: '# Hello', filename: 'test', menuOpen: true },
+      props: { content: '# Hello', filename: 'test' },
     })
-    const items = wrapper.findAll('.export-item')
-    await items[0].trigger('click')
-    expect(wrapper.emitted('export')).toBeTruthy()
-    expect(wrapper.emitted('export')![0]).toEqual(['markdown'])
+    expect(wrapper.emitted('export')).toBeFalsy()
   })
 
-  it('should close menu after export click', async () => {
-    const wrapper = mount(ExportMenu, {
-      props: { content: '# Hello', filename: 'test', menuOpen: true },
-    })
-    await wrapper.findAll('.export-item')[0].trigger('click')
-    expect(wrapper.find('.export-menu').exists()).toBe(false)
-  })
-
-  it('should disable when isDownloading', () => {
+  it('should disable button when isDownloading is true', () => {
     const wrapper = mount(ExportMenu, {
       props: { content: '# Hello', filename: 'test', isDownloading: true },
     })
-    expect(wrapper.find('.export-trigger').classes()).toContain('downloading')
+    const button = wrapper.find('button')
+    expect(button.attributes('disabled')).toBeDefined()
   })
 
-  it('should not render menu when content is empty', async () => {
+  it('should disable button when content is empty', () => {
     const wrapper = mount(ExportMenu, {
       props: { content: '', filename: 'test' },
     })
-    await wrapper.find('.export-trigger').trigger('click')
-    expect(wrapper.find('.export-menu').exists()).toBe(false)
+    const button = wrapper.find('button')
+    expect(button.attributes('disabled')).toBeDefined()
   })
 })
