@@ -403,7 +403,7 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: var(--color-bg-base);
+  background: linear-gradient(135deg, var(--color-bg-base) 0%, var(--color-muted) 50%, var(--color-bg-base) 100%);
   color: var(--color-text-primary);
 }
 
@@ -446,13 +446,14 @@ onUnmounted(() => {
   height: 100%;
   width: 100%;
   padding-top: 16px;
-  background: var(--color-bg-elevated);
+  background: var(--glass-bg, var(--color-bg-elevated));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  backdrop-filter: blur(12px);
 }
 
 /* === 图标按钮工具栏（对齐 DeerFlow absolute right-4） === */
@@ -619,15 +620,18 @@ onUnmounted(() => {
 .preview-panel :deep(p) { margin: 0.8em 0; }
 .preview-panel :deep(ul), .preview-panel :deep(ol) { margin: 0.8em 0; padding-left: 1.6em; }
 .preview-panel :deep(li) { margin: 0.3em 0; }
-.preview-panel :deep(code) { background: var(--color-bg-input); padding: 2px 6px; border-radius: 4px; font-size: 0.875em; font-family: var(--font-mono); }
-.preview-panel :deep(pre) { background: var(--color-terminal-bg); color: var(--color-terminal-text); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 1em 0; }
-.preview-panel :deep(pre code) { background: none; padding: 0; }
-.preview-panel :deep(a) { color: var(--color-primary); text-decoration: underline; text-underline-offset: 2px; }
+.preview-panel :deep(code) { background: var(--color-bg-input); padding: 2px 6px; border-radius: 4px; font-size: 0.875em; font-family: var(--font-mono); color: var(--color-syntax-variable, #ec4899); }
+.preview-panel :deep(pre) { background: var(--color-terminal-bg); color: var(--color-terminal-text); padding: 16px; border-radius: 8px; overflow-x: auto; margin: 1em 0; border: 1px solid var(--color-border); }
+.preview-panel :deep(pre code) { background: none; padding: 0; color: inherit; }
+.preview-panel :deep(a) { color: var(--color-syntax-function, #3b82f6); text-decoration: none; }
+.preview-panel :deep(a:hover) { text-decoration: underline; }
 .preview-panel :deep(img) { max-width: 100%; border-radius: 8px; margin: 1em 0; }
 .preview-panel :deep(blockquote) { border-left: 3px solid var(--color-border); padding-left: 16px; margin: 1em 0; color: var(--color-text-muted); font-style: italic; }
-.preview-panel :deep(table) { width: 100%; border-collapse: collapse; margin: 1em 0; }
-.preview-panel :deep(th), .preview-panel :deep(td) { border: 1px solid var(--color-border); padding: 8px 12px; text-align: left; }
-.preview-panel :deep(th) { background: var(--color-bg-input); font-weight: 600; }
+.preview-panel :deep(table) { width: 100%; border-collapse: collapse; margin: 1em 0; background: var(--color-bg-input); border-radius: 8px; overflow: hidden; border: 1px solid var(--color-border); }
+.preview-panel :deep(th), .preview-panel :deep(td) { padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--color-border); }
+.preview-panel :deep(th) { background: var(--color-bg-base); font-weight: 600; color: var(--color-text-primary); }
+.preview-panel :deep(tr:last-child td) { border-bottom: none; }
+.preview-panel :deep(tr:hover td) { background: var(--color-bg-base); }
 .preview-panel :deep(hr) { border: none; border-top: 1px solid var(--color-border); margin: 2em 0; }
 .preview-panel :deep(strong) { font-weight: 600; }
 

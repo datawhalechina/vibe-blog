@@ -1,3 +1,6 @@
+# Claude Code 项目配置
+.claude/
+
 # 环境变量和敏感信息
 .env
 .env.local

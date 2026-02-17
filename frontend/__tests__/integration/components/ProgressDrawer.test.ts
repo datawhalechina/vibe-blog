@@ -87,8 +87,8 @@ describe('ProgressDrawer.vue', () => {
         },
       })
 
-      const indicator = wrapper.find('.progress-indicator')
-      expect(indicator.classes()).toContain('active')
+      const greenDot = wrapper.find('.terminal-dot.green')
+      expect(greenDot.classes()).toContain('active')
     })
 
     it('should not show active indicator when not loading', () => {
@@ -99,8 +99,8 @@ describe('ProgressDrawer.vue', () => {
         },
       })
 
-      const indicator = wrapper.find('.progress-indicator')
-      expect(indicator.classes()).not.toContain('active')
+      const greenDot = wrapper.find('.terminal-dot.green')
+      expect(greenDot.classes()).not.toContain('active')
     })
 
     it('should show stop button when loading', () => {

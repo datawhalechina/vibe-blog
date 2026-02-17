@@ -25,26 +25,26 @@ describe('ProgressDrawer — Tab 切换', () => {
   it('should render tab bar with two tabs', () => {
     const wrapper = mount(ProgressDrawer, { props: baseProps })
     const text = wrapper.text()
-    expect(text).toContain('活动日志')
-    expect(text).toContain('文章预览')
+    expect(text).toContain('$ tail -f')
+    expect(text).toContain('$ cat preview.md')
   })
 
   it('should default to logs tab active', () => {
     const wrapper = mount(ProgressDrawer, { props: baseProps })
     const text = wrapper.text()
-    expect(text).toContain('活动日志')
+    expect(text).toContain('$ tail -f')
   })
 
   it('should disable preview tab when no content', () => {
     const wrapper = mount(ProgressDrawer, { props: baseProps })
-    expect(wrapper.text()).toContain('文章预览')
+    expect(wrapper.text()).toContain('$ cat preview.md')
   })
 
   it('should enable preview tab when previewContent is set', () => {
     const wrapper = mount(ProgressDrawer, {
       props: { ...baseProps, previewContent: '<p>Hello</p>' },
     })
-    expect(wrapper.text()).toContain('文章预览')
+    expect(wrapper.text()).toContain('$ cat preview.md')
   })
 
   it('should switch to preview tab on click', async () => {

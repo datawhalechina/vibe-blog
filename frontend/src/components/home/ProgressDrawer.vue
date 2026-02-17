@@ -4,10 +4,15 @@
     class="progress-drawer"
     :class="{ expanded: expanded, embedded: embedded }"
   >
-    <!-- 最小化状态栏 -->
+    <!-- 终端窗口头部 -->
     <div class="progress-bar-mini" @click="$emit('toggle')">
       <div class="progress-bar-left">
-        <span class="progress-indicator" :class="{ active: isLoading }"></span>
+        <div class="terminal-dots">
+          <span class="terminal-dot red"></span>
+          <span class="terminal-dot yellow"></span>
+          <span class="terminal-dot green" :class="{ active: isLoading }"></span>
+        </div>
+        <span class="terminal-title">progress.log</span>
         <span class="progress-status">{{ statusBadge }}</span>
         <span class="progress-text">{{ progressText }}</span>
       </div>
@@ -42,7 +47,7 @@
           :class="{ active: activeTab === 'logs' }"
           @click="activeTab = 'logs'"
         >
-          活动日志
+          $ tail -f
         </button>
         <span class="progress-tab-divider">│</span>
         <button
@@ -51,7 +56,7 @@
           :disabled="!previewContent"
           @click="previewContent && (activeTab = 'preview')"
         >
-          文章预览
+          $ cat preview.md
         </button>
       </div>
 
@@ -62,7 +67,7 @@
         <div class="scroll-shadow scroll-shadow-bottom"></div>
         <!-- 任务启动信息 -->
         <div class="progress-task-header">
-          <span class="progress-prompt">❯</span>
+          <span class="progress-prompt">$</span>
           <span class="progress-command">generate</span>
           <span class="progress-arg">--type</span>
           <span class="progress-value">{{ articleType }}</span>
@@ -403,11 +408,12 @@ const getHostname = (url: string): string | null => {
   max-width: 1200px;
   z-index: var(--z-modal);
   font-family: var(--font-mono);
-  background: var(--color-bg-elevated);
+  background: var(--glass-bg, var(--color-bg-elevated));
   border: 1px solid var(--color-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
   transition: var(--transition-all);
+  backdrop-filter: blur(12px);
 }
 
 .progress-drawer.embedded {
@@ -432,7 +438,7 @@ const getHostname = (url: string): string | null => {
   }
 }
 
-/* 最小化状态栏 */
+/* 终端窗口头部 */
 .progress-bar-mini {
   display: flex;
   align-items: center;
@@ -444,10 +450,12 @@ const getHostname = (url: string): string | null => {
   min-height: 40px;
   max-height: 40px;
   overflow: hidden;
+  background: var(--color-muted);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .progress-bar-mini:hover {
-  background: var(--color-bg-input);
+  background: var(--color-bg-hover);
 }
 
 .progress-bar-left {
@@ -459,18 +467,33 @@ const getHostname = (url: string): string | null => {
   overflow: hidden;
 }
 
-.progress-indicator {
-  width: 8px;
-  height: 8px;
-  border-radius: var(--radius-full);
-  background: var(--color-border);
+.terminal-dots {
+  display: flex;
+  gap: var(--space-xs);
   flex-shrink: 0;
 }
 
-.progress-indicator.active {
-  background: var(--color-success);
+.terminal-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-full);
+  transition: var(--transition-all);
+}
+
+.terminal-dot.red { background: var(--color-dot-red); }
+.terminal-dot.yellow { background: var(--color-dot-yellow); }
+.terminal-dot.green { background: var(--color-dot-green); }
+
+.terminal-dot.green.active {
   box-shadow: 0 0 8px var(--color-success-light);
   animation: pulse 1.5s ease-in-out infinite;
+}
+
+.terminal-title {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-tertiary);
+  flex-shrink: 0;
 }
 
 @keyframes pulse {
@@ -681,7 +704,7 @@ const getHostname = (url: string): string | null => {
 }
 
 .progress-prompt {
-  color: var(--color-success);
+  color: var(--color-primary);
   font-weight: var(--font-weight-bold);
 }
 
