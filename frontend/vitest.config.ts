@@ -1,6 +1,6 @@
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
-import { fileURLToPath } from 'node:url'
+import path from 'path'
 
 export default defineConfig({
   plugins: [vue()],
@@ -30,9 +30,9 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-      'jspdf': fileURLToPath(new URL('./__tests__/__mocks__/jspdf.ts', import.meta.url)),
-      'html2canvas': fileURLToPath(new URL('./__tests__/__mocks__/html2canvas.ts', import.meta.url)),
+      '@': path.resolve(__dirname, 'src'),
+      'jspdf': path.resolve(__dirname, '__tests__/__mocks__/jspdf.ts'),
+      'html2canvas': path.resolve(__dirname, '__tests__/__mocks__/html2canvas.ts'),
     },
   },
 })
