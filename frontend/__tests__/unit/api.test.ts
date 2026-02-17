@@ -105,6 +105,7 @@ const server = setupServer(
   http.post('/api/generate', () => HttpResponse.json(mockTaskResponse)),
   http.post('/api/tasks/:taskId/cancel', () => HttpResponse.json({ success: true })),
   http.post('/api/tasks/:taskId/confirm-outline', () => HttpResponse.json({ success: true })),
+  http.post('/api/tasks/:taskId/resume', () => HttpResponse.json({ success: true })),
   http.get('/api/history', () => HttpResponse.json(mockHistoryResponse)),
   http.get('/api/history/:id', () => HttpResponse.json(mockHistoryRecordResponse)),
   http.delete('/api/history/:id', () => HttpResponse.json({ success: true })),
