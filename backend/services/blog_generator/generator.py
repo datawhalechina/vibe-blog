@@ -1075,6 +1075,10 @@ class BlogGenerator:
     
     def _should_deepen(self, state: SharedState) -> Literal["deepen", "continue"]:
         """判断是否需要深化内容"""
+        MAX_DEEPEN_ROUNDS = 5  # 硬限制，防止无限循环
+        if state.get('questioning_count', 0) >= MAX_DEEPEN_ROUNDS:
+            logger.warning(f"深化轮数达到硬限制 ({MAX_DEEPEN_ROUNDS})，强制跳过")
+            return "continue"
         if not state.get('all_sections_detailed', True):
             if state.get('questioning_count', 0) < self.max_questioning_rounds:
                 return "deepen"
