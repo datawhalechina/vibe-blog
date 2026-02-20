@@ -34,6 +34,11 @@ from .agents.thread_checker import ThreadCheckerAgent
 from .agents.voice_checker import VoiceCheckerAgent
 from .agents.factcheck import FactCheckAgent
 from .agents.summary_generator import SummaryGeneratorAgent
+from .middleware import (
+    MiddlewarePipeline, TracingMiddleware, ReducerMiddleware,
+    ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
+)
+import uuid
 
 logger = logging.getLogger(__name__)
 
@@ -133,6 +138,20 @@ class BlogGenerator:
             except Exception as e:
                 logger.warning(f"分层架构校验初始化失败: {e}")
 
+        # 102.10 迁移：中间件管道
+        self.pipeline = MiddlewarePipeline(middlewares=[
+            TracingMiddleware(),
+            ReducerMiddleware(),
+            ErrorTrackingMiddleware(),
+            TokenBudgetMiddleware(
+                compressor=getattr(self, '_context_compressor', None),
+                token_tracker=getattr(self, '_token_tracker', None),
+            ),
+            ContextPrefetchMiddleware(
+                knowledge_service=knowledge_service,
+            ),
+        ])
+
         # 构建工作流
         self.workflow = self._build_workflow()
         self.app = None
@@ -157,28 +176,28 @@ class BlogGenerator:
         """
         workflow = StateGraph(SharedState)
         
-        # 添加节点
-        workflow.add_node("researcher", self._researcher_node)
-        workflow.add_node("planner", self._planner_node)
-        workflow.add_node("writer", self._writer_node)
+        # 添加节点（102.10 迁移：通过中间件管道包装）
+        workflow.add_node("researcher", self.pipeline.wrap_node("researcher", self._researcher_node))
+        workflow.add_node("planner", self.pipeline.wrap_node("planner", self._planner_node))
+        workflow.add_node("writer", self.pipeline.wrap_node("writer", self._writer_node))
         # 多轮搜索相关节点
-        workflow.add_node("check_knowledge", self._check_knowledge_node)
-        workflow.add_node("refine_search", self._refine_search_node)
-        workflow.add_node("enhance_with_knowledge", self._enhance_with_knowledge_node)
+        workflow.add_node("check_knowledge", self.pipeline.wrap_node("check_knowledge", self._check_knowledge_node))
+        workflow.add_node("refine_search", self.pipeline.wrap_node("refine_search", self._refine_search_node))
+        workflow.add_node("enhance_with_knowledge", self.pipeline.wrap_node("enhance_with_knowledge", self._enhance_with_knowledge_node))
         # 追问和审核节点
-        workflow.add_node("questioner", self._questioner_node)
-        workflow.add_node("deepen_content", self._deepen_content_node)
-        workflow.add_node("coder_and_artist", self._coder_and_artist_node)  # 并行节点
-        workflow.add_node("section_evaluate", self._section_evaluate_node)  # 段落评估
-        workflow.add_node("section_improve", self._section_improve_node)  # 段落改进
-        workflow.add_node("consistency_check", self._consistency_check_node)  # 一致性检查
-        workflow.add_node("reviewer", self._reviewer_node)
-        workflow.add_node("revision", self._revision_node)
-        workflow.add_node("factcheck", self._factcheck_node)
-        workflow.add_node("text_cleanup", self._text_cleanup_node)
-        workflow.add_node("humanizer", self._humanizer_node)
-        workflow.add_node("assembler", self._assembler_node)
-        workflow.add_node("summary_generator", self._summary_generator_node)
+        workflow.add_node("questioner", self.pipeline.wrap_node("questioner", self._questioner_node))
+        workflow.add_node("deepen_content", self.pipeline.wrap_node("deepen_content", self._deepen_content_node))
+        workflow.add_node("coder_and_artist", self.pipeline.wrap_node("coder_and_artist", self._coder_and_artist_node))  # 并行节点
+        workflow.add_node("section_evaluate", self.pipeline.wrap_node("section_evaluate", self._section_evaluate_node))  # 段落评估
+        workflow.add_node("section_improve", self.pipeline.wrap_node("section_improve", self._section_improve_node))  # 段落改进
+        workflow.add_node("consistency_check", self.pipeline.wrap_node("consistency_check", self._consistency_check_node))  # 一致性检查
+        workflow.add_node("reviewer", self.pipeline.wrap_node("reviewer", self._reviewer_node))
+        workflow.add_node("revision", self.pipeline.wrap_node("revision", self._revision_node))
+        workflow.add_node("factcheck", self.pipeline.wrap_node("factcheck", self._factcheck_node))
+        workflow.add_node("text_cleanup", self.pipeline.wrap_node("text_cleanup", self._text_cleanup_node))
+        workflow.add_node("humanizer", self.pipeline.wrap_node("humanizer", self._humanizer_node))
+        workflow.add_node("assembler", self.pipeline.wrap_node("assembler", self._assembler_node))
+        workflow.add_node("summary_generator", self.pipeline.wrap_node("summary_generator", self._summary_generator_node))
         
         # 定义边
         workflow.add_edge(START, "researcher")
@@ -1226,6 +1245,9 @@ class BlogGenerator:
             target_length=target_length,
             source_material=source_material
         )
+
+        # 102.10 迁移：设置追踪 ID
+        initial_state["trace_id"] = str(uuid.uuid4())[:8]
         
         logger.info(f"开始生成博客: {topic}")
         logger.info(f"  类型: {article_type}, 受众: {target_audience}, 长度: {target_length}")
@@ -1327,10 +1349,11 @@ class BlogGenerator:
             target_length=target_length,
             source_material=source_material
         )
-        
+
+        # 102.10 迁移：设置追踪 ID
+        initial_state["trace_id"] = str(uuid.uuid4())[:8]
+
         config = {"configurable": {"thread_id": f"blog_{topic}"}}
-        
-        # 使用 stream 方法获取中间状态
         for event in self.app.stream(initial_state, config):
             for node_name, state in event.items():
                 yield {

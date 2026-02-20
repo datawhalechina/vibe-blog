@@ -3,6 +3,7 @@
 """
 
 import os
+import uuid
 from typing import TypedDict, List, Optional, Literal
 from pydantic import BaseModel, Field
 
@@ -259,6 +260,14 @@ class SharedState(TypedDict):
     # 错误信息
     error: Optional[str]
 
+    # 102.10 迁移特性字段
+    trace_id: Optional[str]  # Feature E: 分布式追踪 ID
+    error_history: List[dict]  # Feature C: 错误追踪历史
+    _node_errors: List[dict]  # Feature C: 当前节点错误（内部）
+    _node_budget: Optional[int]  # Feature H: 节点 Token 预算
+    _budget_warning: bool  # Feature H: 预算警告标志
+    prefetch_docs: List[dict]  # Feature G: 预取的知识库文档
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -366,6 +375,13 @@ def create_initial_state(
         final_html=None,
         output_folder=None,
         error=None,
+        # 102.10 迁移特性字段
+        trace_id=uuid.uuid4().hex[:8],
+        error_history=[],
+        _node_errors=[],
+        _node_budget=None,
+        _budget_warning=False,
+        prefetch_docs=[],
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,

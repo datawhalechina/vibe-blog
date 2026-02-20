@@ -92,6 +92,8 @@ class Config:
     # Token 追踪与成本分析
     TOKEN_TRACKING_ENABLED = os.getenv('TOKEN_TRACKING_ENABLED', 'true').lower() == 'true'
     TOKEN_COST_ESTIMATION = os.getenv('TOKEN_COST_ESTIMATION', 'false').lower() == 'true'
+    # 102.10 迁移：主动式 Token 预算管理
+    TOKEN_TOTAL_BUDGET = int(os.getenv('TOKEN_TOTAL_BUDGET', '500000'))
 
     # 结构化任务日志
     BLOG_TASK_LOG_ENABLED = os.getenv('BLOG_TASK_LOG_ENABLED', 'true').lower() == 'true'
