@@ -5,10 +5,11 @@ LLM 弹性调用模块 — 截断扩容、智能重试、超时保护
 1. 响应截断检测 + max_tokens 自动扩容
 2. LLM 重复输出检测
 3. 智能错误分类（上下文超限快速失败、429 指数退避、一般错误重试）
-4. 同步超时保护（signal.SIGALRM）
+4. 同步超时保护（主线程 signal.SIGALRM / 非主线程 concurrent.futures）
 
 来源：37.32 MiroThinker 特性改造
 """
+import concurrent.futures
 import logging
 import os
 import signal
@@ -20,8 +21,8 @@ from typing import Tuple
 logger = logging.getLogger(__name__)
 
 # 默认配置（可通过环境变量覆盖）
-DEFAULT_LLM_TIMEOUT = int(os.environ.get('LLM_CALL_TIMEOUT', '600'))
-DEFAULT_MAX_RETRIES = int(os.environ.get('LLM_MAX_RETRIES', '5'))
+DEFAULT_LLM_TIMEOUT = int(os.environ.get('LLM_CALL_TIMEOUT', '180'))
+DEFAULT_MAX_RETRIES = int(os.environ.get('LLM_MAX_RETRIES', '3'))
 DEFAULT_BASE_WAIT = float(os.environ.get('LLM_RETRY_BASE_WAIT', '5'))
 DEFAULT_MAX_WAIT = float(os.environ.get('LLM_RETRY_MAX_WAIT', '60'))
 DEFAULT_EXPAND_RATIO = float(os.environ.get('LLM_TRUNCATION_EXPAND_RATIO', '1.1'))
@@ -91,17 +92,15 @@ def is_context_length_error(error: Exception) -> bool:
 @contextmanager
 def timeout_guard(seconds: int):
     """
-    同步超时保护（基于 signal.SIGALRM，仅 Unix/macOS）。
+    同步超时保护。
 
-    Windows 环境下降级为无超时保护。
+    主线程使用 signal.SIGALRM（Unix/macOS），
+    非主线程使用 concurrent.futures 线程池兜底。
     """
-    if not hasattr(signal, 'SIGALRM'):
-        # Windows 不支持 SIGALRM，降级
-        yield
-        return
-
-    if threading.current_thread() is not threading.main_thread():
-        # signal.alarm 只能在主线程使用，非主线程降级为无超时保护
+    if not hasattr(signal, 'SIGALRM') or threading.current_thread() is not threading.main_thread():
+        # Windows 或非主线程：使用 threading.Timer 兜底
+        # 通过设置一个标志位，在超时后让调用方感知
+        # 但由于无法中断阻塞的 I/O，这里用 concurrent.futures 包装
         yield
         return
 
@@ -165,13 +164,29 @@ def resilient_chat(
     label = f"[{caller}] " if caller else ""
     current_model = model
 
+    _in_main_thread = (
+        hasattr(signal, 'SIGALRM')
+        and threading.current_thread() is threading.main_thread()
+    )
+
     for attempt in range(max_retries):
         attempts = attempt + 1
         try:
-            with timeout_guard(timeout):
-                from utils.resilient_llm_caller import _rate_limit_hook
+            if _in_main_thread:
+                # 主线程：signal.SIGALRM 可以中断阻塞 I/O
+                with timeout_guard(timeout):
+                    _rate_limit_hook()
+                    response = current_model.invoke(messages)
+            else:
+                # 非主线程：用 concurrent.futures 做超时保护
                 _rate_limit_hook()
-                response = current_model.invoke(messages)
+                with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                    future = pool.submit(current_model.invoke, messages)
+                    try:
+                        response = future.result(timeout=timeout)
+                    except concurrent.futures.TimeoutError:
+                        future.cancel()
+                        raise LLMCallTimeout(f"LLM 调用超时 ({timeout}s)")
 
             content = response.content.strip() if response.content else ""
 
