@@ -166,6 +166,11 @@ class WriterAgent:
 
         # 37.13 写作模板 + 风格注入
         prompt = self._apply_template_and_style(prompt, "writer", kwargs)
+
+        # 102.06: 写作方法论技能注入
+        writing_skill_prompt = kwargs.get('_writing_skill_prompt', '')
+        if writing_skill_prompt:
+            prompt = writing_skill_prompt + "\n\n" + prompt
         
         # 输出完整的 Writer Prompt 到日志（用于诊断）
         logger.info(f"[Writer] ========== 章节 Prompt ({len(prompt)} 字): {section_outline.get('title', 'Unknown')} ==========")
@@ -432,6 +437,7 @@ class WriterAgent:
                 'narrative_flow': narrative_flow,
                 'template': state.get('writing_template'),  # 37.13
                 'style': state.get('writing_style'),  # 37.13
+                '_writing_skill_prompt': state.get('_writing_skill_prompt', ''),  # 102.06
             })
         
         # 使用环境变量配置或传入的参数
@@ -463,6 +469,7 @@ class WriterAgent:
                     narrative_flow=task.get('narrative_flow', {}),
                     template=task.get('template'),  # 37.13
                     style=task.get('style'),  # 37.13
+                    _writing_skill_prompt=task.get('_writing_skill_prompt', ''),  # 102.06
                 )
                 return {
                     'success': True,

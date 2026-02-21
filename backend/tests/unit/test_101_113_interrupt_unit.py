@@ -23,6 +23,7 @@ class TestPlannerNodeInterrupt:
         gen._interactive = interactive
         gen._outline_stream_callback = None
         gen._layer_validator = None
+        gen._writing_skill_manager = None
         return gen
 
     @patch('services.blog_generator.generator.interrupt')
@@ -50,6 +51,7 @@ class TestPlannerNodeInterrupt:
             gen._interactive = True
             gen._outline_stream_callback = None
             gen._layer_validator = None
+            gen._writing_skill_manager = None
 
             state = {'topic': 'test'}
             result = gen._planner_node(state)
@@ -77,6 +79,7 @@ class TestPlannerNodeInterrupt:
             gen._interactive = False
             gen._outline_stream_callback = None
             gen._layer_validator = None
+            gen._writing_skill_manager = None
 
             state = {'topic': 'test'}
             result = gen._planner_node(state)
@@ -106,6 +109,7 @@ class TestPlannerNodeInterrupt:
             gen._interactive = True
             gen._outline_stream_callback = None
             gen._layer_validator = None
+            gen._writing_skill_manager = None
 
             result = gen._planner_node({'topic': 'test'})
 
@@ -126,6 +130,7 @@ class TestPlannerNodeInterrupt:
             gen._interactive = True
             gen._outline_stream_callback = None
             gen._layer_validator = None
+            gen._writing_skill_manager = None
 
             result = gen._planner_node({'topic': 'test'})
             mock_interrupt.assert_not_called()
@@ -251,6 +256,7 @@ class TestInterruptDataStructure:
             gen._interactive = True
             gen._outline_stream_callback = None
             gen._layer_validator = None
+            gen._writing_skill_manager = None
 
             gen._planner_node({'topic': 'AI'})
 

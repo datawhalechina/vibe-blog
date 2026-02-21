@@ -23,10 +23,11 @@ def _extract_source_placeholders(text: str) -> set:
 
 
 def _extract_json(text: str) -> dict:
-    """从 LLM 响应中提取 JSON（处理 markdown 代码块和转义问题）"""
+    """从 LLM 响应中提取 JSON（处理 markdown 代码块、转义和截断问题）"""
     text = text.strip()
     if not text:
         raise ValueError("LLM 返回空内容，无法解析 JSON")
+    # 提取 markdown 代码块中的 JSON
     if '```json' in text:
         start = text.find('```json') + 7
         end = text.find('```', start)
@@ -37,18 +38,30 @@ def _extract_json(text: str) -> dict:
         end = text.find('```', start)
         if end != -1:
             text = text[start:end].strip()
+    # 如果提取后为空，尝试用正则找最外层 {...}
     if not text:
         raise ValueError("LLM 返回内容中未找到有效 JSON")
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        # 模型在 JSON 字符串中输出未转义的换行/控制字符
+
+    # 多轮尝试解析
+    for attempt_fn in [
+        lambda t: json.loads(t),
+        lambda t: json.loads(t, strict=False),
+        lambda t: json.loads(re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', t), strict=False),
+    ]:
         try:
-            return json.loads(text, strict=False)
+            return attempt_fn(text)
         except json.JSONDecodeError:
-            import re as _re
-            text = _re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r'\\\\', text)
-            return json.loads(text, strict=False)
+            continue
+
+    # 最后尝试：用正则提取最外层 {...} 块（应对 LLM 在 JSON 前后输出额外文本）
+    brace_match = re.search(r'\{[\s\S]*\}', text)
+    if brace_match:
+        try:
+            return json.loads(brace_match.group(), strict=False)
+        except json.JSONDecodeError:
+            pass
+
+    raise json.JSONDecodeError("所有解析策略均失败", text, 0)
 
 
 class HumanizerAgent:
@@ -108,12 +121,17 @@ class HumanizerAgent:
                 return _extract_json(response)
             except (json.JSONDecodeError, ValueError) as e:
                 last_err = e
-                logger.warning(f"[Humanizer] 改写解析失败 (attempt {attempt+1}/{self.max_retries+1}): {e}")
+                # 记录 LLM 原始返回内容，方便排查
+                resp_preview = repr(response[:200]) if response else "(None)"
+                logger.warning(
+                    f"[Humanizer] 改写解析失败 (attempt {attempt+1}/{self.max_retries+1}): {e} "
+                    f"| response preview: {resp_preview}"
+                )
                 if attempt < self.max_retries:
                     time.sleep(2)
-        # 所有重试失败，返回原文
+        # 所有重试失败，返回原文（用 humanized_content key 保持与 run() 一致）
         logger.warning(f"[Humanizer] 改写最终失败，保留原文: {last_err}")
-        return {"rewritten_content": content}
+        return {"humanized_content": content, "changes": [], "_fallback": True}
 
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -189,8 +207,8 @@ class HumanizerAgent:
                 continue
 
             humanized = rewrite_result.get('humanized_content')
-            if not humanized:
-                logger.warning(f"[Humanizer] [{idx+1}/{total_sections}] {title} — 改写结果为空，使用原始内容")
+            if not humanized or rewrite_result.get('_fallback'):
+                logger.warning(f"[Humanizer] [{idx+1}/{total_sections}] {title} — 改写结果为空或回退，使用原始内容")
                 section['humanizer_score'] = total_score
                 section['humanizer_skipped'] = True
                 skipped_count += 1

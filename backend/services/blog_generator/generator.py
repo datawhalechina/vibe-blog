@@ -149,6 +149,28 @@ class BlogGenerator:
         # 102.01 迁移：统一并行任务执行引擎
         self.executor = ParallelTaskExecutor()
 
+        # 102.06 迁移：写作方法论技能管理器
+        self._writing_skill_manager = None
+        if os.getenv('WRITING_SKILL_ENABLED', 'true').lower() == 'true':
+            try:
+                from .skills.writing_skill_manager import WritingSkillManager
+                self._writing_skill_manager = WritingSkillManager()
+                self._writing_skill_manager.load()
+                logger.info("102.06 WritingSkillManager 已启用")
+            except Exception as e:
+                logger.warning(f"WritingSkillManager 初始化失败: {e}")
+
+        # 102.03 迁移：用户记忆存储
+        self._memory_storage = None
+        if os.getenv('MEMORY_ENABLED', 'false').lower() == 'true':
+            try:
+                from .memory import MemoryStorage, BlogMemoryConfig
+                mem_config = BlogMemoryConfig.from_env()
+                self._memory_storage = MemoryStorage(storage_path=mem_config.storage_path)
+                logger.info("102.03 MemoryStorage 已启用")
+            except Exception as e:
+                logger.warning(f"MemoryStorage 初始化失败: {e}")
+
         # 构建工作流
         self.workflow = self._build_workflow()
         self.app = None
@@ -303,12 +325,37 @@ class BlogGenerator:
             else:
                 logger.info("大纲已被用户确认")
 
+        # 102.06: 匹配写作技能，注入到 state 供 writer 使用
+        if self._writing_skill_manager:
+            try:
+                topic = state.get('topic', '')
+                article_type = state.get('article_type', '')
+                skill = self._writing_skill_manager.match_skill(topic, article_type)
+                if skill:
+                    result['_writing_skill_prompt'] = self._writing_skill_manager.build_system_prompt_section(skill)
+                    logger.info(f"匹配写作技能: {skill.name}")
+            except Exception as e:
+                logger.debug(f"写作技能匹配跳过: {e}")
+
         return result
     
     def _writer_node(self, state: SharedState) -> SharedState:
         """内容撰写节点"""
         logger.info("=== Step 3: 内容撰写 ===")
         self._validate_layer("content", state)
+
+        # 102.03: 注入用户记忆到 background_knowledge
+        if self._memory_storage:
+            try:
+                user_id = state.get('user_id', 'default')
+                memory_injection = self._memory_storage.format_for_injection(user_id)
+                if memory_injection:
+                    bg = state.get('background_knowledge', '')
+                    state['background_knowledge'] = bg + "\n\n" + memory_injection if bg else memory_injection
+                    logger.info(f"注入用户记忆: {len(memory_injection)} 字符")
+            except Exception as e:
+                logger.debug(f"用户记忆注入跳过: {e}")
+
         before_count = _get_content_word_count(state)
         result = self.writer.run(state)
         after_count = _get_content_word_count(result)

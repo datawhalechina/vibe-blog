@@ -91,14 +91,12 @@ class MemoryStorage:
             return create_empty_memory(user_id)
 
     def save(self, user_id: str, memory_data: dict) -> bool:
-        """原子写入用户记忆（temp + rename）"""
+        """原子写入用户记忆（102.07 统一使用 atomic_write）"""
         file_path = self._user_file(user_id)
         try:
+            from utils.atomic_write import atomic_write
             memory_data["lastUpdated"] = datetime.now(timezone.utc).isoformat()
-            temp_path = file_path.with_suffix(".tmp")
-            with open(temp_path, "w", encoding="utf-8") as f:
-                json.dump(memory_data, f, indent=2, ensure_ascii=False)
-            temp_path.replace(file_path)
+            atomic_write(str(file_path), json.dumps(memory_data, indent=2, ensure_ascii=False))
             self._cache[user_id] = memory_data
             self._mtimes[user_id] = file_path.stat().st_mtime
             return True

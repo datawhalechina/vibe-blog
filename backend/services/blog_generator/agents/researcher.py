@@ -91,6 +91,17 @@ class ResearcherAgent:
                 logger.info(f"📦 本地素材库已启用: {material_dir}")
             except Exception as e:
                 logger.warning(f"本地素材库初始化失败: {e}")
+
+        # 102.08 配置驱动工具注册表（可选，默认 false）
+        self._tool_registry = None
+        if os.environ.get('TOOL_REGISTRY_ENABLED', 'false').lower() == 'true':
+            try:
+                from ..tools.registry import get_tool_registry
+                self._tool_registry = get_tool_registry()
+                available = self._tool_registry.list_tools()
+                logger.info(f"102.08 ToolRegistry 已启用，已加载工具: {available}")
+            except Exception as e:
+                logger.warning(f"ToolRegistry 初始化失败，回退到硬编码路径: {e}")
     
     def generate_search_queries(self, topic: str, target_audience: str) -> List[str]:
         """

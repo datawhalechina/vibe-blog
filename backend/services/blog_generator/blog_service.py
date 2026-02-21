@@ -1118,7 +1118,21 @@ class BlogService:
                     citations=json.dumps(citations, ensure_ascii=False) if citations else None
                 )
                 logger.info(f"历史记录已保存: {task_id}")
-                
+
+                # 102.03: 记录用户行为到记忆存储
+                if self.generator._memory_storage:
+                    try:
+                        user_id = 'default'
+                        self.generator._memory_storage.add_fact(
+                            user_id,
+                            f"生成了关于 {topic} 的 {article_type} 文章",
+                            category="behavior",
+                            confidence=0.8,
+                            source=f"task:{task_id}",
+                        )
+                    except Exception as e:
+                        logger.debug(f"记忆记录跳过: {e}")
+
                 # 保存博客摘要（复用封面图生成时的摘要，避免重复调用 LLM）
                 try:
                     summary_to_save = article_summary
@@ -1282,6 +1296,21 @@ class BlogService:
         }
 
         completed_sections = 0
+
+        # 102.07: 修复悬挂工具调用（防御性代码，防止 resume 时消息历史不完整）
+        try:
+            snapshot = self.generator.app.get_state(config)
+            if snapshot and snapshot.values:
+                for key in ('messages', 'chat_history'):
+                    msgs = snapshot.values.get(key, [])
+                    if msgs:
+                        from utils.dangling_tool_call_fixer import fix_dangling_tool_calls
+                        patches = fix_dangling_tool_calls(msgs)
+                        if patches:
+                            logger.info(f"[resume] 修复 {len(patches)} 个悬挂工具调用")
+                            self.generator.app.update_state(config, {key: msgs + patches})
+        except Exception as e:
+            logger.debug(f"悬挂工具调用检查跳过: {e}")
 
         try:
             # 使用 Command(resume=...) 恢复图执行
@@ -2151,9 +2180,9 @@ Duration: 6-8 seconds. Professional educational style."""
                     # 如果没找到，就在开头插入
                     final_markdown = cover_section + markdown
             
-            # 写入文件
-            with open(filepath, 'w', encoding='utf-8') as f:
-                f.write(final_markdown)
+            # 写入文件（102.07 原子写入，防止崩溃时产生半写文件）
+            from utils.atomic_write import atomic_write
+            atomic_write(filepath, final_markdown)
             
             # 后处理：修复分割线前后的换行符
             try:

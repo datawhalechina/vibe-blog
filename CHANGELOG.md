@@ -4,6 +4,24 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-21
+
+### Added (102 系列特性引入)
+- ✨ **102.10 八特性基础层** — 中间件管道、Reducer、结构化错误、追踪 ID、懒初始化、上下文预取、Token 预算（61 tests）
+- ✨ **102.07 容错恢复与上下文压缩** — 断点续写、上下文窗口压缩
+- ✨ **102.08 配置驱动工具系统** — 声明式工具注册与配置化管理
+- ✨ **102.02 中间件管道系统升级** — 管道编排增强（25 tests）
+- ✨ **102.01 统一并行编排引擎** — ParallelTaskExecutor 统一子代理并行/串行调度（22 tests）
+- ✨ **102.06 SKILL.md 声明式写作技能系统** — 写作技能管理器 + public skills 目录（22 tests）
+- ✨ **102.03 持久化记忆系统** — 跨会话记忆存储与检索（32 tests）
+- 📋 **E2E 博客生成验证流程文档** — `.claude/E2E-TESTING.md`，涵盖前端交互（TipTap）、API、SSE 监控、大纲确认、完整管线阶段
+
+### Tests
+- ✅ 全量单元测试 141 tests 通过
+- ✅ E2E 端到端博客生成验证通过（主题: OpenClaw Agent 执行框架，4 章节 4 配图）
+
+---
+
 ## 2026-02-16
 
 ### Added
