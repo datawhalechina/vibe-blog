@@ -7,6 +7,7 @@ from __future__ import annotations
 import logging
 import os
 from contextvars import ContextVar
+from logging.handlers import RotatingFileHandler
 from typing import Iterable
 
 # 任务 ID 上下文变量（供异步任务链路注入）
@@ -135,11 +136,15 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
     # 文件 handler：在只读环境（如 Vercel）下自动跳过
     try:
         base_dir = os.path.dirname(os.path.realpath(__file__))
-        resolved_log_dir = log_dir or os.path.join(base_dir, "logs")
+        # 统一日志目录到 vibe-blog/logs/（与启动脚本一致）
+        project_root = os.path.dirname(base_dir)
+        resolved_log_dir = log_dir or os.path.join(project_root, "logs")
         os.makedirs(resolved_log_dir, exist_ok=True)
 
         log_file = os.path.join(resolved_log_dir, "app.log")
-        file_handler = logging.FileHandler(log_file, encoding="utf-8")
+        file_handler = RotatingFileHandler(
+            log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+        )
         file_handler.setLevel(logging.DEBUG)
         file_handler.setFormatter(plain_formatter)
         file_handler.addFilter(task_filter)
@@ -153,4 +158,58 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
 def get_logger(name: str) -> logging.Logger:
     """统一入口，便于未来切换日志实现。"""
     return logging.getLogger(name)
+
+
+# ---------------------------------------------------------------------------
+# 按任务分离日志
+# ---------------------------------------------------------------------------
+
+class TaskIdMatchFilter(logging.Filter):
+    """只放行指定 task_id 的日志记录。"""
+
+    def __init__(self, task_id: str) -> None:
+        super().__init__()
+        self.task_id = task_id
+
+    def filter(self, record: logging.LogRecord) -> bool:  # noqa: D401
+        return getattr(record, "task_id", "") == f"[{self.task_id}]"
+
+
+def create_task_logger(task_id: str, log_dir: str | None = None) -> logging.Handler:
+    """为指定任务创建独立的文件日志 handler。
+
+    日志写入 ``logs/blog_tasks/{task_id}/task.log``。
+    返回 handler 实例，调用方需在任务结束后调用 ``remove_task_logger`` 清理。
+    """
+    base_dir = os.path.dirname(os.path.realpath(__file__))
+    project_root = os.path.dirname(base_dir)
+    resolved_log_dir = log_dir or os.path.join(project_root, "logs", "blog_tasks")
+    task_dir = os.path.join(resolved_log_dir, task_id)
+    os.makedirs(task_dir, exist_ok=True)
+
+    fmt = "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+    datefmt = "%Y-%m-%d %H:%M:%S"
+    formatter = logging.Formatter(fmt=fmt, datefmt=datefmt)
+
+    handler = logging.FileHandler(
+        os.path.join(task_dir, "task.log"), encoding="utf-8"
+    )
+    handler.setLevel(logging.DEBUG)
+    handler.setFormatter(formatter)
+    handler.addFilter(TaskIdMatchFilter(task_id))
+    handler._vibe_blog_task_handler = True  # type: ignore[attr-defined]
+
+    root_logger = logging.getLogger()
+    _ensure_task_filter(root_logger)  # 确保 TaskIdFilter 已注入
+    root_logger.addHandler(handler)
+    return handler
+
+
+def remove_task_logger(handler: logging.Handler) -> None:
+    """移除并关闭任务日志 handler。"""
+    try:
+        logging.getLogger().removeHandler(handler)
+        handler.close()
+    except Exception:
+        pass
 

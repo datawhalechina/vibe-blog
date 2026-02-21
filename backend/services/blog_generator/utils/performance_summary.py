@@ -187,9 +187,18 @@ class BlogPerformanceSummary:
         if not log_path.exists():
             return summary
 
-        for json_file in sorted(log_path.glob("blog_*.json")):
+        for json_file in sorted(log_path.glob("*.json")):
             if json_file.name == "performance_summary.json":
                 continue
+            try:
+                with open(json_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                summary.add_task_log(_TaskLogProxy(data))
+            except Exception:
+                continue
+
+        # 也扫描子文件夹中的 task.json（新格式）
+        for json_file in sorted(log_path.glob("*/task.json")):
             try:
                 with open(json_file, "r", encoding="utf-8") as f:
                     data = json.load(f)

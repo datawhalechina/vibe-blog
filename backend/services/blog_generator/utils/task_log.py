@@ -132,11 +132,20 @@ class BlogTaskLog:
         self.log_step("system", "task_failed", error, level="error")
 
     def save(self, logs_dir: str = None) -> str:
-        """保存为 JSON 文件，返回文件路径"""
-        logs_dir = logs_dir or os.environ.get("BLOG_LOGS_DIR", "logs/blog_tasks")
-        Path(logs_dir).mkdir(parents=True, exist_ok=True)
+        """保存为 JSON 文件到 logs/blog_tasks/{task_id}/task.json"""
+        if logs_dir:
+            base_logs_dir = logs_dir
+        elif os.environ.get("BLOG_LOGS_DIR"):
+            base_logs_dir = os.environ["BLOG_LOGS_DIR"]
+        else:
+            # 统一使用 vibe-blog/logs/blog_tasks 目录（与 logging_config.py / 启动脚本一致）
+            # task_log.py → utils/ → blog_generator/ → services/ → backend/ → vibe-blog/
+            project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            base_logs_dir = str(project_root / "logs" / "blog_tasks")
+        task_dir = Path(base_logs_dir) / self.task_id
+        task_dir.mkdir(parents=True, exist_ok=True)
 
-        path = Path(logs_dir) / f"{self.task_id}.json"
+        path = task_dir / "task.json"
         with open(path, "w", encoding="utf-8") as f:
             json.dump(asdict(self), f, ensure_ascii=False, indent=2)
 
