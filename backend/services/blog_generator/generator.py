@@ -33,6 +33,7 @@ from .middleware import (
     TaskLogMiddleware,
     ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
 )
+from .context_management_middleware import ContextManagementMiddleware
 from .parallel import ParallelTaskExecutor, TaskConfig
 from .llm_proxy import TieredLLMProxy
 from .llm_tier_config import get_agent_tier
@@ -146,6 +147,10 @@ class BlogGenerator:
             self._task_log_middleware,
             ReducerMiddleware(),
             ErrorTrackingMiddleware(),
+            ContextManagementMiddleware(
+                llm_service=llm_client,
+                model_name=os.getenv("LLM_MODEL", "gpt-4o"),
+            ),
             TokenBudgetMiddleware(
                 compressor=getattr(self, '_context_compressor', None),
                 token_tracker=getattr(self, '_token_tracker', None),
