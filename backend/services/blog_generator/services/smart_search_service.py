@@ -419,6 +419,8 @@ class SmartSearchService:
 
     def _search_arxiv(self, query: str, max_results: int) -> Dict[str, Any]:
         """搜索 arXiv"""
+        from utils.rate_limiter import get_global_rate_limiter
+        get_global_rate_limiter().wait_sync(domain='search_arxiv')
         arxiv_service = get_arxiv_service()
         if arxiv_service:
             return arxiv_service.search(query, max_results)
@@ -449,6 +451,8 @@ class SmartSearchService:
     
     def _search_general(self, query: str, max_results: int) -> Dict[str, Any]:
         """通用搜索"""
+        from utils.rate_limiter import get_global_rate_limiter
+        get_global_rate_limiter().wait_sync(domain='search_general')
         search_service = get_search_service()
         if search_service and search_service.is_available():
             result = search_service.search(query, max_results)
@@ -462,6 +466,8 @@ class SmartSearchService:
     
     def _search_google(self, query: str, max_results: int) -> Dict[str, Any]:
         """Google 搜索（通过 Serper API，75.02）"""
+        from utils.rate_limiter import get_global_rate_limiter
+        get_global_rate_limiter().wait_sync(domain='search_serper')
         from .serper_search_service import get_serper_service
         serper = get_serper_service()
         if not serper or not serper.is_available():
@@ -470,6 +476,8 @@ class SmartSearchService:
 
     def _search_sogou(self, query: str, max_results: int) -> Dict[str, Any]:
         """搜狗搜索（通过腾讯云 SearchPro API，75.07）"""
+        from utils.rate_limiter import get_global_rate_limiter
+        get_global_rate_limiter().wait_sync(domain='search_sogou')
         from .sogou_search_service import get_sogou_service
         sogou = get_sogou_service()
         if not sogou or not sogou.is_available():

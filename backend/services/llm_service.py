@@ -27,20 +27,16 @@ def _resolve_caller(caller: str) -> str:
     return "unknown"
 
 # 全局请求限流器：防止并发请求触发 API 速率限制
+# 41.07: 委托给 GlobalRateLimiter 单例（多域隔离 + 指标暴露）
 _request_lock = threading.Lock()
 _last_request_time = 0.0
 _MIN_REQUEST_INTERVAL = float(__import__('os').environ.get('LLM_MIN_REQUEST_INTERVAL', '1.0'))  # 秒
 
 
 def _rate_limit():
-    """简单的全局限流：确保两次请求之间至少间隔 _MIN_REQUEST_INTERVAL 秒"""
-    global _last_request_time
-    with _request_lock:
-        now = time.monotonic()
-        elapsed = now - _last_request_time
-        if elapsed < _MIN_REQUEST_INTERVAL:
-            time.sleep(_MIN_REQUEST_INTERVAL - elapsed)
-        _last_request_time = time.monotonic()
+    """全局 LLM 限流（向后兼容接口，内部委托 GlobalRateLimiter）"""
+    from utils.rate_limiter import get_global_rate_limiter
+    get_global_rate_limiter().wait_sync(domain='llm')
 
 
 class LLMService:
