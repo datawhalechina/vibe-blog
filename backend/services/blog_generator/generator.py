@@ -348,6 +348,22 @@ class BlogGenerator:
             except Exception as e:
                 logger.debug(f"写作技能匹配跳过: {e}")
 
+        # 41.05 图片预规划：在大纲确认后、写作前生成全局图片计划
+        if os.environ.get('IMAGE_PREPLAN_ENABLED', 'false').lower() == 'true':
+            try:
+                from .image_preplanner import ImagePreplanner
+                preplanner = ImagePreplanner(self.llm)
+                outline = result.get('outline', {})
+                image_plan = preplanner.plan(
+                    outline=outline,
+                    background_knowledge=state.get('background_knowledge', ''),
+                    article_type=state.get('article_type', 'tutorial'),
+                )
+                result['image_preplan'] = image_plan
+                logger.info(f"[41.05] 图片预规划完成: {len(image_plan)} 张")
+            except Exception as e:
+                logger.warning(f"[41.05] 图片预规划失败: {e}")
+
         return result
     
     def _writer_node(self, state: SharedState) -> SharedState:
