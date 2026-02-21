@@ -12,6 +12,20 @@ import httpx
 
 logger = logging.getLogger(__name__)
 
+
+def _resolve_caller(caller: str) -> str:
+    """解析 caller 标识：优先使用显式传入值，否则从中间件上下文获取当前节点名。"""
+    if caller:
+        return caller
+    try:
+        from services.blog_generator.middleware import current_node_name
+        node = current_node_name.get("")
+        if node:
+            return node
+    except Exception:
+        pass
+    return "unknown"
+
 # 全局请求限流器：防止并发请求触发 API 速率限制
 _request_lock = threading.Lock()
 _last_request_time = 0.0
@@ -220,7 +234,7 @@ class LLMService:
                         thinking_tokens = response.usage.thinking_tokens
                     if thinking_tokens:
                         usage.extra = {"thinking_tokens": thinking_tokens}
-                    self.token_tracker.record(usage, agent=caller or "unknown")
+                    self.token_tracker.record(usage, agent=_resolve_caller(caller))
                 except Exception:
                     pass
 
@@ -354,7 +368,7 @@ class LLMService:
                 token_usage = metadata["token_usage"]
                 token_usage.model = self.text_model
                 token_usage.provider = self.provider_format
-                self.token_tracker.record(token_usage, agent=caller or "unknown")
+                self.token_tracker.record(token_usage, agent=_resolve_caller(caller))
 
             return content
 
@@ -429,7 +443,7 @@ class LLMService:
                                 last_chunk, model=self.text_model, provider=self.provider_format
                             )
                             if token_usage.input_tokens or token_usage.output_tokens:
-                                self.token_tracker.record(token_usage, agent=caller or "unknown")
+                                self.token_tracker.record(token_usage, agent=_resolve_caller(caller))
                         except Exception:
                             pass
 

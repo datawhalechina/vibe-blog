@@ -16,12 +16,16 @@
 
 from __future__ import annotations
 
+import contextvars
 import logging
 import os
 import time
 from typing import Any, Callable, Dict, List, Optional, Protocol, runtime_checkable
 
 logger = logging.getLogger(__name__)
+
+# 当前执行节点名称，供 LLMService 自动归因 token 使用
+current_node_name: contextvars.ContextVar[str] = contextvars.ContextVar("current_node_name", default="")
 
 
 # ==================== 特性 A：NodeMiddleware 协议 + MiddlewarePipeline ====================
@@ -131,6 +135,7 @@ class MiddlewarePipeline:
 
             # 执行原始节点（带 on_error 降级）
             start_time = time.time()
+            token = current_node_name.set(node_name)
             try:
                 result = fn(current_state)
             except Exception as e:
@@ -148,6 +153,8 @@ class MiddlewarePipeline:
                             logger.exception("Middleware %s.on_error failed for %s", type(mw).__name__, node_name)
                 else:
                     raise  # 没有中间件处理，继续抛出
+            finally:
+                current_node_name.reset(token)
 
             duration_ms = int((time.time() - start_time) * 1000)
             if isinstance(result, dict):
