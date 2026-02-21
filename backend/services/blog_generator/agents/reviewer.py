@@ -50,15 +50,27 @@ class ReviewerAgent:
         outline: Dict[str, Any],
         verbatim_data: list = None,
         learning_objectives: list = None,
+        guidelines: list = None,
     ) -> Dict[str, Any]:
         """审核文档"""
         pm = get_prompt_manager()
+
+        # 41.11: 注入自定义审核标准
+        guidelines_block = ""
+        if guidelines:
+            import os
+            if os.environ.get('REVIEW_GUIDELINES_ENABLED', 'false').lower() == 'true':
+                guidelines_text = "\n".join(f"- {g}" for g in guidelines)
+                guidelines_block = f"\n\n【自定义审核标准】\n{guidelines_text}\n请在审核中额外检查以上标准。\n"
+
         prompt = pm.render_reviewer(
             document=document,
             outline=outline,
             verbatim_data=verbatim_data or [],
             learning_objectives=learning_objectives or [],
         )
+        if guidelines_block:
+            prompt = prompt + guidelines_block
 
         logger.info(f"[Reviewer] Prompt 长度: {len(prompt)} 字")
 

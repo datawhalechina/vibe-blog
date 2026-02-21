@@ -11,6 +11,8 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **41.07 全局限流器** — GlobalRateLimiter 单例替换原有 `_rate_limit()`，支持 5 域隔离限流（LLM/Serper/搜狗/通用搜索/arXiv），同步+异步双模式，指标暴露供 41.08 成本追踪使用
 - ✨ **41.02 源可信度筛选** — SourceCredibilityFilter LLM 四维评估（权威性/时效性/相关性/深度），集成到 SmartSearchService 合并去重之后，`SOURCE_CREDIBILITY_ENABLED=true` 启用，失败降级返回原始结果
 - ✨ **41.04 子查询并行研究** — SubQueryEngine LLM 生成 N 个语义互补子查询 + ThreadPoolExecutor 并行搜索，三级降级（LLM+context → LLM → 硬编码），`SUB_QUERY_ENABLED=true` 启用
+- ✨ **41.10 动态 Agent 角色** — AgentPersona 预设人设库（tech_expert/finance_analyst/education_specialist/science_writer），通过 StyleProfile.persona_key 注入，`AGENT_PERSONA_ENABLED=true` 启用
+- ✨ **41.11 Guidelines 驱动审核** — 按文章类型注入自定义审核标准（tutorial/science_popular/deep_analysis），ReviewerAgent 支持 guidelines 参数，`REVIEW_GUIDELINES_ENABLED=true` 启用
 - ✨ **75.10 搜索服务集成 + 死代码治理** — 将 75.02~75.09 各搜索服务统一接入 `init_blog_services()`
   - `init_blog_services()` 新增 Serper Google 搜索（75.02）和搜狗/腾讯云 SearchPro（75.07）初始化
   - 每个可选服务独立 try-except，一个失败不影响其他

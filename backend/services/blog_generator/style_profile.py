@@ -5,8 +5,8 @@ StyleProfile — 工作流风格配置
 风格参数：文风、配图、AI 特性开关
 """
 
-from dataclasses import dataclass
-from typing import Literal
+from dataclasses import dataclass, field
+from typing import Literal, Optional, List
 
 
 @dataclass
@@ -59,6 +59,27 @@ class StyleProfile:
 
     enable_ai_boost: bool = True
     """AI 话题自动增强搜索（自动扩展到所有 AI 权威博客源）"""
+
+    # === 41.10 动态 Agent 角色 ===
+
+    persona_key: str = ""
+    """预设人设 key（如 'tech_expert'），留空不注入人设"""
+
+    # === 41.11 Guidelines 驱动审核 ===
+
+    review_guidelines: List[str] = None
+    """自定义审核标准列表，None 使用默认审核维度"""
+
+    def get_persona_prompt(self) -> str:
+        """获取人设 Prompt 片段（41.10）"""
+        if not self.persona_key:
+            return ""
+        import os
+        if os.environ.get('AGENT_PERSONA_ENABLED', 'false').lower() != 'true':
+            return ""
+        from .persona_presets import get_persona
+        persona = get_persona(self.persona_key)
+        return persona.to_prompt_segment() if persona else ""
 
     # === 预设套餐 ===
 
