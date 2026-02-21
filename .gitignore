@@ -13,6 +13,7 @@
 coverage.json
 coverage.lcov
 htmlcov/
+frontend/coverage/
 backend/.coverage
 backend/coverage.json
 backend/coverage.lcov
