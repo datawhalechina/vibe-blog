@@ -60,6 +60,12 @@ class LLMService:
         google_api_key: str = "",
         text_model: str = "gpt-4o",
         max_tokens: int = None,
+        fast_model: str = "",
+        smart_model: str = "",
+        strategic_model: str = "",
+        fast_max_tokens: int = 3000,
+        smart_max_tokens: int = 8192,
+        strategic_max_tokens: int = 4000,
     ):
         """
         初始化 LLM 服务
@@ -71,6 +77,12 @@ class LLMService:
             google_api_key: Google API Key
             text_model: 文本生成模型名称
             max_tokens: 最大输出 token 数 (默认 None 使用环境变量或 8192)
+            fast_model: 快速模型名称（41.06 三级 LLM，留空退化为 text_model）
+            smart_model: 智能模型名称
+            strategic_model: 策略模型名称
+            fast_max_tokens: 快速模型 max_tokens
+            smart_max_tokens: 智能模型 max_tokens
+            strategic_max_tokens: 策略模型 max_tokens
         """
         self.provider_format = provider_format.lower()
         self._openai_api_key = openai_api_key
@@ -83,6 +95,13 @@ class LLMService:
 
         # 懒加载的模型实例
         self._text_chat_model = None
+
+        # 41.06 三级 LLM 模型配置（空字符串退化为 text_model）
+        self._model_config = {
+            'fast': {'model': fast_model or self.text_model, 'max_tokens': fast_max_tokens, 'instance': None},
+            'smart': {'model': smart_model or self.text_model, 'max_tokens': smart_max_tokens, 'instance': None},
+            'strategic': {'model': strategic_model or self.text_model, 'max_tokens': strategic_max_tokens, 'instance': None},
+        }
 
         # Token 追踪器（由 BlogGenerator 注入，默认 None）
         self.token_tracker = None
@@ -147,6 +166,32 @@ class LLMService:
         if self._text_chat_model is None:
             self._text_chat_model = self._create_chat_model(self.text_model)
         return self._text_chat_model
+
+    def get_model_for_tier(self, tier: str):
+        """按级别获取模型实例（懒加载）
+
+        Args:
+            tier: 'fast' | 'smart' | 'strategic'
+
+        Returns:
+            LangChain ChatModel 实例
+        """
+        config = self._model_config.get(tier)
+        if not config:
+            return self.get_text_model()
+        if config['instance'] is None:
+            config['instance'] = self._create_chat_model(config['model'])
+        return config['instance']
+
+    def _get_tier_info(self, tier: str):
+        """获取 tier 对应的 (model_instance, model_name, max_tokens)
+
+        未指定 tier 或 tier 无效时返回默认模型信息。
+        """
+        if tier and tier in self._model_config:
+            cfg = self._model_config[tier]
+            return self.get_model_for_tier(tier), cfg['model'], cfg['max_tokens']
+        return self.get_text_model(), self.text_model, self.max_tokens
     
     def is_available(self) -> bool:
         """检查 LLM 服务是否可用"""
@@ -166,12 +211,14 @@ class LLMService:
         langchain_messages: list,
         budget_tokens: int = 19000,
         caller: str = "",
+        model_name_override: str = "",
     ) -> Optional[str]:
         """使用 Anthropic Extended Thinking 模式调用
 
         通过 anthropic SDK 直接调用（LangChain 尚未完整支持 thinking 参数）。
         如果 anthropic SDK 不可用，降级为普通调用。
         """
+        model_name = model_name_override or self.text_model
         try:
             import anthropic
         except ImportError:
@@ -198,7 +245,7 @@ class LLMService:
             )
 
             kwargs = {
-                "model": self.text_model,
+                "model": model_name,
                 "max_tokens": self.max_tokens + budget_tokens,
                 "thinking": {
                     "type": "enabled",
@@ -225,7 +272,7 @@ class LLMService:
                     usage = TokenUsage(
                         input_tokens=response.usage.input_tokens,
                         output_tokens=response.usage.output_tokens,
-                        model=self.text_model,
+                        model=model_name,
                         provider="anthropic",
                     )
                     # 记录 thinking tokens（如果 API 返回）
@@ -277,6 +324,7 @@ class LLMService:
         caller: str = "",
         thinking: bool = False,
         thinking_budget: int = 19000,
+        tier: str = "",
     ) -> Optional[str]:
         """
         发送聊天请求（带截断扩容、智能重试、超时保护）
@@ -288,6 +336,7 @@ class LLMService:
             caller: 调用方标识（用于日志追踪）
             thinking: 是否启用 Extended Thinking 模式（仅 Claude 模型支持）
             thinking_budget: Thinking 模式的 budget_tokens（默认 19000）
+            tier: 模型级别 ('fast'|'smart'|'strategic')，留空使用默认模型
 
         Returns:
             模型响应文本，失败返回 None
@@ -295,14 +344,14 @@ class LLMService:
         from utils.resilient_llm_caller import resilient_chat, ContextLengthExceeded
         from utils.context_guard import ContextGuard
 
-        model = self.get_text_model()
+        model, model_name, max_tokens = self._get_tier_info(tier)
         if not model:
             logger.error("模型不可用")
             return None
 
         try:
             # 上下文长度预警（不阻断调用）
-            guard = ContextGuard(self.text_model, max_output_tokens=self.max_tokens)
+            guard = ContextGuard(model_name, max_output_tokens=max_tokens)
             check = guard.check(messages)
             if not check["is_safe"]:
                 logger.warning(
@@ -328,19 +377,20 @@ class LLMService:
             if _send_llm:
                 self.task_manager.send_event(self.task_id, 'llm_start', {
                     'agent': caller,
-                    'model': self.text_model,
+                    'model': model_name,
                     'thinking': thinking,
                 })
 
             # Thinking 模式分支
-            if thinking and self._supports_thinking(self.text_model):
+            if thinking and self._supports_thinking(model_name):
                 content = self._chat_with_thinking(
                     langchain_messages, thinking_budget, caller=caller,
+                    model_name_override=model_name,
                 )
                 metadata = {"attempts": 1}
             else:
                 if thinking:
-                    logger.info(f"[{caller}] 模型 {self.text_model} 不支持 Thinking，降级为普通调用")
+                    logger.info(f"[{caller}] 模型 {model_name} 不支持 Thinking，降级为普通调用")
                 # 使用 resilient_chat 替代原来的简单调用
                 content, metadata = resilient_chat(
                     model=model,
@@ -353,7 +403,7 @@ class LLMService:
                 duration_ms = int((time.time() - start_time) * 1000)
                 self.task_manager.send_event(self.task_id, 'llm_end', {
                     'agent': caller,
-                    'model': self.text_model,
+                    'model': model_name,
                     'duration_ms': duration_ms,
                     'truncated': metadata.get('truncated', False),
                     'attempts': metadata.get('attempts', 1),
@@ -366,7 +416,7 @@ class LLMService:
             # 记录 token 用量
             if self.token_tracker and metadata.get("token_usage"):
                 token_usage = metadata["token_usage"]
-                token_usage.model = self.text_model
+                token_usage.model = model_name
                 token_usage.provider = self.provider_format
                 self.token_tracker.record(token_usage, agent=_resolve_caller(caller))
 
@@ -386,6 +436,7 @@ class LLMService:
         on_chunk: callable = None,
         response_format: Dict[str, Any] = None,
         caller: str = "",
+        tier: str = "",
     ) -> Optional[str]:
         """
         发送流式聊天请求（带超时保护和智能重试）
@@ -396,6 +447,7 @@ class LLMService:
             on_chunk: 每收到一个 chunk 时的回调函数 (delta, accumulated)
             response_format: 响应格式，如 {"type": "json_object"}
             caller: 调用方标识（用于日志追踪）
+            tier: 模型级别 ('fast'|'smart'|'strategic')，留空使用默认模型
 
         Returns:
             完整的模型响应文本，失败返回 None
@@ -406,7 +458,7 @@ class LLMService:
             DEFAULT_LLM_TIMEOUT, DEFAULT_MAX_RETRIES, DEFAULT_BASE_WAIT, DEFAULT_MAX_WAIT,
         )
 
-        model = self.get_text_model()
+        model, model_name, _ = self._get_tier_info(tier)
         if not model:
             logger.error("模型不可用")
             return None
@@ -440,7 +492,7 @@ class LLMService:
                         try:
                             from utils.token_tracker import extract_token_usage_from_langchain
                             token_usage = extract_token_usage_from_langchain(
-                                last_chunk, model=self.text_model, provider=self.provider_format
+                                last_chunk, model=model_name, provider=self.provider_format
                             )
                             if token_usage.input_tokens or token_usage.output_tokens:
                                 self.token_tracker.record(token_usage, agent=_resolve_caller(caller))
@@ -485,23 +537,25 @@ class LLMService:
         self,
         prompt: str,
         image_base64: str,
-        mime_type: str = "image/jpeg"
+        mime_type: str = "image/jpeg",
+        tier: str = "",
     ) -> Optional[str]:
         """
         发送包含图片的聊天请求（多模态）
-        
+
         Args:
             prompt: 文本提示词
             image_base64: Base64 编码的图片数据
             mime_type: 图片 MIME 类型 (image/jpeg, image/png 等)
-            
+            tier: 模型级别 ('fast'|'smart'|'strategic')，留空使用默认模型
+
         Returns:
             模型响应文本，失败返回 None
         """
         try:
             from langchain_core.messages import HumanMessage
-            
-            model = self.get_text_model()
+
+            model, _, _ = self._get_tier_info(tier)
             if not model:
                 logger.error("模型不可用")
                 return None
@@ -540,10 +594,10 @@ def get_llm_service() -> Optional[LLMService]:
 def init_llm_service(config: dict) -> LLMService:
     """
     从配置初始化 LLM 服务
-    
+
     Args:
         config: Flask app.config 字典
-        
+
     Returns:
         LLMService 实例
     """
@@ -554,6 +608,17 @@ def init_llm_service(config: dict) -> LLMService:
         openai_api_base=config.get('OPENAI_API_BASE', ''),
         google_api_key=config.get('GOOGLE_API_KEY', ''),
         text_model=config.get('TEXT_MODEL', 'gpt-4o'),
+        # 41.06 三级 LLM 模型配置
+        fast_model=config.get('LLM_FAST', ''),
+        smart_model=config.get('LLM_SMART', ''),
+        strategic_model=config.get('LLM_STRATEGIC', ''),
+        fast_max_tokens=config.get('LLM_FAST_MAX_TOKENS', 3000),
+        smart_max_tokens=config.get('LLM_SMART_MAX_TOKENS', 8192),
+        strategic_max_tokens=config.get('LLM_STRATEGIC_MAX_TOKENS', 4000),
     )
     logger.info(f"LLM 服务已初始化: provider={_llm_service.provider_format}, text_model={_llm_service.text_model}")
+    for tier_name in ('fast', 'smart', 'strategic'):
+        tier_model = _llm_service._model_config[tier_name]['model']
+        if tier_model != _llm_service.text_model:
+            logger.info(f"  LLM {tier_name}: {tier_model}")
     return _llm_service

@@ -34,6 +34,8 @@ from .middleware import (
     ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
 )
 from .parallel import ParallelTaskExecutor, TaskConfig
+from .llm_proxy import TieredLLMProxy
+from .llm_tier_config import get_agent_tier
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -95,16 +97,19 @@ class BlogGenerator:
         # max_revision_rounds 向后兼容：优先用 StyleProfile，否则用参数
         self.max_revision_rounds = max_revision_rounds
 
-        # 初始化各 Agent
-        self.researcher = ResearcherAgent(llm_client, search_service, knowledge_service)
-        self.planner = PlannerAgent(llm_client)
-        self.writer = WriterAgent(llm_client)
-        self.coder = CoderAgent(llm_client)
-        self.artist = ArtistAgent(llm_client)
-        self.questioner = QuestionerAgent(llm_client)
-        self.reviewer = ReviewerAgent(llm_client)
+        # 初始化各 Agent（41.06: 通过 TieredLLMProxy 按级别路由模型）
+        def _proxy(agent_name):
+            return TieredLLMProxy(llm_client, get_agent_tier(agent_name))
+
+        self.researcher = ResearcherAgent(_proxy('researcher'), search_service, knowledge_service)
+        self.planner = PlannerAgent(_proxy('planner'))
+        self.writer = WriterAgent(_proxy('writer'))
+        self.coder = CoderAgent(_proxy('coder'))
+        self.artist = ArtistAgent(_proxy('artist'))
+        self.questioner = QuestionerAgent(_proxy('questioner'))
+        self.reviewer = ReviewerAgent(_proxy('reviewer'))
         self.assembler = AssemblerAgent()
-        self.search_coordinator = SearchCoordinator(llm_client, search_service)
+        self.search_coordinator = SearchCoordinator(_proxy('search_coordinator'), search_service)
 
         # 增强 Agent：环境变量作为全局开关（StyleProfile 作为运行时开关）
         self._env_humanizer = os.getenv('HUMANIZER_ENABLED', 'true').lower() == 'true'
@@ -115,14 +120,14 @@ class BlogGenerator:
         self._env_summary = os.getenv('SUMMARY_GENERATOR_ENABLED', 'true').lower() == 'true'
 
         # 初始化增强 Agent（只要环境变量没禁用就创建实例）
-        self.humanizer = HumanizerAgent(llm_client) if self._env_humanizer else None
-        self.thread_checker = ThreadCheckerAgent(llm_client) if self._env_thread_check else None
-        self.voice_checker = VoiceCheckerAgent(llm_client) if self._env_voice_check else None
-        self.factcheck = FactCheckAgent(llm_client) if self._env_factcheck else None
+        self.humanizer = HumanizerAgent(_proxy('humanizer')) if self._env_humanizer else None
+        self.thread_checker = ThreadCheckerAgent(_proxy('thread_checker')) if self._env_thread_check else None
+        self.voice_checker = VoiceCheckerAgent(_proxy('voice_checker')) if self._env_voice_check else None
+        self.factcheck = FactCheckAgent(_proxy('factcheck')) if self._env_factcheck else None
 
         # 业务级状态追踪（69.05）
         self.tracker = SessionTracker()
-        self.summary_generator = SummaryGeneratorAgent(llm_client) if self._env_summary else None
+        self.summary_generator = SummaryGeneratorAgent(_proxy('summary_generator')) if self._env_summary else None
 
         # 37.12 分层架构校验器（可选）
         self._layer_validator = None

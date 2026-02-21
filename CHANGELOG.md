@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-02-21
 
 ### Added
+- ✨ **41.06 三级 LLM 模型策略** — 为 13 个 Agent 按任务复杂度分配 fast/smart/strategic 三级模型，通过 TieredLLMProxy 透明代理实现零 Agent 代码改动，环境变量 `LLM_FAST`/`LLM_SMART`/`LLM_STRATEGIC` 配置，留空时退化为单模型行为（向后兼容）
 - ✨ **75.10 搜索服务集成 + 死代码治理** — 将 75.02~75.09 各搜索服务统一接入 `init_blog_services()`
   - `init_blog_services()` 新增 Serper Google 搜索（75.02）和搜狗/腾讯云 SearchPro（75.07）初始化
   - 每个可选服务独立 try-except，一个失败不影响其他

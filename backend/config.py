@@ -131,6 +131,14 @@ class Config:
     THINKING_ENABLED = os.getenv('THINKING_ENABLED', 'false').lower() == 'true'
     THINKING_BUDGET_TOKENS = int(os.getenv('THINKING_BUDGET_TOKENS', '19000'))
 
+    # 三级 LLM 模型策略（41.06 迁移）— 留空则退化为 TEXT_MODEL
+    LLM_FAST = os.getenv('LLM_FAST', '')
+    LLM_SMART = os.getenv('LLM_SMART', '')
+    LLM_STRATEGIC = os.getenv('LLM_STRATEGIC', '')
+    LLM_FAST_MAX_TOKENS = int(os.getenv('LLM_FAST_MAX_TOKENS', '3000'))
+    LLM_SMART_MAX_TOKENS = int(os.getenv('LLM_SMART_MAX_TOKENS', '8192'))
+    LLM_STRATEGIC_MAX_TOKENS = int(os.getenv('LLM_STRATEGIC_MAX_TOKENS', '4000'))
+
     # Jina 深度抓取（75.03）
     JINA_API_KEY = os.getenv('JINA_API_KEY', '')
     DEEP_SCRAPE_ENABLED = os.getenv('DEEP_SCRAPE_ENABLED', 'true').lower() == 'true'
