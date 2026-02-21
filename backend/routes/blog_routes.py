@@ -518,7 +518,7 @@ def evaluate_article(blog_id):
     """评估文章质量"""
     try:
         db_service = get_db_service()
-        blog = db_service.get_blog(blog_id)
+        blog = db_service.get_history(blog_id)
         if not blog:
             return jsonify({'success': False, 'error': '文章不存在'}), 404
 

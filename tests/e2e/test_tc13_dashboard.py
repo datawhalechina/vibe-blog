@@ -21,9 +21,9 @@ def test_dashboard_loads(page, base_url, take_screenshot):
     assert title.is_visible()
     assert "任务中心" in title.text_content()
 
-    # 4 个统计卡片
+    # 5 个统计卡片（处理中、等待中、今日完成、失败、已取消）
     stat_cards = page.locator(".stat-card")
-    assert stat_cards.count() == 4
+    assert stat_cards.count() == 5
 
     # 标签文字
     labels = page.locator(".stat-label")

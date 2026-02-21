@@ -9,6 +9,7 @@ TC-15: 大纲确认交互测试
 """
 from e2e_utils import (
     find_element,
+    fill_input,
     cancel_task,
     INPUT_SELECTORS,
     GENERATE_BTN_SELECTORS,
@@ -30,8 +31,7 @@ class TestOutlineConfirm:
 
         input_el, _ = find_element(page, INPUT_SELECTORS)
         assert input_el is not None, f"未找到主题输入框，尝试过: {INPUT_SELECTORS}"
-        input_el.click()
-        input_el.fill(topic)
+        fill_input(page, input_el, topic)
         take_screenshot("tc15_01_topic_filled")
 
         # ── Step 2: 点击生成，捕获 task_id ──

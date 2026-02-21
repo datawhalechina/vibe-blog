@@ -61,12 +61,13 @@ SSE_HOOK_JS = """
 """
 
 # 输入框选择器列表（按优先级）
+# 前端使用 TipTap (ProseMirror) 富文本编辑器，输入区域是 contenteditable div
 INPUT_SELECTORS = [
+    'div.ProseMirror[contenteditable="true"]',
+    '.tiptap.ProseMirror',
+    '.code-input-textarea .ProseMirror',
     'textarea[placeholder*="输入"]',
     'textarea[placeholder*="主题"]',
-    'textarea[placeholder*="想写"]',
-    'input[placeholder*="技术主题"]',
-    'input[placeholder*="主题"]',
     'textarea',
 ]
 
@@ -91,6 +92,39 @@ def find_element(page, selectors: list, timeout: int = 3000):
         except Exception:
             continue
     return None, None
+
+
+def fill_input(page, el, text: str):
+    """向输入元素填入文本，兼容 TipTap contenteditable 和普通 input/textarea。
+
+    TipTap 的 ProseMirror 是 contenteditable div，不支持 .fill()，
+    需要先 click 聚焦，再用 keyboard.type() 输入。
+    """
+    tag = el.evaluate("e => e.tagName")
+    is_contenteditable = el.evaluate("e => e.contentEditable === 'true'")
+
+    if is_contenteditable or tag == "DIV":
+        el.click()
+        # 清空已有内容
+        page.keyboard.press("Meta+a")
+        page.keyboard.press("Backspace")
+        page.keyboard.type(text, delay=20)
+    else:
+        el.click()
+        el.fill(text)
+
+
+def clear_input(page, el):
+    """清空输入元素内容，兼容 TipTap contenteditable。"""
+    tag = el.evaluate("e => e.tagName")
+    is_contenteditable = el.evaluate("e => e.contentEditable === 'true'")
+
+    if is_contenteditable or tag == "DIV":
+        el.click()
+        page.keyboard.press("Meta+a")
+        page.keyboard.press("Backspace")
+    else:
+        el.fill("")
 
 
 def run_playwright_generation(
@@ -144,8 +178,7 @@ def run_playwright_generation(
             page.screenshot(path=f'/tmp/{screenshot_prefix}_step2_fail.png')
             return result
         
-        input_el.click()
-        input_el.fill(topic)
+        fill_input(page, input_el, topic)
         logger.info(f"    ✅ 已输入主题 (selector: {selector})")
 
         # Step 3: 点击生成

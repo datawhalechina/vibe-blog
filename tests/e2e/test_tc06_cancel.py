@@ -3,7 +3,7 @@ TC-6: 任务取消（P1）
 
 验证：点击停止按钮中断生成
 """
-from e2e_utils import find_element, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
+from e2e_utils import find_element, fill_input, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
 
 
 def test_cancel_generation(page, base_url, take_screenshot):
@@ -11,7 +11,7 @@ def test_cancel_generation(page, base_url, take_screenshot):
     page.goto(base_url, wait_until="networkidle")
 
     input_el, _ = find_element(page, INPUT_SELECTORS)
-    input_el.fill("取消测试主题")
+    fill_input(page, input_el, "取消测试主题")
 
     gen_btn, _ = find_element(page, GENERATE_BTN_SELECTORS)
     gen_btn.click()

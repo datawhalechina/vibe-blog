@@ -563,6 +563,14 @@ class BlogService:
         except Exception:
             pass
 
+        # 创建按任务分离的文本日志
+        task_log_handler = None
+        try:
+            from logging_config import create_task_logger
+            task_log_handler = create_task_logger(task_id)
+        except Exception:
+            pass
+
         try:
             # 发送开始事件
             if task_manager:
@@ -1235,6 +1243,10 @@ class BlogService:
             if sse_handler and not locals().get('_interrupted'):
                 for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
+            # 清理按任务分离的文本日志 handler
+            if task_log_handler and not locals().get('_interrupted'):
+                from logging_config import remove_task_logger
+                remove_task_logger(task_log_handler)
     
     def _run_resume(
         self,
@@ -1260,6 +1272,14 @@ class BlogService:
         interactive = task_info.get('interactive', False)
         generate_cover_video = task_info.get('generate_cover_video', False)
         video_aspect_ratio = task_info.get('video_aspect_ratio', '16:9')
+
+        # 创建按任务分离的文本日志（resume 阶段继续写入同一任务文件夹）
+        task_log_handler = None
+        try:
+            from logging_config import create_task_logger
+            task_log_handler = create_task_logger(task_id)
+        except Exception:
+            pass
         article_config = task_info.get('article_config', {})
         token_tracker = task_info.get('token_tracker')
         task_log = task_info.get('task_log')
@@ -1673,6 +1693,10 @@ class BlogService:
             if sse_handler:
                 for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
+            # 清理按任务分离的文本日志 handler
+            if task_log_handler:
+                from logging_config import remove_task_logger
+                remove_task_logger(task_log_handler)
 
     def _generate_cover_image(
         self,
@@ -2247,7 +2271,7 @@ class LLMClientAdapter:
     def token_tracker(self, value):
         self.llm_service.token_tracker = value
     
-    def chat(self, messages, response_format=None, caller: str = ""):
+    def chat(self, messages, response_format=None, caller: str = "", **kwargs):
         """
         调用 LLM 进行对话
 
@@ -2255,19 +2279,21 @@ class LLMClientAdapter:
             messages: 消息列表
             response_format: 响应格式 (可选)，如 {"type": "json_object"}
             caller: 调用方标识 (可选)，用于日志追踪
+            **kwargs: 透传给 LLMService 的额外参数 (tier, thinking, thinking_budget 等)
 
         Returns:
             LLM 响应文本
         """
-        # 直接调用 LLMService 的 chat 方法，传递 response_format 和 caller
-        result = self.llm_service.chat(messages, response_format=response_format, caller=caller)
-        
+        result = self.llm_service.chat(
+            messages, response_format=response_format, caller=caller, **kwargs
+        )
+
         if result:
             return result
         else:
             raise Exception('LLM 调用失败')
-    
-    def chat_stream(self, messages, on_chunk=None, response_format=None):
+
+    def chat_stream(self, messages, on_chunk=None, response_format=None, **kwargs):
         """
         流式调用 LLM 进行对话
 
@@ -2275,19 +2301,22 @@ class LLMClientAdapter:
             messages: 消息列表
             on_chunk: 每收到一个 chunk 时的回调函数 (delta, accumulated)
             response_format: 响应格式 (可选)，如 {"type": "json_object"}
+            **kwargs: 透传给 LLMService 的额外参数 (tier, temperature, caller 等)
 
         Returns:
             完整的 LLM 响应文本
         """
         if hasattr(self.llm_service, 'chat_stream'):
-            result = self.llm_service.chat_stream(messages, on_chunk=on_chunk, response_format=response_format)
+            result = self.llm_service.chat_stream(
+                messages, on_chunk=on_chunk, response_format=response_format, **kwargs
+            )
             if result:
                 return result
             else:
                 raise Exception('LLM 流式调用失败')
         else:
             # 降级为普通调用
-            return self.chat(messages, response_format=response_format)
+            return self.chat(messages, response_format=response_format, **kwargs)
 
 
 def get_blog_service() -> Optional[BlogService]:

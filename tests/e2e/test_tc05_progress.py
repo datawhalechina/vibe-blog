@@ -3,7 +3,7 @@ TC-5: 进度抽屉 & SSE 监控（P1）
 
 验证：进度抽屉出现、日志条目增长、状态徽章、展开/收起
 """
-from e2e_utils import find_element, INPUT_SELECTORS, GENERATE_BTN_SELECTORS, cancel_task
+from e2e_utils import find_element, fill_input, INPUT_SELECTORS, GENERATE_BTN_SELECTORS, cancel_task
 
 
 def test_progress_drawer_appears(page, base_url, take_screenshot):
@@ -11,7 +11,7 @@ def test_progress_drawer_appears(page, base_url, take_screenshot):
     page.goto(base_url, wait_until="networkidle")
 
     input_el, _ = find_element(page, INPUT_SELECTORS)
-    input_el.fill("E2E 进度测试")
+    fill_input(page, input_el, "E2E 进度测试")
 
     captured_task_id = None
 

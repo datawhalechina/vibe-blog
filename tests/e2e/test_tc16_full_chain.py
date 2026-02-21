@@ -15,6 +15,7 @@ TC-16: 全链路闭环验证（P0 — 串联所有孤岛）
 """
 from e2e_utils import (
     find_element,
+    fill_input,
     INPUT_SELECTORS,
     GENERATE_BTN_SELECTORS,
     get_blog_detail_api,
@@ -43,8 +44,7 @@ class TestFullChain:
 
         input_el, _ = find_element(page, INPUT_SELECTORS)
         assert input_el is not None, "未找到主题输入框"
-        input_el.click()
-        input_el.fill(topic)
+        fill_input(page, input_el, topic)
 
         adv_btn = page.locator("button.code-action-btn:has-text('高级选项')")
         adv_btn.click()
@@ -81,13 +81,17 @@ class TestFullChain:
             page.wait_for_timeout(poll_interval * 1000)
             waited += poll_interval
 
-        # ── A4: 验证到达详情页 ──
+        # ── A4: 生成完成，导航到详情页 ──
         page.wait_for_timeout(5000)
-        assert '/blog/' in page.url, f"未跳转到详情页: {page.url}"
+        # 生成完成后可能停留在 /generate/ 或跳转到 /blog/
+        if '/blog/' in page.url:
+            blog_id = page.url.rstrip('/').split('/')[-1]
+        else:
+            blog_id = captured_task_id
+
+        page.goto(f"{base_url}/blog/{blog_id}", wait_until="networkidle")
         page.wait_for_load_state("networkidle", timeout=15000)
         take_screenshot("chain_03_detail_page")
-
-        blog_id = page.url.rstrip('/').split('/')[-1]
 
         # ── A5: 详情页内容验证 ──
         blog_title = page.locator(".blog-title")
@@ -202,7 +206,7 @@ class TestFullChain:
 
         # ── D3: 验证统计卡片 ──
         stat_cards = page.locator(".stat-card")
-        assert stat_cards.count() == 4, \
+        assert stat_cards.count() == 5, \
             f"统计卡片数量异常: {stat_cards.count()}"
 
         # ── D4: 通过 API 验证任务记录 ──

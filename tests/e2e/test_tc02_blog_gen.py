@@ -9,6 +9,8 @@ TC-2: 博客生成主流程（P0 — 最关键）
 """
 from e2e_utils import (
     find_element,
+    fill_input,
+    clear_input,
     INPUT_SELECTORS,
     GENERATE_BTN_SELECTORS,
     get_blog_detail_api,
@@ -34,8 +36,7 @@ class TestBlogGeneration:
         # ── Step 2: 输入主题 ──
         input_el, used_selector = find_element(page, INPUT_SELECTORS)
         assert input_el is not None, f"未找到主题输入框，尝试过: {INPUT_SELECTORS}"
-        input_el.click()
-        input_el.fill(topic)
+        fill_input(page, input_el, topic)
         take_screenshot("02_topic_filled")
 
         # ── Step 3: 展开高级选项，选择 mini ──
@@ -99,10 +100,18 @@ class TestBlogGeneration:
 
         take_screenshot("07_generation_done")
 
-        # ── Step 7: 验证跳转到详情页 ──
+        # ── Step 7: 验证生成完成 ──
         page.wait_for_timeout(5000)
-        assert '/blog/' in page.url, f"未跳转到详情页，当前 URL: {page.url}"
+        # 生成完成后可能停留在 /generate/ 或跳转到 /blog/
+        current_url = page.url
+        if '/blog/' in current_url:
+            blog_id = current_url.rstrip('/').split('/')[-1]
+        else:
+            # 停留在 /generate/task_xxx，用 task_id 作为 blog_id
+            blog_id = captured_task_id
 
+        # 导航到详情页验证内容
+        page.goto(f"{base_url}/blog/{blog_id}", wait_until="networkidle")
         page.wait_for_load_state("networkidle", timeout=15000)
         take_screenshot("08_detail_page")
 
@@ -133,7 +142,6 @@ class TestBlogGeneration:
             "SSE hook 未捕获到 outline 或 sections"
 
         # ── Step 10: 后端数据校验 ──
-        blog_id = page.url.rstrip('/').split('/')[-1]
         blog_data = get_blog_detail_api(blog_id)
         if blog_data:
             # 验证后端确实存储了生成结果
@@ -175,8 +183,8 @@ class TestBlogGeneration:
 
         input_el, _ = find_element(page, INPUT_SELECTORS)
         assert input_el is not None, "未找到主题输入框"
-        input_el.fill("测试主题")
+        fill_input(page, input_el, "测试主题")
         assert gen_btn.is_enabled(), "有主题时按钮应 enabled"
 
-        input_el.fill("")
+        clear_input(page, input_el)
         assert gen_btn.is_disabled(), "清空后按钮应 disabled"

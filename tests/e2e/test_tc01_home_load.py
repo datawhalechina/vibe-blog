@@ -3,7 +3,7 @@ TC-1: 首页加载与基础渲染（P0）
 
 验证：导航栏、输入卡片、生成按钮状态、主题切换、滚动提示
 """
-from e2e_utils import find_element, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
+from e2e_utils import find_element, fill_input, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
 
 
 def test_home_page_loads(page, base_url, take_screenshot):
@@ -36,7 +36,7 @@ def test_generate_button_enables_with_topic(page, base_url):
 
     input_el, _ = find_element(page, INPUT_SELECTORS)
     assert input_el is not None, f"未找到主题输入框，尝试过: {INPUT_SELECTORS}"
-    input_el.fill("测试主题")
+    fill_input(page, input_el, "测试主题")
 
     gen_btn, _ = find_element(page, GENERATE_BTN_SELECTORS)
     assert gen_btn is not None, f"未找到生成按钮，尝试过: {GENERATE_BTN_SELECTORS}"
