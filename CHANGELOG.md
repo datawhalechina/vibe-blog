@@ -71,6 +71,21 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✅ 12/12 verify_102_features 检查通过
 - ✅ E2E 端到端博客生成验证通过（主题: OpenClaw Agent 执行框架，4 章节 4 配图）
 - ✅ E2E mini 博客生成验证通过（主题: Git rebase 实战技巧），task log JSON 确认 step 级耗时记录正常
+- ✅ **41.xx GPT-Researcher 迁移全量集成验证** — 14/14 特性 CONNECTED，零孤岛代码
+  - 41.01 Deep Research Engine — `DEEP_RESEARCH_ENABLED` ✅ 模块存在 ✅ researcher.py 调用 ✅ 默认关闭
+  - 41.02 Source Credibility Filter — `SOURCE_CREDIBILITY_ENABLED` ✅ 模块存在 ✅ smart_search_service.py 调用 ✅ 默认关闭
+  - 41.03 Semantic Compressor — `SEMANTIC_COMPRESS_ENABLED` ✅ 模块存在 ✅ researcher.py 调用 ✅ 默认关闭
+  - 41.04 Sub-Query Parallel Engine — `SUB_QUERY_ENABLED` ✅ 模块存在 ✅ researcher.py 调用 ✅ 默认关闭
+  - 41.05 Image Preplanner — `IMAGE_PREPLAN_ENABLED` ✅ 模块存在 ✅ generator.py + artist.py 调用 ✅ 默认关闭
+  - 41.06 Tiered LLM Model Strategy — ✅ 模块存在 ✅ generator.py 全 Agent 包装 ✅ 始终启用（透明退化）
+  - 41.07 Rate Limiter — ✅ 模块存在 ✅ llm_service.py + smart_search_service.py 调用 ✅ 始终启用（interval=0 退化为 no-op）
+  - 41.08 Cost Tracker — `COST_TRACKING_ENABLED` ✅ 模块存在 ✅ generator.py + llm_service.py 调用 ✅ 默认关闭
+  - 41.09 Cross-Section Dedup — `CROSS_SECTION_DEDUP_ENABLED` ✅ 模块存在 ✅ LangGraph 节点注册 ✅ 默认关闭
+  - 41.10 Dynamic Agent Persona — `AGENT_PERSONA_ENABLED` ✅ 模块存在 ✅ _writer_node 注入 + writer 消费 ✅ 默认关闭
+  - 41.11 Review Guidelines — `REVIEW_GUIDELINES_ENABLED` ✅ 模块存在 ✅ reviewer.run() 自动匹配 ✅ 默认关闭
+  - 41.16 Prompt Family（P5 基础设施）— `PROMPT_FAMILY_ENABLED` ✅ 独立模块 ✅ 默认关闭
+  - 41.17 Retriever Registry（P5 基础设施）— `RETRIEVER_REGISTRY_ENABLED` ✅ 独立模块 ✅ 默认关闭
+  - 41.18 Tool Enhanced LLM（P5 基础设施）— `LLM_TOOLS_ENABLED` ✅ 独立模块 ✅ 默认关闭
 
 ---
 

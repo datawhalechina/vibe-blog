@@ -3,6 +3,7 @@ TC-1: 首页加载与基础渲染（P0）
 
 验证：导航栏、输入卡片、生成按钮状态、主题切换、滚动提示
 """
+from e2e_utils import find_element, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
 
 
 def test_home_page_loads(page, base_url, take_screenshot):
@@ -11,11 +12,12 @@ def test_home_page_loads(page, base_url, take_screenshot):
     take_screenshot("loaded")
 
     # 输入卡片
-    assert page.locator("textarea.code-input-textarea").is_visible()
+    input_el, _ = find_element(page, INPUT_SELECTORS)
+    assert input_el is not None, f"未找到主题输入框，尝试过: {INPUT_SELECTORS}"
 
     # 生成按钮存在且 disabled（无主题时）
-    gen_btn = page.locator("button.code-generate-btn")
-    assert gen_btn.is_visible()
+    gen_btn, _ = find_element(page, GENERATE_BTN_SELECTORS)
+    assert gen_btn is not None, f"未找到生成按钮，尝试过: {GENERATE_BTN_SELECTORS}"
     assert gen_btn.is_disabled()
 
     # 主题切换按钮
@@ -32,10 +34,12 @@ def test_generate_button_enables_with_topic(page, base_url):
     """输入主题后生成按钮变为可用"""
     page.goto(base_url, wait_until="networkidle")
 
-    textarea = page.locator("textarea.code-input-textarea")
-    textarea.fill("测试主题")
+    input_el, _ = find_element(page, INPUT_SELECTORS)
+    assert input_el is not None, f"未找到主题输入框，尝试过: {INPUT_SELECTORS}"
+    input_el.fill("测试主题")
 
-    gen_btn = page.locator("button.code-generate-btn")
+    gen_btn, _ = find_element(page, GENERATE_BTN_SELECTORS)
+    assert gen_btn is not None, f"未找到生成按钮，尝试过: {GENERATE_BTN_SELECTORS}"
     assert gen_btn.is_enabled()
 
 

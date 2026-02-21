@@ -4,13 +4,15 @@ vibe-blog E2E 测试 — 共享 Playwright Fixtures
 功能：
 - browser (session): 共享浏览器实例
 - context (function): 每测试独立上下文
-- page (function): 自动注入 SSE_HOOK_JS
+- page (function): 自动注入 SSE_HOOK_JS + 控制台日志捕获
 - take_screenshot: 按测试名+步骤名截图
+- console_logs: 捕获浏览器控制台日志
 - RUN_E2E_TESTS=1 全局门控
 """
 import os
 import sys
 import time
+import json
 import pytest
 
 # 将 backend 和 backend/tests 加入 path 以复用 e2e_utils
@@ -71,11 +73,29 @@ def context(browser):
 
 
 @pytest.fixture
-def page(context):
-    """Function-scoped 页面，自动注入 SSE Hook"""
+def console_logs():
+    """收集浏览器控制台日志，测试结束后可检查"""
+    logs = []
+    return logs
+
+
+@pytest.fixture
+def page(context, console_logs):
+    """Function-scoped 页面，自动注入 SSE Hook + 控制台日志捕获"""
     p = context.new_page()
     p.set_default_timeout(30_000)
     p.add_init_script(SSE_HOOK_JS)
+
+    # 捕获浏览器控制台日志
+    def _on_console(msg):
+        console_logs.append({
+            "type": msg.type,
+            "text": msg.text,
+            "url": msg.location.get("url", "") if msg.location else "",
+        })
+
+    p.on("console", _on_console)
+
     yield p
     p.close()
 
@@ -92,6 +112,18 @@ def take_screenshot(page, screenshot_dir, request):
         return path
 
     return _take
+
+
+@pytest.fixture
+def save_logs(screenshot_dir, request, console_logs):
+    """测试结束后保存控制台日志到文件（供排查用）"""
+    yield
+    if console_logs:
+        test_name = request.node.name
+        ts = time.strftime('%H%M%S')
+        path = os.path.join(screenshot_dir, f"{test_name}_console_{ts}.json")
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(console_logs, f, ensure_ascii=False, indent=2)
 
 
 @pytest.fixture

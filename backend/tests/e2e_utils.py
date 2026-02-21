@@ -240,3 +240,148 @@ def cancel_task(task_id: str):
         logger.info(f"  🛑 已取消任务: {task_id}")
     except Exception as e:
         logger.warning(f"  ⚠️ 取消任务失败: {e}")
+
+
+# ═══════════════════════════════════════════════════════════════
+# 详情页内容验证
+# ═══════════════════════════════════════════════════════════════
+
+def verify_blog_detail_page(page, topic: str = None) -> dict:
+    """
+    验证博客详情页内容是否正确渲染。
+
+    Returns:
+        {
+            "title": str | None,
+            "sections_count": int,
+            "content_length": int,
+            "has_images": bool,
+            "has_code_blocks": bool,
+            "errors": list[str],
+        }
+    """
+    result = {
+        "title": None,
+        "sections_count": 0,
+        "content_length": 0,
+        "has_images": False,
+        "has_code_blocks": False,
+        "errors": [],
+    }
+
+    # 等待内容区域渲染
+    try:
+        page.locator(".blog-content.prose, .content-card-body").first.wait_for(
+            state="visible", timeout=10000
+        )
+    except Exception:
+        result["errors"].append("详情页内容区域未渲染")
+        return result
+
+    # 标题
+    title_el = page.locator("h1.blog-title, .title-section h1").first
+    try:
+        result["title"] = title_el.text_content(timeout=5000)
+    except Exception:
+        result["errors"].append("未找到博客标题")
+
+    if topic and result["title"]:
+        # 标题应包含主题关键词（至少部分匹配）
+        topic_words = [w for w in topic.split() if len(w) > 1]
+        if topic_words and not any(w in result["title"] for w in topic_words):
+            result["errors"].append(
+                f"标题 '{result['title']}' 与主题 '{topic}' 不匹配"
+            )
+
+    # 正文内容
+    content_el = page.locator(".blog-content.prose, .content-card-body").first
+    try:
+        content_text = content_el.text_content(timeout=5000)
+        result["content_length"] = len(content_text or "")
+        if result["content_length"] < 100:
+            result["errors"].append(
+                f"正文内容过短: {result['content_length']} 字符"
+            )
+    except Exception:
+        result["errors"].append("无法读取正文内容")
+
+    # 章节标题 (h2/h3)
+    headings = page.locator(".blog-content h2, .blog-content h3, .content-card-body h2, .content-card-body h3")
+    result["sections_count"] = headings.count()
+    if result["sections_count"] == 0:
+        result["errors"].append("未找到章节标题 (h2/h3)")
+
+    # 图片
+    images = page.locator(".blog-content img, .content-card-body img")
+    result["has_images"] = images.count() > 0
+
+    # 代码块
+    code_blocks = page.locator(".blog-content pre code, .content-card-body pre code")
+    result["has_code_blocks"] = code_blocks.count() > 0
+
+    return result
+
+
+# ═══════════════════════════════════════════════════════════════
+# 后端日志 & 任务状态采集
+# ═══════════════════════════════════════════════════════════════
+
+def get_task_status(task_id: str) -> dict | None:
+    """通过 API 获取任务状态"""
+    try:
+        resp = requests.get(f"{BACKEND_URL}/api/tasks/{task_id}", timeout=5)
+        if resp.status_code == 200:
+            return resp.json().get("task")
+    except Exception as e:
+        logger.warning(f"获取任务状态失败: {e}")
+    return None
+
+
+def get_blog_detail_api(blog_id: str) -> dict | None:
+    """通过 API 获取博客详情（用于后端数据验证）"""
+    try:
+        resp = requests.get(f"{BACKEND_URL}/api/history/{blog_id}", timeout=10)
+        if resp.status_code == 200:
+            return resp.json()
+    except Exception as e:
+        logger.warning(f"获取博客详情失败: {e}")
+    return None
+
+
+# ═══════════════════════════════════════════════════════════════
+# 特性验证机制
+# ═══════════════════════════════════════════════════════════════
+
+# 特性验证注册表：迁移新特性后，在此注册验证函数
+# 格式: { "feature_name": callable(page, blog_data) -> (bool, str) }
+_feature_checks = {}
+
+
+def register_feature_check(name: str, check_fn):
+    """注册一个特性验证函数。
+
+    check_fn 签名: (page, blog_data: dict) -> (passed: bool, message: str)
+    - page: Playwright page（已在详情页）
+    - blog_data: 后端 API 返回的博客数据（可能为 None）
+    """
+    _feature_checks[name] = check_fn
+    logger.info(f"注册特性验证: {name}")
+
+
+def run_feature_checks(page, blog_data: dict = None) -> list[dict]:
+    """运行所有已注册的特性验证。
+
+    Returns:
+        [{"feature": str, "passed": bool, "message": str}, ...]
+    """
+    results = []
+    for name, fn in _feature_checks.items():
+        try:
+            passed, msg = fn(page, blog_data)
+            results.append({"feature": name, "passed": passed, "message": msg})
+            status = "PASS" if passed else "FAIL"
+            logger.info(f"  特性验证 [{status}] {name}: {msg}")
+        except Exception as e:
+            results.append({"feature": name, "passed": False, "message": str(e)})
+            logger.error(f"  特性验证 [ERROR] {name}: {e}")
+    return results
