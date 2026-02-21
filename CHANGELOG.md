@@ -4,6 +4,23 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-21 (fix/tier-bug-and-logging-improvement)
+
+### Fixed
+- 🐛 **LLMClientAdapter tier 参数转发** — `chat()`/`chat_stream()` 添加 `**kwargs`，修复 TieredLLMProxy 传递 `tier` 参数时报 `unexpected keyword argument` 导致所有博客 `final_markdown` 为空的 P0 回归
+- 🐛 **blog_routes get_history 404** — `/api/history/<blog_id>` 调用 `get_blog()` 改为 `get_history()`，修复详情页 404
+
+### Added
+- ✨ **按任务分离日志** — 每个生成任务独立日志文件 `logs/blog_tasks/{task_id}/task.log`，通过 `TaskIdMatchFilter` 只记录该任务的日志，与结构化 JSON (`task.json`) 放在同一子文件夹
+- ✨ **RotatingFileHandler** — 全局 `app.log` 从无限增长的 `FileHandler` 改为 `RotatingFileHandler`（10MB × 5 备份），防止日志膨胀
+- ✨ **统一日志目录** — 所有日志统一到 `vibe-blog/logs/`，消除 `backend/logs/` 和 `vibe-blog/logs/` 双目录混乱
+
+### Improved
+- 🔧 **E2E 测试弹性选择器** — `fill_input`/`clear_input` 工具函数兼容 TipTap 富文本编辑器和普通 input，多选择器降级策略
+- 🔧 **performance_summary.py 兼容新旧目录** — 同时扫描旧的 `*.json` 平铺文件和新的 `*/task.json` 子文件夹结构
+
+---
+
 ## 2026-02-21
 
 ### Added
