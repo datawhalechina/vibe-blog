@@ -116,6 +116,16 @@ class ResearcherAgent:
                 logger.info("41.04 子查询并行研究引擎已启用")
             except Exception as e:
                 logger.warning(f"子查询引擎初始化失败: {e}")
+
+        # 41.03 语义压缩器
+        self._semantic_compressor = None
+        if os.environ.get('SEMANTIC_COMPRESS_ENABLED', 'false').lower() == 'true':
+            try:
+                from ..services.semantic_compressor import SemanticCompressor
+                self._semantic_compressor = SemanticCompressor()
+                logger.info("41.03 语义压缩器已启用")
+            except Exception as e:
+                logger.warning(f"语义压缩器初始化失败: {e}")
     
     def generate_search_queries(self, topic: str, target_audience: str) -> List[str]:
         """
@@ -682,9 +692,17 @@ class ResearcherAgent:
             # ✅ 无文档 → 完全走原有逻辑，零改动
             logger.info("📋 使用原有搜索模式（无文档上传）")
             logger.info(f"📋 将使用网络搜索结果生成博客内容")
+
+            # 41.03 语义压缩：在 summarize 前压缩搜索结果
+            compressed_results = search_results
+            if self._semantic_compressor and search_results:
+                compressed_results = self._semantic_compressor.compress(
+                    query=topic, search_results=search_results,
+                )
+
             summary = self.summarize(
                 topic=topic,
-                search_results=search_results,
+                search_results=compressed_results,
                 target_audience=target_audience
             )
             state['knowledge_source_stats'] = {

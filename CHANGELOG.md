@@ -14,6 +14,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **41.10 动态 Agent 角色** — AgentPersona 预设人设库（tech_expert/finance_analyst/education_specialist/science_writer），通过 StyleProfile.persona_key 注入，`AGENT_PERSONA_ENABLED=true` 启用
 - ✨ **41.11 Guidelines 驱动审核** — 按文章类型注入自定义审核标准（tutorial/science_popular/deep_analysis），ReviewerAgent 支持 guidelines 参数，`REVIEW_GUIDELINES_ENABLED=true` 启用
 - ✨ **41.08 成本追踪增强** — CostTracker 实时 USD 成本估算 + 预算熔断器（warn/abort），集成 GlobalRateLimiter 指标聚合，`COST_TRACKING_ENABLED=true` 启用，`COST_BUDGET_USD` 设置预算上限
+- ✨ **41.03 Embedding 上下文压缩** — SemanticCompressor 基于 embedding 余弦相似度排序搜索结果，保留 top-K 最相关片段，支持 OpenAI/本地 TF-IDF 双模式，`SEMANTIC_COMPRESS_ENABLED=true` 启用
 - ✨ **75.10 搜索服务集成 + 死代码治理** — 将 75.02~75.09 各搜索服务统一接入 `init_blog_services()`
   - `init_blog_services()` 新增 Serper Google 搜索（75.02）和搜狗/腾讯云 SearchPro（75.07）初始化
   - 每个可选服务独立 try-except，一个失败不影响其他
