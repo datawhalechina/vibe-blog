@@ -287,6 +287,9 @@ class SharedState(TypedDict):
     topic_ideas: List[dict]  # 筛选后的选题方向 [{idea, knowledge_point}, ...]
     topic_statement: Optional[str]  # 选题陈述 Markdown
 
+    # 1003.04 动态主题队列 (DynamicTopicQueue 序列化状态)
+    topic_queue_data: Optional[dict]  # DynamicTopicQueue.to_dict() 输出
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -416,6 +419,8 @@ def create_initial_state(
         knowledge_points=[],
         topic_ideas=[],
         topic_statement=None,
+        # 1003.04 动态主题队列
+        topic_queue_data=None,
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,
