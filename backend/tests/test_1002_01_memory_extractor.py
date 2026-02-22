@@ -331,9 +331,9 @@ class TestConfigEnhancement:
         assert config.auto_extract_enabled is True
 
     def test_model_name_default(self):
-        """model_name 默认应为空字符串"""
+        """model_name 默认应为 None"""
         config = BlogMemoryConfig()
-        assert config.model_name == ""
+        assert config.model_name is None
 
     def test_from_env_reads_new_fields(self):
         """from_env 应读取新增的环境变量"""

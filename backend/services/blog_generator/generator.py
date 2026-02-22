@@ -174,16 +174,18 @@ class BlogGenerator:
             except Exception as e:
                 logger.warning(f"WritingSkillManager 初始化失败: {e}")
 
-        # 102.03 迁移：用户记忆存储
+        # 102.03 迁移：用户记忆存储（1002.05: 使用全局配置单例）
         self._memory_storage = None
-        if os.getenv('MEMORY_ENABLED', 'false').lower() == 'true':
-            try:
-                from .memory import MemoryStorage, BlogMemoryConfig
-                mem_config = BlogMemoryConfig.from_env()
+        try:
+            from .memory.config import get_memory_config, load_memory_config_from_env
+            load_memory_config_from_env()
+            mem_config = get_memory_config()
+            if mem_config.enabled:
+                from .memory import MemoryStorage
                 self._memory_storage = MemoryStorage(storage_path=mem_config.storage_path)
                 logger.info("102.03 MemoryStorage 已启用")
-            except Exception as e:
-                logger.warning(f"MemoryStorage 初始化失败: {e}")
+        except Exception as e:
+            logger.warning(f"MemoryStorage 初始化失败: {e}")
 
         # 构建工作流
         self.workflow = self._build_workflow()
@@ -1140,6 +1142,8 @@ class BlogGenerator:
                 self.task_log = task_log
                 # 注入到中间件，自动记录每个节点耗时
                 self._task_log_middleware.set_task_log(task_log)
+                if token_tracker:
+                    self._task_log_middleware.set_token_tracker(token_tracker)
         except Exception:
             pass
 
