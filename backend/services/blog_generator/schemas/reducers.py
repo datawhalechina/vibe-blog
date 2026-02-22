@@ -12,6 +12,8 @@ from __future__ import annotations
 
 from typing import Any, Callable, Dict, List
 
+from ..citations.merger import merge_citations
+
 
 def merge_list_dedup(existing: List[Any], new: List[Any]) -> List[Any]:
     """
@@ -74,5 +76,6 @@ STATE_REDUCERS: Dict[str, Callable[[List, List], List]] = {
     "section_images": merge_list_dedup,
     "key_concepts": merge_list_dedup,
     "reference_links": merge_list_dedup,
+    "citation_collection": merge_citations,
     "review_issues": merge_list_dedup,
 }

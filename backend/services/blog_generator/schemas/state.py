@@ -175,6 +175,7 @@ class SharedState(TypedDict):
     key_concepts: List[str]  # 提取的核心概念
     reference_links: List[str]  # 参考链接 (网络来源)
     document_references: List[dict]  # 文档来源引用
+    citation_collection: List[dict]  # 结构化引用集合（CitationCollector 输出）
     knowledge_source_stats: dict  # 知识来源统计
     
     # Instructional Design 分析 (Researcher 输出)
@@ -327,6 +328,7 @@ def create_initial_state(
         key_concepts=[],
         reference_links=[],
         document_references=[],
+        citation_collection=[],
         knowledge_source_stats={},
         # Instructional Design 分析
         instructional_analysis=None,
