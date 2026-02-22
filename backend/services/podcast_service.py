@@ -60,6 +60,14 @@ PODCAST_SCRIPT_USER_PROMPT = """请将以下内容转化为播客脚本：
 
 请输出 JSON 格式的播客脚本："""
 
+# ── 1003.07 叙述风格 Prompt ──────────────────────────────────
+
+NARRATE_STYLE_PROMPTS = {
+    "friendly": '你是一位友好、平易近人的导师。使用"我们"、"咱们"拉近距离，语气轻松但专业，适当加入互动引导。',
+    "academic": '你是一位资深学者，正在进行学术讲座。使用严谨专业的语言，保持清晰的引言-正文-结论结构。',
+    "concise": '你是一位高效的知识传播者。直接明了，先总后分，只涵盖最核心的内容。',
+}
+
 
 # ── PodcastService ────────────────────────────────────────────
 
@@ -183,6 +191,64 @@ class PodcastService:
             lines.append(f"{speaker}: {line.paragraph}")
             lines.append("")
         return "\n".join(lines)
+
+    # ── 1003.07 单人叙述模式 ────────────────────────────────────
+
+    def narrate(self, content: str, style: str = "friendly",
+                voice: str = None, skip_audio: bool = False) -> Dict[str, Any]:
+        """单人叙述模式 — 借鉴 DeepTutor NarratorAgent"""
+        script_text = self._generate_narration_script(content, style)
+        key_points = self._extract_key_points(content)
+        result = {
+            "script": script_text,
+            "key_points": key_points,
+            "style": style,
+            "has_audio": False,
+        }
+        if not skip_audio and self.tts_provider and self.tts_provider.is_available():
+            tts_result = self.tts_provider.synthesize(script_text, voice_type=voice or "alloy")
+            if tts_result:
+                audio_filename = f"narrate_{uuid.uuid4().hex[:8]}.mp3"
+                audio_path = os.path.join(self.output_folder, audio_filename)
+                with open(audio_path, "wb") as f:
+                    f.write(tts_result.audio_data)
+                result["audio_path"] = audio_path
+                result["has_audio"] = True
+        return result
+
+    def _generate_narration_script(self, content: str, style: str = "friendly") -> str:
+        """生成单人叙述脚本"""
+        style_prompt = NARRATE_STYLE_PROMPTS.get(style, NARRATE_STYLE_PROMPTS["friendly"])
+        messages = [
+            {"role": "system", "content": f"{style_prompt}\n\n请将以下内容转化为口语化的叙述稿件，适合朗读。只输出叙述文本，不要 JSON 或 Markdown 格式。"},
+            {"role": "user", "content": content[:6000]},
+        ]
+        try:
+            response = self.llm_service.chat(
+                messages=messages, temperature=0.7, caller="narration_script_writer",
+            )
+            return (response or "").strip()
+        except Exception as e:
+            logger.warning(f"叙述脚本生成失败: {e}")
+            return ""
+
+    def _extract_key_points(self, content: str) -> List[str]:
+        """从内容中提取 3-5 个关键点"""
+        messages = [
+            {"role": "system", "content": "你是一位内容分析专家。请从给定的内容中提取3-5个关键点。\n输出格式：JSON数组，每个元素是一个字符串。\n只输出JSON数组，不要包含其他内容。"},
+            {"role": "user", "content": f"请从以下内容中提取关键点：\n\n{content[:4000]}"},
+        ]
+        try:
+            response = self.llm_service.chat(
+                messages=messages, temperature=0.3, caller="key_points_extractor",
+            )
+            if response:
+                json_match = re.search(r'\[.*\]', response, re.DOTALL)
+                if json_match:
+                    return json.loads(json_match.group())
+        except Exception as e:
+            logger.warning(f"关键点提取失败: {e}")
+        return []
 
     # ── 完整管线 ─────────────────────────────────────────────
 
