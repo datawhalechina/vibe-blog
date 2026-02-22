@@ -51,6 +51,7 @@ from services.knowledge_service import init_knowledge_service
 from services.oss_service import get_oss_service, init_oss_service
 from services.video_service import get_video_service, init_video_service
 from services.podcast_service import init_podcast_service
+from services.ppt_service import init_ppt_service
 
 # 初始化日志
 setup_logging()
@@ -114,6 +115,13 @@ def create_app(config_class=None):
         logger.info("播客生成服务已初始化")
     except Exception as e:
         logger.warning(f"播客生成服务初始化失败 (可选模块): {e}")
+
+    # 初始化 PPT 演示文稿生成服务
+    try:
+        init_ppt_service(llm_service=get_llm_service())
+        logger.info("PPT 演示文稿生成服务已初始化")
+    except Exception as e:
+        logger.warning(f"PPT 生成服务初始化失败 (可选模块): {e}")
 
     # 初始化知识源相关服务
     init_db_service()

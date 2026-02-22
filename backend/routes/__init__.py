@@ -38,3 +38,4 @@ def register_all_blueprints(app):
     app.register_blueprint(memory_bp)
     app.register_blueprint(podcast_bp)
     app.register_blueprint(prose_bp)
+    app.register_blueprint(ppt_bp)
