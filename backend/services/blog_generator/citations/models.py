@@ -61,3 +61,22 @@ class CitationMetadata(BaseModel):
             published_date=result.get("publish_date", ""),
             extra={"source": result.get("source", "")},
         )
+
+
+class ToolTrace(BaseModel):
+    """工具调用追踪记录 — 1003.03 迁移自 DeepTutor ToolTrace"""
+
+    tool_id: str  # 唯一标识 "tool_1"
+    citation_id: str  # 引用 ID "CIT-1-01" 或 "PLAN-01"
+    tool_type: str  # 工具类型 rag/web_search/paper_search/code
+    query: str = ""  # 查询语句
+    raw_answer: str = ""  # 原始结果（截断到 50KB）
+    summary: str = ""  # 摘要
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
+    def model_post_init(self, __context: Any) -> None:
+        # 自动截断 raw_answer
+        if len(self.raw_answer) > 50000:
+            self.raw_answer = self.raw_answer[:50000] + "...[truncated]"

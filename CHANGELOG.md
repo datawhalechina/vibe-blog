@@ -9,6 +9,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ### Added
 - ✨ **1003.01 四阶段选题生成** — TopicIdeaAgent 实现松筛→探索→严筛→陈述四阶段选题工作流，从搜索结果提取知识点并生成高质量选题方向，环境变量 `TOPIC_IDEA_ENABLED` 控制开关（默认关闭）
 - ✨ **1003.02 RAG 知识库检索** — 组合式 RAG 管线（Fluent API），支持 FixedSizeChunker 分块 + OpenAI Embedding 向量化 + DenseRetriever 余弦相似度检索，RAGRetrieverAdapter 适配 RetrieverRegistry
+- ✨ **1003.03 统一引用管理** — CitationManager 阶段化 ID（PLAN-XX/CIT-X-XX）+ ToolTrace 工具调用追踪 + 引用验证/修复 + 格式化输出，增量增强现有 CitationCollector
 
 ---
 
