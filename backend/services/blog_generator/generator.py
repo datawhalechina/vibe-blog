@@ -31,7 +31,7 @@ from .agents.summary_generator import SummaryGeneratorAgent
 from .middleware import (
     MiddlewarePipeline, TracingMiddleware, ReducerMiddleware,
     ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
-    TaskLogMiddleware,
+    TaskLogMiddleware, VisionMiddleware,
     ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
 )
 from .context_management_middleware import ContextManagementMiddleware
@@ -147,7 +147,20 @@ class BlogGenerator:
 
         # 102.10 迁移：中间件管道
         self._task_log_middleware = TaskLogMiddleware()
-        self.pipeline = MiddlewarePipeline(middlewares=[
+
+        # 1002.14 视觉能力：初始化图片理解服务和中间件
+        self._image_understanding_service = None
+        self._vision_middleware = None
+        if os.getenv('VISION_ENABLED', 'false').lower() == 'true':
+            try:
+                from services.image_understanding_service import ImageUnderstandingService
+                self._image_understanding_service = ImageUnderstandingService(llm_service=llm_client)
+                self._vision_middleware = VisionMiddleware(image_service=self._image_understanding_service)
+                logger.info("1002.14 VisionMiddleware 已启用")
+            except Exception as e:
+                logger.warning(f"VisionMiddleware 初始化失败: {e}")
+
+        middleware_list = [
             TracingMiddleware(),
             self._task_log_middleware,
             ReducerMiddleware(),
@@ -163,7 +176,11 @@ class BlogGenerator:
             ContextPrefetchMiddleware(
                 knowledge_service=knowledge_service,
             ),
-        ])
+        ]
+        if self._vision_middleware:
+            middleware_list.append(self._vision_middleware)
+
+        self.pipeline = MiddlewarePipeline(middlewares=middleware_list)
 
         # 102.01 迁移：统一并行任务执行引擎
         self.executor = ParallelTaskExecutor()

@@ -278,6 +278,10 @@ class SharedState(TypedDict):
     # 1002.04 系统化深度研究方法论
     research_plan: Optional[dict]  # 结构化研究计划（维度、思路、综合检查结果）
 
+    # 1002.14 视觉能力（图片理解）
+    viewed_images: dict  # {path: {base64, mime_type}} — 已查看的图片数据
+    image_understandings: List[dict]  # 图片理解结果列表
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -400,6 +404,9 @@ def create_initial_state(
         clarification_round=0,
         # 1002.04 系统化深度研究方法论
         research_plan=None,
+        # 1002.14 视觉能力（图片理解）
+        viewed_images={},
+        image_understandings=[],
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,

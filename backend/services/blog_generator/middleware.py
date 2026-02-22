@@ -545,3 +545,60 @@ class ContextCompressionMiddleware(ExtendedMiddleware):
 
     def after_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
         return None
+
+
+# ==================== 1002.14：VisionMiddleware ====================
+
+
+# 需要视觉注入的节点列表
+VISION_ENABLED_NODES = {"planner", "writer", "artist", "assembler"}
+
+
+class VisionMiddleware(ExtendedMiddleware):
+    """
+    节点级视觉中间件 — 在目标节点执行前注入图片理解结果。
+
+    在 before_node 中检查 state 中是否有待理解的图片，
+    自动调用 ImageUnderstandingService 分析并将结果注入 state。
+
+    环境变量开关：VISION_ENABLED (default: false)
+    """
+
+    def __init__(self, image_service=None):
+        self._image_service = image_service
+
+    def before_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
+        """在目标节点执行前注入图片理解结果"""
+        if os.getenv("VISION_ENABLED", "false").lower() != "true":
+            return None
+
+        if node_name not in VISION_ENABLED_NODES:
+            return None
+
+        viewed_images = state.get("viewed_images", {})
+        if not viewed_images:
+            return None
+
+        if state.get("image_understandings"):
+            return None
+
+        if not self._image_service:
+            return None
+
+        logger.info(f"[VisionMiddleware] 为节点 {node_name} 注入 {len(viewed_images)} 张图片理解")
+
+        understandings = []
+        for path, img_data in viewed_images.items():
+            result = self._image_service.analyze_image(path, context=state.get("topic", ""))
+            if result:
+                understandings.append({
+                    "path": result.path,
+                    "description": result.description,
+                    "detected_text": result.detected_text,
+                    "image_type": result.image_type,
+                    "relevance_score": result.relevance_score,
+                })
+
+        if understandings:
+            return {"image_understandings": understandings}
+        return None
