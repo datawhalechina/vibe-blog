@@ -14,6 +14,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **1003.05 双循环架构** — Analysis Loop（AnalysisInvestigator + AnalysisNoteAgent），在 researcher→planner 之间插入 LLM 自主判断的深度调查循环，结构化知识链 analysis_knowledge_chain + 自动摘要，环境变量 `ANALYSIS_LOOP_ENABLED` 控制开关（默认关闭）
 - ✨ **1003.06 代码执行沙箱** — ImportGuard AST 白名单 + WorkspaceManager 路径隔离 + subprocess 超时控制，支持同步 run_code_sync() 和异步 run_code()，环境变量 `ENABLE_CODE_VERIFY` 控制 CoderAgent 验证开关（默认关闭）
 - ✨ **1003.07 TTS 音频/Podcast 增强** — OpenAITTSProvider（6 声线 + 4096 智能截断）+ init_tts_provider 优先级回退（OpenAI→火山引擎）+ PodcastService.narrate() 单人叙述模式（friendly/academic/concise 三风格）+ _extract_key_points() 关键点提取
+- ✨ **1003.08 多语言 i18n 框架** — 后端 locale_utils.normalize_locale() 统一语言标准化（zh/en/chinese/english→zh-CN/en-US）+ 前端 vue-i18n 初始化模块 + zh-CN/en-US 双语翻译文件（33 键）+ normalizeLocale() TS 函数
 
 ---
 
