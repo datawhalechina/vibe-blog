@@ -15,6 +15,8 @@ from .task_service import TaskManager, get_task_manager
 from .pipeline_service import PipelineService, create_pipeline_service
 from .blog_generator import BlogGenerator, SearchService, init_search_service, get_search_service
 from .blog_generator.blog_service import BlogService, init_blog_service, get_blog_service
+from .podcast_service import PodcastService, init_podcast_service, get_podcast_service
+from .tts_service import TTSProvider, VolcengineTTSProvider, init_tts_provider, get_tts_provider
 
 __all__ = [
     'LLMService',
@@ -39,4 +41,11 @@ __all__ = [
     'SearchService',
     'init_search_service',
     'get_search_service',
+    'PodcastService',
+    'init_podcast_service',
+    'get_podcast_service',
+    'TTSProvider',
+    'VolcengineTTSProvider',
+    'init_tts_provider',
+    'get_tts_provider',
 ]

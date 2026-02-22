@@ -50,6 +50,7 @@ from services.file_parser_service import get_file_parser, init_file_parser
 from services.knowledge_service import init_knowledge_service
 from services.oss_service import get_oss_service, init_oss_service
 from services.video_service import get_video_service, init_video_service
+from services.podcast_service import init_podcast_service
 
 # 初始化日志
 setup_logging()
@@ -106,6 +107,13 @@ def create_app(config_class=None):
         logger.info("统一视频生成服务已初始化 (Veo3 + Sora2)")
     else:
         logger.warning("视频生成服务不可用")
+
+    # 初始化播客生成服务
+    try:
+        init_podcast_service(llm_service=get_llm_service())
+        logger.info("播客生成服务已初始化")
+    except Exception as e:
+        logger.warning(f"播客生成服务初始化失败 (可选模块): {e}")
 
     # 初始化知识源相关服务
     init_db_service()

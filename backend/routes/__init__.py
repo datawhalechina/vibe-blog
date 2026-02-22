@@ -15,6 +15,7 @@ from routes.chat_routes import chat_bp
 from routes.feishu_routes import feishu_bp
 from routes.settings_routes import settings_bp
 from routes.memory_routes import memory_bp
+from routes.podcast_routes import podcast_bp
 
 
 def register_all_blueprints(app):
@@ -33,3 +34,4 @@ def register_all_blueprints(app):
     app.register_blueprint(feishu_bp)
     app.register_blueprint(settings_bp)
     app.register_blueprint(memory_bp)
+    app.register_blueprint(podcast_bp)
