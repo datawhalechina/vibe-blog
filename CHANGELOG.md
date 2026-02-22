@@ -24,6 +24,13 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **1003.21 生成状态管理 Store** — Pinia generation store（GenerationStage 状态机 + TaskState 任务追踪 + LogEntry 结构化日志 + handleStageChange/handleTaskUpdate/handleProgress），8 个测试全通过
 - ✨ **1003.22 会话生命周期管理** — SessionLifecycleManager（SQLite 持久化 + Session 数据类 + SessionStatus/SessionType 枚举 + CRUD + 状态转换 + TTL 过期 + 容量上限），13 个测试全通过
 - ✨ **1003.23 文件夹同步管理** — FolderSyncService（link_folder 幂等关联 + detect_changes mtime 增量检测 + mark_synced 同步标记 + JSON 元数据持久化 + 7 种文件扩展名支持），12 个测试全通过
+- ✨ **1003.17 配置热重载** — ConfigReloader 线程安全配置缓存（版本化 reload + 失败回滚 + reload_all 批量 + get/clear），10 个测试全通过
+- ✨ **1003.18 Token 用量统计** — TokenStats 多维度聚合器（TokenUsageRecord 数据类 + by_agent/by_model/total/top_consumers），8 个测试全通过
+- ✨ **1003.19 交互式 HTML 生成** — InteractiveHTMLAgent（LLM HTML 生成 + _extract_html 代码块提取 + _validate_html 结构验证 + _generate_fallback XSS 安全降级），10 个测试全通过
+- ✨ **1003.20 创作者洞察报告** — CreatorInsightService（BlogRecord 数据类 + 主题分布 + 质量趋势 + 标签云 + 活跃度统计 + 创作建议），12 个测试全通过
+- ✨ **1003.26 LLM 调用日志** — LLMCallLogger（LLMCallRecord 数据类 + track() 上下文管理器自动计时 + get_summary 按模型聚合 + success_rate），9 个测试全通过
+- ✨ **1003.27 任务 ID 管理器** — TaskIDManager 单例（threading.Lock 线程安全 + generate 格式化 ID + idempotent task_key + update_status/cleanup），11 个测试全通过
+- ✨ **1003.28 Dashboard 活动追踪** — ActivityTracker（JSON 持久化 + ActivityType 枚举 + add_entry/get_recent/get_stats + MAX_ENTRIES 自动裁剪 + clear），11 个测试全通过
 
 ---
 
