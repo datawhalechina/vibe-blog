@@ -269,6 +269,9 @@ class SharedState(TypedDict):
     _budget_warning: bool  # Feature H: 预算警告标志
     prefetch_docs: List[dict]  # Feature G: 预取的知识库文档
 
+    # 1002.04 系统化深度研究方法论
+    research_plan: Optional[dict]  # 结构化研究计划（维度、思路、综合检查结果）
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -384,6 +387,8 @@ def create_initial_state(
         _node_budget=None,
         _budget_warning=False,
         prefetch_docs=[],
+        # 1002.04 系统化深度研究方法论
+        research_plan=None,
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,
