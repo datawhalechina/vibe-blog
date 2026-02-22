@@ -810,6 +810,20 @@ class PromptManager:
             outline=outline
         )
 
+    def render_prompt_enhancer(
+        self,
+        prompt: str,
+        context: str = "",
+        article_style: str = "",
+    ) -> str:
+        """渲染 Prompt 增强器模板"""
+        return self.render(
+            'blog/prompt_enhancer',
+            prompt=prompt,
+            context=context,
+            article_style=article_style,
+        )
+
 
 # 全局实例
 _prompt_manager: Optional[PromptManager] = None

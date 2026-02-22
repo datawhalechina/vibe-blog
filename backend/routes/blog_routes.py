@@ -455,7 +455,7 @@ def generate_blog_sync():
 
 @blog_bp.route('/api/blog/enhance-topic', methods=['POST'])
 def enhance_topic():
-    """优化用户输入的主题（Prompt 增强）"""
+    """优化用户输入的主题（Prompt 增强器 — LangGraph 子图）"""
     try:
         data = request.get_json()
         if not data:
@@ -465,11 +465,21 @@ def enhance_topic():
         if not topic:
             return jsonify({'success': False, 'error': '请提供 topic 参数'}), 400
 
+        # 新增参数（向后兼容，均为可选）
+        context = data.get('context', '')
+        article_style = data.get('article_style', '')
+        locale = data.get('locale', 'zh-CN')
+
         blog_service = get_blog_service()
         if not blog_service:
             return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
 
-        enhanced = blog_service.enhance_topic(topic)
+        enhanced = blog_service.enhance_topic(
+            topic,
+            context=context,
+            article_style=article_style,
+            locale=locale,
+        )
 
         return jsonify({
             'success': True,

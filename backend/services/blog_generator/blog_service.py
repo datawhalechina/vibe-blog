@@ -65,47 +65,48 @@ class BlogService:
             pass
         return None
 
-    def enhance_topic(self, topic: str, timeout: float = 3.0) -> str:
+    def enhance_topic(self, topic: str, timeout: float = 5.0,
+                      context: str = "", article_style: str = "",
+                      locale: str = "zh-CN") -> str:
         """
-        使用 LLM 优化用户输入的主题
+        使用 LangGraph 子图增强用户 prompt
 
         Args:
             topic: 用户原始输入
             timeout: 超时秒数（超时则返回原始 topic）
+            context: 附加上下文
+            article_style: 文章风格
+            locale: 语言区域
 
         Returns:
             优化后的主题字符串
         """
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "你是一个技术博客主题优化助手。用户会给你一个简短的技术主题，"
-                    "请将其优化为一个更具体、更有吸引力的博客标题。\n"
-                    "要求：\n"
-                    "1. 保留用户的核心意图\n"
-                    "2. 补充具体的技术细节或应用场景\n"
-                    "3. 使标题更适合作为一篇深度技术博客的标题\n"
-                    "4. 只返回优化后的标题文本，不要加引号或其他格式"
-                ),
-            },
-            {
-                "role": "user",
-                "content": topic,
-            },
-        ]
         try:
             import concurrent.futures
+            from services.blog_generator.prompt_enhancer.builder import (
+                build_prompt_enhancer_graph,
+            )
+
+            graph = build_prompt_enhancer_graph(self.generator.llm)
+            initial_state = {
+                "prompt": topic,
+                "context": context,
+                "article_style": article_style or None,
+                "locale": locale,
+                "output": "",
+            }
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.generator.llm.chat, messages, None, "enhance_topic")
+                future = executor.submit(graph.invoke, initial_state)
                 result = future.result(timeout=timeout)
-            if result and result.strip():
-                enhanced = result.strip().strip('"\'《》「」')
-                return enhanced
+
+            enhanced = result.get("output", "").strip()
+            if enhanced:
+                return enhanced.strip('"\'《》「」')
         except concurrent.futures.TimeoutError:
-            logger.warning(f"主题优化超时({timeout}s)，返回原始主题")
+            logger.warning(f"Prompt enhancement timeout ({timeout}s)")
         except Exception as e:
-            logger.warning(f"主题优化失败，返回原始主题: {e}")
+            logger.warning(f"Prompt enhancement failed: {e}")
         return topic
 
     def _get_flask_app(self):
