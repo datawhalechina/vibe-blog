@@ -18,6 +18,7 @@ from routes.memory_routes import memory_bp
 from routes.podcast_routes import podcast_bp
 from routes.prose_routes import prose_bp
 from routes.ppt_routes import ppt_bp
+from routes.skills_api import skills_bp
 
 
 def register_all_blueprints(app):
@@ -39,3 +40,4 @@ def register_all_blueprints(app):
     app.register_blueprint(podcast_bp)
     app.register_blueprint(prose_bp)
     app.register_blueprint(ppt_bp)
+    app.register_blueprint(skills_bp)

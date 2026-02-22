@@ -185,16 +185,20 @@ class BlogGenerator:
         # 102.01 迁移：统一并行任务执行引擎
         self.executor = ParallelTaskExecutor()
 
-        # 102.06 迁移：写作方法论技能管理器
+        # 102.06 迁移：写作方法论技能管理器 + 1002.15 统一加载器
+        self._skill_loader = None
         self._writing_skill_manager = None
         if os.getenv('WRITING_SKILL_ENABLED', 'true').lower() == 'true':
             try:
+                from .skills.loader import UnifiedSkillLoader
                 from .skills.writing_skill_manager import WritingSkillManager
-                self._writing_skill_manager = WritingSkillManager()
+                self._skill_loader = UnifiedSkillLoader()
+                self._skill_loader.load(enabled_only=False)
+                self._writing_skill_manager = WritingSkillManager(loader=self._skill_loader)
                 self._writing_skill_manager.load()
-                logger.info("102.06 WritingSkillManager 已启用")
+                logger.info("1002.15 UnifiedSkillLoader + WritingSkillManager 已启用")
             except Exception as e:
-                logger.warning(f"WritingSkillManager 初始化失败: {e}")
+                logger.warning(f"Skills 系统初始化失败: {e}")
 
         # 102.03 迁移：用户记忆存储（1002.05: 使用全局配置单例）
         self._memory_storage = None
