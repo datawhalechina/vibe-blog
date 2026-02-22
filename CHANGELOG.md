@@ -20,6 +20,10 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **1003.11 精确回答 + BaseAgent** — BaseAgent 可选基类（call_llm 重试 + call_llm_json 自动解析 + get_prompt 配置 + refresh_config 热刷新）+ TwoStageDecisionMixin 两阶段决策模式 + PrecisionAnswerAgent 精确回答提取，12 个测试全通过
 - ✨ **1003.12 前端状态持久化** — persistence.ts 纯函数工具库（StorageWrapper 版本化 + 旧格式兼容 + QuotaExceeded 处理 + persistState/mergeWithDefaults）+ usePersistentRef Vue composable（debounce 自动保存），12 个测试全通过
 - ✨ **1003.13 PDF 导出增强** — usePdfExport composable（html2canvas DOM 截图 + convertSvgsToImages SVG→PNG + splitCanvasIntoPages A4 分页 + 页码 + preprocessMarkdownForPdf 预处理），5 个测试全通过
+- ✨ **1003.15 研究深度预设** — ResearchPreset 数据类（quick/medium/deep/auto 四档预设），控制搜索轮次、来源上限、分析深度，apply_preset_to_state() 一键应用到 SharedState，9 个测试全通过
+- ✨ **1003.21 生成状态管理 Store** — Pinia generation store（GenerationStage 状态机 + TaskState 任务追踪 + LogEntry 结构化日志 + handleStageChange/handleTaskUpdate/handleProgress），8 个测试全通过
+- ✨ **1003.22 会话生命周期管理** — SessionLifecycleManager（SQLite 持久化 + Session 数据类 + SessionStatus/SessionType 枚举 + CRUD + 状态转换 + TTL 过期 + 容量上限），13 个测试全通过
+- ✨ **1003.23 文件夹同步管理** — FolderSyncService（link_folder 幂等关联 + detect_changes mtime 增量检测 + mark_synced 同步标记 + JSON 元数据持久化 + 7 种文件扩展名支持），12 个测试全通过
 
 ---
 
