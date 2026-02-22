@@ -16,6 +16,17 @@ logger = logging.getLogger(__name__)
 # 默认模板根目录
 BASE_DIR = os.path.dirname(__file__)
 
+# 多语言 locale 映射表
+LOCALE_MAP = {
+    "zh-CN": "zh_CN",
+    "zh_CN": "zh_CN",
+    "zh": "zh_CN",
+    "en-US": "en_US",
+    "en_US": "en_US",
+    "en": "en_US",
+}
+DEFAULT_LOCALE = "zh_CN"
+
 
 class PromptManager:
     """
@@ -81,30 +92,63 @@ class PromptManager:
         import json
         return json.dumps(obj, ensure_ascii=False, indent=indent)
 
-    def render(self, template_name: str, **kwargs) -> str:
+    def _normalize_locale(self, locale: str = None) -> str:
         """
-        渲染模板
+        标准化 locale 格式
+
+        Args:
+            locale: 原始 locale 字符串 (如 "en-US", "zh_CN", "en")
+
+        Returns:
+            标准化后的 locale (如 "en_US", "zh_CN")
+        """
+        if not locale or not locale.strip():
+            return DEFAULT_LOCALE
+        return LOCALE_MAP.get(locale, DEFAULT_LOCALE)
+
+    def render(self, template_name: str, locale: str = None, **kwargs) -> str:
+        """
+        渲染模板，支持多语言 locale fallback。
+
+        查找顺序:
+          1. {template_name}.{normalized_locale}.j2  (如 blog/planner.en_US.j2)
+          2. {template_name}.j2                      (默认版本)
 
         Args:
             template_name: 模板名称，支持子目录前缀 (如 "blog/planner")，不含 .j2 后缀
+            locale: 语言标识 (如 "en-US", "zh-CN")，可选，默认加载中文模板
             **kwargs: 模板变量
 
         Returns:
             渲染后的字符串
         """
-        # 自动添加 .j2 后缀
-        if not template_name.endswith('.j2'):
-            template_name = f"{template_name}.j2"
+        # 去掉可能存在的 .j2 后缀，得到 base name
+        base_name = template_name[:-3] if template_name.endswith('.j2') else template_name
+        default_template = f"{base_name}.j2"
 
+        # 标准化 locale
+        normalized = self._normalize_locale(locale)
+
+        # 自动注入当前时间戳
+        kwargs['current_time'] = datetime.now().strftime('%Y年%m月%d日')
+        kwargs['current_year'] = datetime.now().year
+        kwargs['current_month'] = datetime.now().month
+
+        # 非默认 locale 时，尝试加载 locale 版本模板
+        if normalized != DEFAULT_LOCALE:
+            locale_template = f"{base_name}.{normalized}.j2"
+            try:
+                template = self.env.get_template(locale_template)
+                return template.render(**kwargs)
+            except Exception:
+                logger.debug(f"Locale 模板未找到: {locale_template}，回退到默认模板")
+
+        # 回退到默认模板
         try:
-            template = self.env.get_template(template_name)
-            # 自动注入当前时间戳
-            kwargs['current_time'] = datetime.now().strftime('%Y年%m月%d日')
-            kwargs['current_year'] = datetime.now().year
-            kwargs['current_month'] = datetime.now().month
+            template = self.env.get_template(default_template)
             return template.render(**kwargs)
         except Exception as e:
-            logger.error(f"模板渲染失败 [{template_name}]: {e}")
+            logger.error(f"模板渲染失败 [{default_template}]: {e}")
             raise
 
     # ========== Blog Agent 便捷方法 ==========
