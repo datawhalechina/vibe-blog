@@ -4,6 +4,28 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-22 (feature/115-frontend-enhancements)
+
+### Added
+- ✨ **KaTeX 数学公式渲染** — `useMarkdownRenderer` 集成 `marked-katex-extension`，支持 `$...$` 行内和 `$$...$$` 块级公式，全局加载 `katex.min.css` + `katex-overrides.css`
+- ✨ **智能自动滚动** — `useSmartAutoScroll` composable + ProgressDrawer 集成"回到底部"按钮，Generate 页面进度面板自动跟踪最新日志
+- ✨ **拖拽上传 + 粘贴** — `useDragUpload` + `usePasteService` composable，BlogInputCard 支持拖拽文件显示 overlay、粘贴内容自动填入
+- ✨ **Token 可视化圆环** — `TokenUsageRing` SVG 圆环组件 + `useTaskStream` 解析 SSE `token_usage` 数据，Generate 页面工具栏实时显示 token 消耗
+- ✨ **打字动画 + 分割面板 + 字体控制** — `useTypingAnimation` 逐字渲染预览、`useResizableSplit` 可拖拽双栏布局、`FontSizeControl` + `useFontScale` 博客详情页字体缩放（`--font-scale` CSS 变量）
+- ✨ **Cron 任务管理 UI** — 全新 `/cron` 页面，CronManager + CronJobCard + CronJobDrawer + CronExecutionHistory + CronExpressionInput 五组件，`useCronJobs` composable 含 5s 轮询
+
+### Changed
+- 🔧 **后端 SSE progress 事件注入 token_usage** — `blog_service.py` 新增 `_get_token_usage()` 辅助方法，在 progress/complete 事件中携带实时 token 用量，TokenUsageRing 在生成过程中即可显示
+- 🔧 **Generate.vue 双栏布局重构** — 左栏 ProgressDrawer + 右栏预览面板，中间 `.split-handle` 可拖拽调整比例（默认 40:60）
+- 🔧 **BlogDetailContent 字体响应式** — `font-size` 从固定 `15px` 改为 `calc(15px * var(--font-scale, 1))`
+
+### Tests
+- 🧪 **E2E 完整博客生成验证** — `tests/e2e_full_blog_gen.py` 7 步端到端测试：首页拖拽 → 输入主题 → 生成页面特性 → 等待生成 → 博客详情 → Cron 页面 → KaTeX 渲染，17/18 通过
+- 🧪 **E2E DOM 级别验证** — `tests/e2e_aionui_verify.py` 22/22 通过，覆盖全部 6 个特性的 DOM 集成
+- 🧪 **单元测试** — TokenUsageRing、KaTeX 渲染、useCronJobs、useDragUpload、useFontScale、usePasteService、useResizableSplit、useSmartAutoScroll、useTypingAnimation
+
+---
+
 ## 2026-02-21 (fix/tier-bug-and-logging-improvement)
 
 ### Fixed

@@ -1,5 +1,5 @@
 <template>
-  <div class="code-input-card">
+  <div class="code-input-card" v-bind="dragHandlers" @paste="onPaste">
     <!-- Code Style 粒子背景 -->
     <div class="particles-bg">
       <!-- 代码符号粒子 - 移动端减少数量 -->
@@ -57,6 +57,17 @@
         <span class="btn-text">{{ isLoading ? '生成中' : 'execute' }}</span>
       </button>
     </div>
+
+    <!-- 拖拽上传 overlay -->
+    <Transition name="drag-fade">
+      <div v-if="isDragging" class="drag-overlay">
+        <div class="drag-overlay-content">
+          <Upload :size="32" class="drag-icon" />
+          <span class="drag-text">释放文件以上传</span>
+          <span class="drag-hint">支持 PDF、Markdown、TXT 格式</span>
+        </div>
+      </div>
+    </Transition>
 
     <!-- Prompt 增强动画（对齐 DeerFlow input-box.tsx:156-200） -->
     <Transition name="enhance-fade">
@@ -129,8 +140,10 @@
 
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { FileText, FileCheck, Loader, X, Rocket, Wand2 } from 'lucide-vue-next'
+import { FileText, FileCheck, Loader, X, Rocket, Wand2, Upload } from 'lucide-vue-next'
 import TipTapEditor from './TipTapEditor.vue'
+import { useDragUpload } from '@/composables/useDragUpload'
+import { usePasteService } from '@/composables/usePasteService'
 
 interface UploadedDocument {
   id: string
@@ -160,6 +173,20 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+
+const ALLOWED_EXTS = ['pdf', 'md', 'txt', 'markdown']
+
+const { isDragging, dragHandlers } = useDragUpload({
+  allowedExts: ALLOWED_EXTS,
+  onFilesDropped: (files) => emit('fileUpload', files as unknown as FileList),
+  enabled: computed(() => !props.isLoading),
+})
+
+const { onPaste } = usePasteService({
+  allowedExts: ALLOWED_EXTS,
+  onFilesPasted: (files) => emit('fileUpload', files as unknown as FileList),
+  enabled: computed(() => !props.isLoading),
+})
 
 const showUploadTooltip = ref(false)
 
@@ -729,5 +756,58 @@ const isSpinningStatus = (status: string) => {
   .doc-status.loading {
     animation: none;
   }
+}
+
+/* 拖拽上传 overlay */
+.drag-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--glass-bg, rgba(0, 0, 0, 0.6));
+  backdrop-filter: blur(8px);
+  border: 2px dashed var(--color-primary);
+  border-radius: inherit;
+}
+
+.drag-overlay-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-sm);
+}
+
+.drag-icon {
+  color: var(--color-primary);
+  animation: drag-bounce 1s ease-in-out infinite;
+}
+
+.drag-text {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-base);
+  color: var(--color-text-inverse);
+  font-weight: var(--font-weight-semibold);
+}
+
+.drag-hint {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--color-text-muted);
+}
+
+@keyframes drag-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+.drag-fade-enter-active,
+.drag-fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.drag-fade-enter-from,
+.drag-fade-leave-to {
+  opacity: 0;
 }
 </style>

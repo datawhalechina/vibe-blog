@@ -46,6 +46,11 @@ const routes = [
     path: '/dashboard',
     name: 'Dashboard',
     component: () => import('../views/Dashboard.vue')
+  },
+  {
+    path: '/cron',
+    name: 'CronManager',
+    component: () => import('../views/CronManager.vue')
   }
 ]
 

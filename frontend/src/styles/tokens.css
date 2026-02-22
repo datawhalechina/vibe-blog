@@ -121,6 +121,16 @@
   --font-size-2xl: 1.5rem;
   --font-size-3xl: 2rem;
 
+  /* Scaled font sizes (controlled by useFontScale composable) */
+  --font-scale: 1;
+  --font-size-xs-scaled: calc(var(--font-size-xs) * var(--font-scale));
+  --font-size-sm-scaled: calc(var(--font-size-sm) * var(--font-scale));
+  --font-size-base-scaled: calc(var(--font-size-base) * var(--font-scale));
+  --font-size-lg-scaled: calc(var(--font-size-lg) * var(--font-scale));
+  --font-size-xl-scaled: calc(var(--font-size-xl) * var(--font-scale));
+  --font-size-2xl-scaled: calc(var(--font-size-2xl) * var(--font-scale));
+  --font-size-3xl-scaled: calc(var(--font-size-3xl) * var(--font-scale));
+
   /* Font Weights */
   --font-weight-normal: 400;
   --font-weight-medium: 500;

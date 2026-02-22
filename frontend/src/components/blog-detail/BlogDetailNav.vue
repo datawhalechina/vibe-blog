@@ -11,6 +11,7 @@
     <div class="terminal-nav-right">
       <router-link to="/blog" class="nav-cmd">cd ~/blog-list</router-link>
       <router-link to="/" class="nav-cmd">cd ~/home</router-link>
+      <FontSizeControl />
       <button class="theme-toggle" @click="themeStore.toggleTheme()" title="切换主题">
         <svg v-if="isDark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18">
           <circle cx="12" cy="12" r="4"></circle>
@@ -34,6 +35,7 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useThemeStore } from '../../stores/theme'
+import FontSizeControl from '@/components/ui/FontSizeControl.vue'
 
 interface Props {
   category?: string

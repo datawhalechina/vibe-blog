@@ -178,6 +178,42 @@ class SogouRetriever(BaseRetriever):
         ]
 
 
+class ScholarRetriever(BaseRetriever):
+    """Google Scholar search adapter for RetrieverRegistry"""
+    name = "scholar"
+
+    def is_available(self) -> bool:
+        return bool(os.environ.get('SERPER_API_KEY'))
+
+    def search(self, query: str, max_results: int = 10) -> List[SearchItem]:
+        from services.blog_generator.services.serper_scholar_service import SerperScholarService
+        svc = SerperScholarService()
+        result = svc.search(query, max_results=max_results)
+        if not result.get("success"):
+            return []
+        return [
+            SearchItem(
+                href=r.get("url", ""),
+                title=r.get("title", ""),
+                body=self._format_body(r),
+                source="scholar",
+            )
+            for r in result.get("results", [])
+        ]
+
+    @staticmethod
+    def _format_body(r: dict) -> str:
+        parts = [r.get("snippet", "")]
+        if r.get("publication_info"):
+            parts.append(f"[{r['publication_info']}]")
+        if r.get("year"):
+            parts.append(f"({r['year']})")
+        if r.get("cited_by"):
+            parts.append(f"Cited: {r['cited_by']}")
+        return " ".join(p for p in parts if p)
+
+
 # 自动注册内置检索器
 RetrieverRegistry.register("serper", SerperRetriever)
 RetrieverRegistry.register("sogou", SogouRetriever)
+RetrieverRegistry.register("scholar", ScholarRetriever)

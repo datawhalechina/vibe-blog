@@ -5,6 +5,7 @@
 import { ref, onUnmounted } from 'vue'
 import * as api from '@/services/api'
 import type { Citation } from '@/utils/citationMatcher'
+import type { TokenUsageSummary } from '@/types/token'
 
 export interface ProgressItem {
   time: string
@@ -33,6 +34,7 @@ export function useTaskStream() {
   const waitingForOutline = ref(false)
   const citations = ref<Citation[]>([])
   const completedBlogId = ref('')
+  const tokenUsage = ref<TokenUsageSummary | null>(null)
   const activeSectionIndex = ref(-1)  // 当前正在写的章节索引（从 0 开始）
   let sectionCount = 0                // 已见章节总数
 
@@ -49,6 +51,13 @@ export function useTaskStream() {
       previewContent.value = content
       previewTimer = null
     }, 100)
+  }
+
+  // 更新 token 用量（如果 SSE 事件中有 token_usage 字段）
+  const updateTokenUsage = (data: any) => {
+    if (data?.token_usage) {
+      tokenUsage.value = data.token_usage
+    }
   }
 
   // 添加进度项
@@ -98,6 +107,7 @@ export function useTaskStream() {
 
     es.addEventListener('progress', (e: MessageEvent) => {
       const d = JSON.parse(e.data)
+      updateTokenUsage(d)
       const icon = getStageIcon(d.stage)
       addProgressItem(`${icon} ${d.message}`, d.stage === 'error' ? 'error' : 'info')
       progressText.value = d.message
@@ -160,6 +170,7 @@ export function useTaskStream() {
 
     es.addEventListener('result', (e: MessageEvent) => {
       const d = JSON.parse(e.data)
+      updateTokenUsage(d)
       const data = d.data || {}
 
       switch (d.type) {
@@ -290,6 +301,7 @@ export function useTaskStream() {
 
     es.addEventListener('complete', (e: MessageEvent) => {
       const d = JSON.parse(e.data)
+      updateTokenUsage(d)
       addProgressItem('🎉 生成完成！', 'success')
       statusBadge.value = '已完成'
       progressText.value = '生成完成'
@@ -385,6 +397,7 @@ export function useTaskStream() {
     waitingForOutline.value = false
     citations.value = []
     completedBlogId.value = ''
+    tokenUsage.value = null
     accumulatedPreview = ''
     completedSectionsContent = ''
     currentSectionTitle = ''
@@ -414,6 +427,7 @@ export function useTaskStream() {
     waitingForOutline,
     citations,
     completedBlogId,
+    tokenUsage,
     activeSectionIndex,
     // 方法
     connectSSE,

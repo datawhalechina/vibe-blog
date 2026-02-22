@@ -104,7 +104,7 @@ defineProps<Props>()
 
 /* 博客内容样式 */
 .blog-content {
-  font-size: 15px;
+  font-size: calc(15px * var(--font-scale, 1));
   line-height: 1.8;
   color: var(--text);
 }

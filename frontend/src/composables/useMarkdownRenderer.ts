@@ -1,8 +1,10 @@
 import { computed } from 'vue'
 import { marked } from 'marked'
 import { markedHighlight } from 'marked-highlight'
+import markedKatex from 'marked-katex-extension'
 import hljs from 'highlight.js'
 import 'highlight.js/styles/github-dark.css'
+import 'katex/dist/katex.min.css'
 
 // 配置 marked 使用 marked-highlight 扩展做代码高亮
 marked.use(markedHighlight({
@@ -21,6 +23,11 @@ marked.use(markedHighlight({
       return code
     }
   },
+}))
+
+marked.use(markedKatex({
+  throwOnError: false,
+  output: 'htmlAndMathml',
 }))
 
 /**

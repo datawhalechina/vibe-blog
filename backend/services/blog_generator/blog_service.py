@@ -53,6 +53,18 @@ class BlogService:
         # 101.113: 记录正在等待大纲确认的任务（用于 resume 时查找 config）
         self._interrupted_tasks: Dict[str, Dict] = {}  # task_id -> {config, task_manager, ...}
 
+    def _get_token_usage(self) -> Optional[Dict]:
+        """获取当前 token 用量摘要（用于注入 SSE 事件）"""
+        if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() == 'false':
+            return None
+        try:
+            llm = self.generator.llm
+            if hasattr(llm, 'token_tracker') and llm.token_tracker:
+                return llm.token_tracker.get_summary()
+        except Exception:
+            pass
+        return None
+
     def enhance_topic(self, topic: str, timeout: float = 3.0) -> str:
         """
         使用 LLM 优化用户输入的主题
@@ -702,12 +714,16 @@ class BlogService:
                     progress_info = stage_progress.get(node_name, (50, f'正在执行 {node_name}...'))
                     
                     if task_manager:
-                        # 发送阶段进度
-                        task_manager.send_event(task_id, 'progress', {
+                        # 发送阶段进度（含 token 用量）
+                        progress_data = {
                             'stage': node_name,
                             'progress': progress_info[0],
                             'message': progress_info[1]
-                        })
+                        }
+                        token_usage = self._get_token_usage()
+                        if token_usage:
+                            progress_data['token_usage'] = token_usage
+                        task_manager.send_event(task_id, 'progress', progress_data)
                         # 同步进度到排队系统（Dashboard 进度条）
                         update_queue_progress(
                             task_id, progress_info[0],
@@ -1206,14 +1222,10 @@ class BlogService:
                     'cover_video': cover_video_path,
                     'citations': citations
                 }
-                # 注入 token 用量摘要（37.34 + 37.31）
-                if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':
-                    try:
-                        llm = self.generator.llm
-                        if hasattr(llm, 'token_tracker') and llm.token_tracker:
-                            complete_data['token_usage'] = llm.token_tracker.get_summary()
-                    except Exception:
-                        pass
+                # 注入 token 用量摘要
+                token_usage = self._get_token_usage()
+                if token_usage:
+                    complete_data['token_usage'] = token_usage
                 task_manager.send_event(task_id, 'complete', complete_data)
             
             logger.info(f"博客生成完成: {task_id}, 保存到: {saved_path}")
@@ -1351,11 +1363,15 @@ class BlogService:
                     progress_info = stage_progress.get(node_name, (50, f'正在执行 {node_name}...'))
 
                     if task_manager:
-                        task_manager.send_event(task_id, 'progress', {
+                        progress_data = {
                             'stage': node_name,
                             'progress': progress_info[0],
                             'message': progress_info[1]
-                        })
+                        }
+                        token_usage = self._get_token_usage()
+                        if token_usage:
+                            progress_data['token_usage'] = token_usage
+                        task_manager.send_event(task_id, 'progress', progress_data)
                         update_queue_progress(
                             task_id, progress_info[0],
                             stage=progress_info[1],
@@ -1659,13 +1675,9 @@ class BlogService:
                     'cover_video': cover_video_path,
                     'citations': citations
                 }
-                if os.environ.get('SSE_TOKEN_SUMMARY_ENABLED', 'true').lower() != 'false':
-                    try:
-                        llm = self.generator.llm
-                        if hasattr(llm, 'token_tracker') and llm.token_tracker:
-                            complete_data['token_usage'] = llm.token_tracker.get_summary()
-                    except Exception:
-                        pass
+                token_usage = self._get_token_usage()
+                if token_usage:
+                    complete_data['token_usage'] = token_usage
                 task_manager.send_event(task_id, 'complete', complete_data)
 
             logger.info(f"博客生成完成（resume）: {task_id}, 保存到: {saved_path}")

@@ -3,7 +3,7 @@
     <!-- 双栏主体 -->
     <div class="generate-main">
       <!-- 左栏：活动日志 -->
-      <div class="generate-left" v-show="!isMobile || mobileTab === 'activity'">
+      <div class="generate-left" v-show="!isMobile || mobileTab === 'activity'" :style="!isMobile ? { width: splitRatio + '%', flexShrink: 0 } : {}">
         <ProgressDrawer
           :visible="true"
           :expanded="true"
@@ -25,8 +25,13 @@
         />
       </div>
 
+      <!-- 可拖拽分割线 -->
+      <div v-if="!isMobile" class="split-handle" @pointerdown="handlePointerDown">
+        <div class="split-handle-line"></div>
+      </div>
+
       <!-- 右栏：研究面板（Card 容器） -->
-      <div class="generate-right" v-show="!isMobile || mobileTab === 'preview'">
+      <div class="generate-right" v-show="!isMobile || mobileTab === 'preview'" :style="!isMobile ? { width: (100 - splitRatio) + '%' } : {}">
         <div class="research-card">
           <!-- 右上角工具栏（DeerFlow lucide + Tooltip） -->
           <div class="card-toolbar">
@@ -39,6 +44,7 @@
                 </TooltipTrigger>
                 <TooltipContent>停止</TooltipContent>
               </Tooltip>
+              <TokenUsageRing v-if="tokenUsage" :token-usage="tokenUsage" :size="24" />
               <template v-if="previewContent && !isLoading">
                 <Tooltip>
                   <TooltipTrigger as-child>
@@ -171,6 +177,8 @@ import { useRoute, useRouter } from 'vue-router'
 import { useTaskStream } from '@/composables/useTaskStream'
 import { useExport } from '@/composables/useExport'
 import { useMarkdownRenderer } from '@/composables/useMarkdownRenderer'
+import { useTypingAnimation } from '@/composables/useTypingAnimation'
+import { useResizableSplit } from '@/composables/useResizableSplit'
 import { scanCitationLinks } from '@/utils/citationMatcher'
 import type { Citation } from '@/utils/citationMatcher'
 import { Square, Pencil, Undo2, Copy, Check, GraduationCap, Github, Settings as SettingsIcon, X as XIcon } from 'lucide-vue-next'
@@ -178,6 +186,7 @@ import { Button } from '@/components/ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import * as api from '@/services/api'
 import ProgressDrawer from '@/components/home/ProgressDrawer.vue'
+import TokenUsageRing from '@/components/home/TokenUsageRing.vue'
 import ExportMenu from '@/components/generate/ExportMenu.vue'
 import QualityDialog from '@/components/generate/QualityDialog.vue'
 import CitationTooltip from '@/components/generate/CitationTooltip.vue'
@@ -205,6 +214,7 @@ const {
   waitingForOutline,
   citations,
   completedBlogId,
+  tokenUsage,
   activeSectionIndex,
   connectSSE,
   confirmOutline,
@@ -217,6 +227,21 @@ const copied = ref(false)
 const isEditing = ref(false)
 const editableContent = ref('')
 const { renderMarkdown } = useMarkdownRenderer()
+
+// 打字动画：流式文本逐字显示
+const { displayedContent: typedPreview } = useTypingAnimation({
+  content: previewContent,
+  enabled: isLoading,
+  speed: 80,
+})
+
+// 可拖拽分割线
+const { splitRatio, handlePointerDown } = useResizableSplit({
+  defaultRatio: 40,
+  minRatio: 25,
+  maxRatio: 65,
+  storageKey: 'vibe-blog-generate-split',
+})
 
 // 预览渲染：给每个章节注入颜色标记
 const previewRef = ref<HTMLElement | null>(null)
@@ -231,7 +256,7 @@ const sectionColors = [
   '#84cc16', // 黄绿
 ]
 const renderedHtml = computed(() => {
-  const html = renderMarkdown(previewContent.value)
+  const html = renderMarkdown(typedPreview.value)
   if (!html) return ''
   let sectionIdx = 0
   return html.replace(/<h2([\s>])/g, (_match, rest) => {
@@ -421,13 +446,11 @@ onUnmounted(() => {
   display: flex;
   flex: 1;
   overflow: hidden;
-  gap: 32px;
   padding: 48px 16px 16px;
 }
 
 .generate-left {
-  flex-shrink: 0;
-  width: 538px;
+  flex: none;
   overflow-y: auto;
   transition: all 0.3s ease-out;
 }
@@ -438,6 +461,29 @@ onUnmounted(() => {
   max-width: 960px;
   padding-bottom: 16px;
   transition: all 0.3s ease-out;
+}
+
+/* === 可拖拽分割线 === */
+.split-handle {
+  flex-shrink: 0;
+  width: 8px;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+}
+.split-handle-line {
+  width: 2px;
+  height: 40px;
+  border-radius: 1px;
+  background: var(--color-border);
+  transition: background 0.2s, height 0.2s;
+}
+.split-handle:hover .split-handle-line {
+  background: var(--color-primary);
+  height: 60px;
 }
 
 /* === Card 容器（对齐 DeerFlow Card） === */

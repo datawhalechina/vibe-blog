@@ -93,16 +93,35 @@ class DeepScraper:
         self.llm_service = llm_service
         self.top_n = top_n
 
+        # Goal-directed extractor (feature toggle, default off)
+        self._extractor = None
+        if os.environ.get("GOAL_EXTRACTION_ENABLED", "false").lower() == "true":
+            try:
+                from services.blog_generator.services.goal_directed_extractor import GoalDirectedExtractor
+                self._extractor = GoalDirectedExtractor(llm_service=llm_service)
+                logger.info("Goal-directed extraction enabled")
+            except Exception as e:
+                logger.warning(f"GoalDirectedExtractor init failed: {e}")
+
     def scrape_top_n(
         self,
         results: List[Dict],
         topic: str,
         n: int = None,
+        goal: str = None,
     ) -> List[Dict]:
-        """对搜索结果 Top N 进行深度抓取 + LLM 提取"""
+        """对搜索结果 Top N 进行深度抓取 + LLM 提取
+
+        Args:
+            results: search results
+            topic: research topic
+            n: max URLs to scrape
+            goal: specific extraction goal (used by GoalDirectedExtractor)
+        """
         n = n or self.top_n
         selected = self._select_urls(results, n)
         enriched = []
+        effective_goal = goal or f"收集与「{topic}」相关的关键技术信息、核心概念和实践案例"
 
         for item in selected:
             url = item.get("url", "")
@@ -110,13 +129,25 @@ class DeepScraper:
             if not full_text:
                 continue
 
-            extracted = self._extract_info(full_text, topic)
-            enriched.append({
-                "url": url,
-                "title": item.get("title", ""),
-                "full_text": full_text,
-                "extracted_info": extracted,
-            })
+            if self._extractor:
+                extraction = self._extractor.extract(full_text, effective_goal)
+                enriched.append({
+                    "url": url,
+                    "title": item.get("title", ""),
+                    "rational": extraction.rational,
+                    "evidence": extraction.evidence,
+                    "summary": extraction.summary,
+                    "extraction_success": extraction.success,
+                    "full_text_length": len(full_text),
+                })
+            else:
+                extracted = self._extract_info(full_text, topic)
+                enriched.append({
+                    "url": url,
+                    "title": item.get("title", ""),
+                    "full_text": full_text,
+                    "extracted_info": extracted,
+                })
 
         logger.info(f"深度抓取完成: {len(enriched)}/{len(selected)} 成功")
         return enriched

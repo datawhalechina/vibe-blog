@@ -1,0 +1,13 @@
+/* KaTeX line-height fix */
+.katex, .katex * { line-height: normal; }
+
+/* Block formula: centered + horizontal scroll */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+  text-align: center;
+}
+
+/* Dark mode */
+.dark-mode .katex { color: var(--code-text, #f1f5f9); }

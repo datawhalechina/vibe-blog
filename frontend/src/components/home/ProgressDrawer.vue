@@ -248,6 +248,18 @@
           </div>
           <span class="progress-loading-text">{{ progressText }}</span>
         </div>
+
+        <!-- 回到底部按钮 -->
+        <Transition name="fade">
+          <button
+            v-if="!isFollowing && expanded"
+            class="scroll-to-bottom-btn"
+            @click="scrollToBottom"
+          >
+            <ChevronDown :size="14" />
+            回到底部
+          </button>
+        </Transition>
       </div>
 
       <!-- 文章预览 Tab -->
@@ -260,8 +272,9 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Square, ChevronRight, ChevronDown, X, Lightbulb, Search, BookOpenText } from 'lucide-vue-next'
+import { useSmartAutoScroll } from '@/composables/useSmartAutoScroll'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -321,16 +334,13 @@ const visibleItems = computed(() => {
     : items
 })
 
-// Auto-scroll to bottom when new items are added
-watch(
-  () => props.progressItems.length,
-  async () => {
-    await nextTick()
-    if (progressBodyRef.value) {
-      progressBodyRef.value.scrollTop = progressBodyRef.value.scrollHeight
-    }
-  }
-)
+// 智能自动滚动 — 迁移自 AionUi useAutoScroll.ts
+const { isFollowing, scrollToBottom } = useSmartAutoScroll({
+  containerRef: progressBodyRef,
+  source: () => props.progressItems.length,
+  threshold: 200,
+  behavior: 'smooth',
+})
 
 // DeerFlow ThoughtBlock: 从日志中提取思考过程
 const thoughtLogs = computed(() => {
@@ -342,11 +352,12 @@ const thoughtLogs = computed(() => {
 
 // ThoughtBlock: auto-scroll to bottom
 const thoughtScrollRef = ref<HTMLElement | null>(null)
-watch(thoughtLogs, async () => {
-  await nextTick()
-  if (thoughtScrollRef.value) {
-    thoughtScrollRef.value.scrollTop = thoughtScrollRef.value.scrollHeight
-  }
+// ThoughtBlock 智能滚动
+useSmartAutoScroll({
+  containerRef: thoughtScrollRef,
+  source: () => thoughtLogs.value.length,
+  threshold: 100,
+  behavior: 'smooth',
 })
 
 // ThoughtBlock: auto-collapse when outlineData appears
@@ -1022,5 +1033,40 @@ const getHostname = (url: string): string | null => {
 
 .crawl-link:hover {
   text-decoration: underline;
+}
+
+.scroll-to-bottom-btn {
+  position: sticky;
+  bottom: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  padding: var(--space-xs) var(--space-md);
+  background: var(--color-bg-elevated);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-xs);
+  font-family: var(--font-mono);
+  color: var(--color-text-secondary);
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+  z-index: 20;
+  transition: var(--transition-all);
+}
+
+.scroll-to-bottom-btn:hover {
+  background: var(--color-bg-hover);
+  color: var(--color-text-primary);
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.2s ease;
+}
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
 }
 </style>

@@ -455,7 +455,7 @@ describe('ProgressDrawer.vue', () => {
         },
       })
 
-      // Mock scrollTop and scrollHeight
+      // Mock scrollHeight, scrollTop, clientHeight and scrollTo for useSmartAutoScroll
       const progressBody = wrapper.find('.progress-logs-container').element as HTMLElement
       Object.defineProperty(progressBody, 'scrollHeight', {
         configurable: true,
@@ -466,6 +466,12 @@ describe('ProgressDrawer.vue', () => {
         writable: true,
         value: 0,
       })
+      Object.defineProperty(progressBody, 'clientHeight', {
+        configurable: true,
+        value: 900,
+      })
+      const scrollToSpy = vi.fn()
+      progressBody.scrollTo = scrollToSpy
 
       // Add new item
       await wrapper.setProps({
@@ -477,8 +483,8 @@ describe('ProgressDrawer.vue', () => {
 
       await nextTick()
 
-      // Should scroll to bottom
-      expect(progressBody.scrollTop).toBe(1000)
+      // Should call scrollTo with scrollHeight
+      expect(scrollToSpy).toHaveBeenCalledWith({ top: 1000, behavior: 'smooth' })
     })
   })
 
