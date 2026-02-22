@@ -130,7 +130,8 @@ class BlogService:
         """
         return self.resume_generation(task_id, action=action, outline=outline)
 
-    def resume_generation(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
+    def resume_generation(self, task_id: str, action: str = 'accept', outline: dict = None,
+                          clarification_responses: list = None) -> bool:
         """
         恢复中断的生成任务（101.113 LangGraph interrupt 方案）
 
@@ -138,8 +139,9 @@ class BlogService:
 
         Args:
             task_id: 任务 ID
-            action: 'accept' 或 'edit'
+            action: 'accept' / 'edit' / 'clarify_response'
             outline: 修改后的大纲（仅 action='edit' 时需要）
+            clarification_responses: 用户澄清回复（仅 action='clarify_response' 时需要）
 
         Returns:
             是否成功启动恢复
@@ -150,7 +152,9 @@ class BlogService:
             return False
 
         # 构建 resume 值
-        if action == 'edit' and outline:
+        if action == 'clarify_response' and clarification_responses:
+            resume_value = {"action": "clarify_response", "responses": clarification_responses}
+        elif action == 'edit' and outline:
             resume_value = {"action": "edit", "outline": outline}
         else:
             resume_value = "accept"
@@ -983,10 +987,9 @@ class BlogService:
                                 }
                             })
             
-            # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认）
+            # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认 / 主动澄清）
             snapshot = self.generator.app.get_state(config)
             if snapshot.next:  # 图还有未完成的节点 → 被 interrupt 暂停了
-                logger.info(f"图执行被 interrupt 暂停，等待用户确认大纲 [{task_id}]")
                 # 提取 interrupt 数据
                 interrupt_value = None
                 if snapshot.tasks:
@@ -995,12 +998,22 @@ class BlogService:
                             interrupt_value = task.interrupts[0].value
                             break
 
+                interrupt_type = interrupt_value.get('type', '') if interrupt_value else ''
+                logger.info(f"图执行被 interrupt 暂停 (type={interrupt_type}) [{task_id}]")
+
                 # 发送 outline_ready 事件
-                if task_manager and interrupt_value and interrupt_value.get('type') == 'confirm_outline':
+                if task_manager and interrupt_type == 'confirm_outline':
                     task_manager.send_event(task_id, 'outline_ready', {
                         'title': interrupt_value.get('title', ''),
                         'sections': interrupt_value.get('sections', []),
                         'sections_titles': interrupt_value.get('sections_titles', []),
+                    })
+
+                # 1002.10: 发送 clarification_needed 事件
+                if task_manager and interrupt_type == 'clarification_needed':
+                    task_manager.send_event(task_id, 'clarification_needed', {
+                        'questions': interrupt_value.get('questions', []),
+                        'formatted_messages': interrupt_value.get('formatted_messages', []),
                     })
 
                 # 保存任务信息，供 resume_generation 使用

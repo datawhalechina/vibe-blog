@@ -269,6 +269,12 @@ class SharedState(TypedDict):
     _budget_warning: bool  # Feature H: 预算警告标志
     prefetch_docs: List[dict]  # Feature G: 预取的知识库文档
 
+    # 1002.10 主动澄清机制
+    clarification_needed: bool  # 是否需要澄清
+    clarification_questions: List[dict]  # 澄清问题列表
+    clarification_responses: List[dict]  # 用户回复列表
+    clarification_round: int  # 澄清轮数（防止无限循环，max=2）
+
     # 1002.04 系统化深度研究方法论
     research_plan: Optional[dict]  # 结构化研究计划（维度、思路、综合检查结果）
 
@@ -387,6 +393,11 @@ def create_initial_state(
         _node_budget=None,
         _budget_warning=False,
         prefetch_docs=[],
+        # 1002.10 主动澄清机制
+        clarification_needed=False,
+        clarification_questions=[],
+        clarification_responses=[],
+        clarification_round=0,
         # 1002.04 系统化深度研究方法论
         research_plan=None,
         # 新增：文章长度配置

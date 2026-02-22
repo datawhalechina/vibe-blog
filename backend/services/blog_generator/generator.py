@@ -20,6 +20,7 @@ from .agents.artist import ArtistAgent
 from .agents.questioner import QuestionerAgent
 from .agents.reviewer import ReviewerAgent
 from .agents.assembler import AssemblerAgent
+from .agents.clarification import ClarificationAgent
 from .agents.search_coordinator import SearchCoordinator
 from .agents.humanizer import HumanizerAgent
 from utils.session_tracker import SessionTracker
@@ -128,6 +129,10 @@ class BlogGenerator:
 
         # 业务级状态追踪（69.05）
         self.tracker = SessionTracker()
+
+        # 1002.10 主动澄清机制
+        self._env_clarification = os.getenv('CLARIFICATION_ENABLED', 'true').lower() == 'true'
+        self.clarification = ClarificationAgent(_proxy('clarification')) if self._env_clarification else None
         self.summary_generator = SummaryGeneratorAgent(_proxy('summary_generator')) if self._env_summary else None
 
         # 37.12 分层架构校验器（可选）
@@ -212,6 +217,7 @@ class BlogGenerator:
         workflow = StateGraph(SharedState)
         
         # 添加节点（102.10 迁移：通过中间件管道包装）
+        workflow.add_node("clarify_topic", self.pipeline.wrap_node("clarify_topic", self._clarify_topic_node))
         workflow.add_node("researcher", self.pipeline.wrap_node("researcher", self._researcher_node))
         workflow.add_node("planner", self.pipeline.wrap_node("planner", self._planner_node))
         workflow.add_node("writer", self.pipeline.wrap_node("writer", self._writer_node))
@@ -236,7 +242,15 @@ class BlogGenerator:
         workflow.add_node("summary_generator", self.pipeline.wrap_node("summary_generator", self._summary_generator_node))
         
         # 定义边
-        workflow.add_edge(START, "researcher")
+        workflow.add_edge(START, "clarify_topic")
+        workflow.add_conditional_edges(
+            "clarify_topic",
+            self._should_clarify,
+            {
+                "clarify": "clarify_topic",  # interrupt 后用户回复，重新分析
+                "continue": "researcher",
+            }
+        )
         workflow.add_edge("researcher", "planner")
         workflow.add_edge("planner", "writer")
         
@@ -302,6 +316,60 @@ class BlogGenerator:
         
         return workflow
     
+    def _clarify_topic_node(self, state: SharedState) -> SharedState:
+        """主动澄清节点 — 分析 topic 是否需要用户补充信息"""
+        if not self.clarification:
+            state['clarification_needed'] = False
+            return state
+
+        logger.info("=== Step 0: 主动澄清检查 ===")
+        result = self.clarification.analyze(state)
+        state.update(result)
+
+        if result.get("clarification_needed"):
+            # 使用 LangGraph interrupt 中断执行，等待用户回复
+            from .agents.clarification import format_clarification_message
+            questions = result.get("clarification_questions", [])
+            interrupt_data = {
+                "type": "clarification_needed",
+                "questions": questions,
+                "formatted_messages": [
+                    format_clarification_message(
+                        question=q.get("question", ""),
+                        clarification_type=q.get("clarification_type", "missing_info"),
+                        context=q.get("context"),
+                        options=q.get("options"),
+                    )
+                    for q in questions
+                ],
+            }
+            user_response = interrupt(interrupt_data)
+
+            # 处理用户回复
+            state['clarification_round'] = state.get('clarification_round', 0) + 1
+            if isinstance(user_response, dict):
+                responses = user_response.get("responses", [])
+                state['clarification_responses'] = responses
+                # 将用户回复追加到 topic 或 source_material
+                if responses:
+                    extra_context = "; ".join(
+                        r.get("answer", "") for r in responses if r.get("answer")
+                    )
+                    if extra_context:
+                        state['source_material'] = (
+                            (state.get('source_material') or '') + "\n\n用户补充: " + extra_context
+                        ).strip()
+                        logger.info(f"用户澄清回复已注入: {extra_context[:80]}...")
+            state['clarification_needed'] = False
+
+        return state
+
+    def _should_clarify(self, state: SharedState) -> Literal["clarify", "continue"]:
+        """判断是否需要澄清（条件边）"""
+        if state.get("clarification_needed"):
+            return "clarify"
+        return "continue"
+
     def _researcher_node(self, state: SharedState) -> SharedState:
         """素材收集节点"""
         if state.get('skip_researcher'):
