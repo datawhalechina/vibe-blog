@@ -12,6 +12,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **1003.03 统一引用管理** — CitationManager 阶段化 ID（PLAN-XX/CIT-X-XX）+ ToolTrace 工具调用追踪 + 引用验证/修复 + 格式化输出，增量增强现有 CitationCollector
 - ✨ **1003.04 动态主题队列** — DynamicTopicQueue 主题块级调度（TopicStatus 状态机 + TopicBlock 数据类），支持运行时 add_block() 追加 + has_topic() 去重 + max_length 容量控制 + FIFO 调度 + 序列化，SharedState 新增 topic_queue_data 字段
 - ✨ **1003.05 双循环架构** — Analysis Loop（AnalysisInvestigator + AnalysisNoteAgent），在 researcher→planner 之间插入 LLM 自主判断的深度调查循环，结构化知识链 analysis_knowledge_chain + 自动摘要，环境变量 `ANALYSIS_LOOP_ENABLED` 控制开关（默认关闭）
+- ✨ **1003.06 代码执行沙箱** — ImportGuard AST 白名单 + WorkspaceManager 路径隔离 + subprocess 超时控制，支持同步 run_code_sync() 和异步 run_code()，环境变量 `ENABLE_CODE_VERIFY` 控制 CoderAgent 验证开关（默认关闭）
 
 ---
 
