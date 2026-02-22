@@ -1,0 +1,30 @@
+{
+  "mcpServers": {
+    "filesystem": {
+      "enabled": true,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "./materials"],
+      "description": "本地素材目录访问"
+    },
+    "github": {
+      "enabled": false,
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_TOKEN": "$GITHUB_TOKEN"
+      },
+      "description": "GitHub 仓库操作"
+    },
+    "custom-sse": {
+      "enabled": false,
+      "type": "sse",
+      "url": "http://localhost:8080/mcp",
+      "headers": {
+        "Authorization": "Bearer $KB_API_TOKEN"
+      },
+      "description": "自定义 SSE MCP 服务"
+    }
+  }
+}
