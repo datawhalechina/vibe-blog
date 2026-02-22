@@ -4,6 +4,13 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-23 (feature/1003-deeptutor-migration)
+
+### Added
+- ✨ **1003.01 四阶段选题生成** — TopicIdeaAgent 实现松筛→探索→严筛→陈述四阶段选题工作流，从搜索结果提取知识点并生成高质量选题方向，环境变量 `TOPIC_IDEA_ENABLED` 控制开关（默认关闭）
+
+---
+
 ## 2026-02-22 (feature/115-frontend-enhancements)
 
 ### Added

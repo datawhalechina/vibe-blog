@@ -282,6 +282,11 @@ class SharedState(TypedDict):
     viewed_images: dict  # {path: {base64, mime_type}} — 已查看的图片数据
     image_understandings: List[dict]  # 图片理解结果列表
 
+    # 1003.01 四阶段选题生成 (TopicIdeaAgent 输出)
+    knowledge_points: List[dict]  # 提取的知识点 [{knowledge_point, description}, ...]
+    topic_ideas: List[dict]  # 筛选后的选题方向 [{idea, knowledge_point}, ...]
+    topic_statement: Optional[str]  # 选题陈述 Markdown
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -407,6 +412,10 @@ def create_initial_state(
         # 1002.14 视觉能力（图片理解）
         viewed_images={},
         image_understandings=[],
+        # 1003.01 四阶段选题生成
+        knowledge_points=[],
+        topic_ideas=[],
+        topic_statement=None,
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,

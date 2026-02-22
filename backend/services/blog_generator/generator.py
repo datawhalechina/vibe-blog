@@ -22,6 +22,7 @@ from .agents.reviewer import ReviewerAgent
 from .agents.assembler import AssemblerAgent
 from .agents.clarification import ClarificationAgent
 from .agents.search_coordinator import SearchCoordinator
+from .agents.topic_idea import TopicIdeaAgent
 from .agents.humanizer import HumanizerAgent
 from utils.session_tracker import SessionTracker
 from .agents.thread_checker import ThreadCheckerAgent
@@ -135,6 +136,10 @@ class BlogGenerator:
         self.clarification = ClarificationAgent(_proxy('clarification')) if self._env_clarification else None
         self.summary_generator = SummaryGeneratorAgent(_proxy('summary_generator')) if self._env_summary else None
 
+        # 1003.01 四阶段选题生成
+        self._env_topic_idea = os.getenv('TOPIC_IDEA_ENABLED', 'false').lower() == 'true'
+        self.topic_idea = TopicIdeaAgent(_proxy('topic_idea')) if self._env_topic_idea else None
+
         # 37.12 分层架构校验器（可选）
         self._layer_validator = None
         if os.environ.get('LAYER_VALIDATION_ENABLED', 'false').lower() == 'true':
@@ -240,6 +245,7 @@ class BlogGenerator:
         # 添加节点（102.10 迁移：通过中间件管道包装）
         workflow.add_node("clarify_topic", self.pipeline.wrap_node("clarify_topic", self._clarify_topic_node))
         workflow.add_node("researcher", self.pipeline.wrap_node("researcher", self._researcher_node))
+        workflow.add_node("topic_idea", self.pipeline.wrap_node("topic_idea", self._topic_idea_node))
         workflow.add_node("planner", self.pipeline.wrap_node("planner", self._planner_node))
         workflow.add_node("writer", self.pipeline.wrap_node("writer", self._writer_node))
         # 多轮搜索相关节点
@@ -272,7 +278,8 @@ class BlogGenerator:
                 "continue": "researcher",
             }
         )
-        workflow.add_edge("researcher", "planner")
+        workflow.add_edge("researcher", "topic_idea")
+        workflow.add_edge("topic_idea", "planner")
         workflow.add_edge("planner", "writer")
         
         # Writer 后进入知识空白检查
@@ -399,7 +406,25 @@ class BlogGenerator:
         logger.info("=== Step 1: 素材收集 ===")
         self._validate_layer("research", state)
         return self.researcher.run(state)
-    
+
+    def _topic_idea_node(self, state: SharedState) -> SharedState:
+        """四阶段选题生成节点 (1003.01)"""
+        if not self.topic_idea:
+            return state
+        logger.info("=== Step 1.5: 四阶段选题生成 ===")
+        try:
+            result = self.topic_idea.generate_ideas(state)
+            state['knowledge_points'] = result.get('knowledge_points', [])
+            state['topic_ideas'] = result.get('topic_ideas', [])
+            state['topic_statement'] = result.get('topic_statement')
+            logger.info(
+                f"选题生成完成: {len(state['knowledge_points'])} 知识点, "
+                f"{len(state['topic_ideas'])} 选题方向"
+            )
+        except Exception as e:
+            logger.warning(f"选题生成失败（不阻塞流程）: {e}")
+        return state
+
     def _planner_node(self, state: SharedState) -> SharedState:
         """大纲规划节点"""
         logger.info("=== Step 2: 大纲规划 ===")
