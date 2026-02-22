@@ -118,7 +118,7 @@ if [ "$TEST_ONLY" = false ]; then
         echo -e "${YELLOW}后端未运行，启动中...${NC}"
         mkdir -p "$LOG_DIR"
         TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-        cd "$BACKEND_DIR" && python app.py > "$LOG_DIR/backend_e2e_${TIMESTAMP}.log" 2>&1 &
+        cd "$BACKEND_DIR" && FLASK_NO_RELOAD=1 TRACE_ENABLED=false OUTLINE_AUTO_CONFIRM=true python app.py > "$LOG_DIR/backend_e2e_${TIMESTAMP}.log" 2>&1 &
         BACKEND_PID=$!
         STARTED_BACKEND=true
     else
@@ -168,8 +168,17 @@ if [ -d "$SCREENSHOT_DIR" ]; then
 fi
 mkdir -p "$SCREENSHOT_DIR"
 
+# 清理任务队列数据库残留（避免上次运行的 task 干扰新测试）
+TASK_QUEUE_DB="$BACKEND_DIR/data/task_queue.db"
+if [ -f "$TASK_QUEUE_DB" ]; then
+    echo -e "  清理任务队列数据库残留..."
+    sqlite3 "$TASK_QUEUE_DB" "DELETE FROM task_queue WHERE status IN ('running', 'queued');" 2>/dev/null || true
+fi
+
 # 设置环境变量
 export RUN_E2E_TESTS=1
+export TRACE_ENABLED=false
+export OUTLINE_AUTO_CONFIRM=true
 if [ "$HEADED" = true ]; then
     export E2E_HEADED=1
     export E2E_SLOW_MO=300

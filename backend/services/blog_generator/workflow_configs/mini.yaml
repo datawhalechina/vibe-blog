@@ -14,12 +14,12 @@ default_style:
   tone: "casual"
   complexity: "beginner"
   verbosity: "concise"
-  enable_fact_check: false
-  enable_thread_check: false
-  enable_voice_check: false
-  enable_humanizer: false
+  enable_fact_check: true
+  enable_thread_check: true
+  enable_voice_check: true
+  enable_humanizer: true
   enable_text_cleanup: true
-  enable_summary_gen: false
+  enable_summary_gen: true
 
 phases:
   plan:
@@ -28,13 +28,21 @@ phases:
 
   write:
     - writer
+    - questioner
+    - coder
 
   review:
     - reviewer
 
+  validate:
+    - thread_checker
+    - voice_checker
+
   polish:
     - text_cleanup
+    - humanizer
 
   assemble:
     - artist
     - assembler
+    - summary_generator

@@ -241,4 +241,9 @@ def create_app(config_class=None):
 # 开发服务器入口
 if __name__ == '__main__':
     app = create_app()
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    is_e2e = os.environ.get('FLASK_NO_RELOAD', '') == '1'
+    app.run(
+        host='0.0.0.0', port=5001,
+        debug=not is_e2e,
+        use_reloader=not is_e2e,
+    )
