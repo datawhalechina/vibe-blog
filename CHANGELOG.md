@@ -16,6 +16,10 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **1003.07 TTS 音频/Podcast 增强** — OpenAITTSProvider（6 声线 + 4096 智能截断）+ init_tts_provider 优先级回退（OpenAI→火山引擎）+ PodcastService.narrate() 单人叙述模式（friendly/academic/concise 三风格）+ _extract_key_points() 关键点提取
 - ✨ **1003.08 多语言 i18n 框架** — 后端 locale_utils.normalize_locale() 统一语言标准化（zh/en/chinese/english→zh-CN/en-US）+ 前端 vue-i18n 初始化模块 + zh-CN/en-US 双语翻译文件（33 键）+ normalizeLocale() TS 函数
 - ✨ **1003.09 素材管理系统** — NotebookService（SQLite 笔记本 CRUD + 记录管理 + 统计，级联删除 + 索引优化）+ MaterialOrganizerService（LLM 知识点提取 + 双层降级策略 + 兜底返回），30 个测试全通过
+- ✨ **1003.10 主题优化 RephraseAgent** — 多轮主题优化 Agent（conversation_history 对话追踪 + rephrase() 迭代重述 + check_satisfaction() 满意度判断），关键词匹配 + LLM 降级双层判断，9 个测试全通过
+- ✨ **1003.11 精确回答 + BaseAgent** — BaseAgent 可选基类（call_llm 重试 + call_llm_json 自动解析 + get_prompt 配置 + refresh_config 热刷新）+ TwoStageDecisionMixin 两阶段决策模式 + PrecisionAnswerAgent 精确回答提取，12 个测试全通过
+- ✨ **1003.12 前端状态持久化** — persistence.ts 纯函数工具库（StorageWrapper 版本化 + 旧格式兼容 + QuotaExceeded 处理 + persistState/mergeWithDefaults）+ usePersistentRef Vue composable（debounce 自动保存），12 个测试全通过
+- ✨ **1003.13 PDF 导出增强** — usePdfExport composable（html2canvas DOM 截图 + convertSvgsToImages SVG→PNG + splitCanvasIntoPages A4 分页 + 页码 + preprocessMarkdownForPdf 预处理），5 个测试全通过
 
 ---
 
