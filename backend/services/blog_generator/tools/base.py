@@ -18,7 +18,7 @@ class SearchResult:
     content: str = ""
     source: str = ""
     publish_date: str = ""
-    source_type: str = "web"  # web | wechat | arxiv | local
+    source_type: str = "web"  # web | wechat | arxiv | scholar | local
 
 
 @dataclass
