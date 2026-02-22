@@ -290,6 +290,13 @@ class SharedState(TypedDict):
     # 1003.04 动态主题队列 (DynamicTopicQueue 序列化状态)
     topic_queue_data: Optional[dict]  # DynamicTopicQueue.to_dict() 输出
 
+    # 1003.05 双循环架构 Analysis Loop
+    analysis_knowledge_chain: List[dict]  # [{cite_id, tool_type, query, raw_result, summary}]
+    analysis_round: int  # 当前分析轮次
+    max_analysis_rounds: int  # 最大分析轮次
+    analysis_completed: bool  # 分析是否完成
+    analysis_should_stop: bool  # LLM 判断是否停止
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -421,6 +428,12 @@ def create_initial_state(
         topic_statement=None,
         # 1003.04 动态主题队列
         topic_queue_data=None,
+        # 1003.05 双循环架构 Analysis Loop
+        analysis_knowledge_chain=[],
+        analysis_round=0,
+        max_analysis_rounds=int(os.getenv('ANALYSIS_MAX_ROUNDS', '3')),
+        analysis_completed=False,
+        analysis_should_stop=False,
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,

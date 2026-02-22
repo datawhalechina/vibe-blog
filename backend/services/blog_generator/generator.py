@@ -23,6 +23,8 @@ from .agents.assembler import AssemblerAgent
 from .agents.clarification import ClarificationAgent
 from .agents.search_coordinator import SearchCoordinator
 from .agents.topic_idea import TopicIdeaAgent
+from .agents.analysis_investigator import AnalysisInvestigator
+from .agents.analysis_note import AnalysisNoteAgent
 from .agents.humanizer import HumanizerAgent
 from utils.session_tracker import SessionTracker
 from .agents.thread_checker import ThreadCheckerAgent
@@ -140,6 +142,11 @@ class BlogGenerator:
         self._env_topic_idea = os.getenv('TOPIC_IDEA_ENABLED', 'false').lower() == 'true'
         self.topic_idea = TopicIdeaAgent(_proxy('topic_idea')) if self._env_topic_idea else None
 
+        # 1003.05 双循环架构 Analysis Loop
+        self._env_analysis_loop = os.getenv('ANALYSIS_LOOP_ENABLED', 'false').lower() == 'true'
+        self.analysis_investigator = AnalysisInvestigator(_proxy('analysis_investigator'), search_service) if self._env_analysis_loop else None
+        self.analysis_note = AnalysisNoteAgent(_proxy('analysis_note')) if self._env_analysis_loop else None
+
         # 37.12 分层架构校验器（可选）
         self._layer_validator = None
         if os.environ.get('LAYER_VALIDATION_ENABLED', 'false').lower() == 'true':
@@ -246,6 +253,8 @@ class BlogGenerator:
         workflow.add_node("clarify_topic", self.pipeline.wrap_node("clarify_topic", self._clarify_topic_node))
         workflow.add_node("researcher", self.pipeline.wrap_node("researcher", self._researcher_node))
         workflow.add_node("topic_idea", self.pipeline.wrap_node("topic_idea", self._topic_idea_node))
+        workflow.add_node("analysis_investigate", self.pipeline.wrap_node("analysis_investigate", self._analysis_investigate_node))
+        workflow.add_node("analysis_note", self.pipeline.wrap_node("analysis_note", self._analysis_note_node))
         workflow.add_node("planner", self.pipeline.wrap_node("planner", self._planner_node))
         workflow.add_node("writer", self.pipeline.wrap_node("writer", self._writer_node))
         # 多轮搜索相关节点
@@ -279,7 +288,16 @@ class BlogGenerator:
             }
         )
         workflow.add_edge("researcher", "topic_idea")
-        workflow.add_edge("topic_idea", "planner")
+        workflow.add_edge("topic_idea", "analysis_investigate")
+        workflow.add_edge("analysis_investigate", "analysis_note")
+        workflow.add_conditional_edges(
+            "analysis_note",
+            self._should_stop_analysis,
+            {
+                "continue": "analysis_investigate",
+                "stop": "planner",
+            }
+        )
         workflow.add_edge("planner", "writer")
         
         # Writer 后进入知识空白检查
@@ -424,6 +442,50 @@ class BlogGenerator:
         except Exception as e:
             logger.warning(f"选题生成失败（不阻塞流程）: {e}")
         return state
+
+    def _analysis_investigate_node(self, state: SharedState) -> SharedState:
+        """Analysis Loop — 调查节点 (1003.05)"""
+        if not self.analysis_investigator:
+            state['analysis_should_stop'] = True
+            return state
+        round_num = state.get('analysis_round', 0) + 1
+        logger.info(f"=== Step 1.6: Analysis Investigate (第 {round_num} 轮) ===")
+        try:
+            return self.analysis_investigator.run(state)
+        except Exception as e:
+            logger.warning(f"Analysis Investigate 失败（不阻塞流程）: {e}")
+            state['analysis_should_stop'] = True
+            return state
+
+    def _analysis_note_node(self, state: SharedState) -> SharedState:
+        """Analysis Loop — 笔记摘要节点 (1003.05)"""
+        if not self.analysis_note:
+            return state
+        new_ids = state.get('_new_knowledge_ids', [])
+        if not new_ids:
+            return state
+        logger.info(f"=== Step 1.7: Analysis Note ({len(new_ids)} 项) ===")
+        try:
+            return self.analysis_note.run(state)
+        except Exception as e:
+            logger.warning(f"Analysis Note 失败（不阻塞流程）: {e}")
+            return state
+
+    def _should_stop_analysis(self, state: SharedState) -> Literal["continue", "stop"]:
+        """判断 Analysis Loop 是否停止"""
+        if not self._env_analysis_loop:
+            return "stop"
+        if state.get('analysis_should_stop', False):
+            return "stop"
+        round_num = state.get('analysis_round', 0)
+        max_rounds = state.get('max_analysis_rounds', 3)
+        if round_num >= max_rounds:
+            logger.info(f"Analysis Loop 达到最大轮次 ({max_rounds})，停止")
+            return "stop"
+        new_ids = state.get('_new_knowledge_ids', [])
+        if not new_ids:
+            return "stop"
+        return "continue"
 
     def _planner_node(self, state: SharedState) -> SharedState:
         """大纲规划节点"""

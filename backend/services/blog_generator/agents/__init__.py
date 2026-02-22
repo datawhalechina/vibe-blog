@@ -12,6 +12,8 @@ from .reviewer import ReviewerAgent
 from .assembler import AssemblerAgent
 from .search_coordinator import SearchCoordinator
 from .topic_idea import TopicIdeaAgent
+from .analysis_investigator import AnalysisInvestigator
+from .analysis_note import AnalysisNoteAgent
 
 __all__ = [
     'ResearcherAgent',
@@ -24,4 +26,6 @@ __all__ = [
     'AssemblerAgent',
     'SearchCoordinator',
     'TopicIdeaAgent',
+    'AnalysisInvestigator',
+    'AnalysisNoteAgent',
 ]

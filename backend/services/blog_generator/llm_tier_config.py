@@ -29,6 +29,8 @@ AGENT_LLM_TIERS = {
     'summary_generator': 'fast',
     'clarification': 'fast',
     'topic_idea': 'smart',
+    'analysis_investigator': 'fast',
+    'analysis_note': 'fast',
 }
 
 
