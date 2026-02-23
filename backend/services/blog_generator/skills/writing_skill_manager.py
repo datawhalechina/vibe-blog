@@ -80,12 +80,17 @@ class WritingSkillManager:
 
     扫描 skills/{public,custom}/ 目录，加载 SKILL.md，
     按主题/文章类型匹配最佳技能，注入到 Agent 系统提示词。
+
+    支持两种模式：
+    - 独立模式: 直接扫描目录（向后兼容）
+    - 统一模式: 接收 UnifiedSkillLoader 实例，过滤声明式技能
     """
 
-    def __init__(self, skills_root: Optional[Path] = None):
+    def __init__(self, skills_root: Optional[Path] = None, loader=None):
         self._skills_root = skills_root or self._default_root()
         self._skills: List[WritingSkill] = []
         self._loaded = False
+        self._loader = loader  # 可选的 UnifiedSkillLoader
 
     @staticmethod
     def _default_root() -> Path:
@@ -94,6 +99,34 @@ class WritingSkillManager:
     def load(self, enabled_only: bool = True) -> List[WritingSkill]:
         """扫描并加载所有技能"""
         self._skills = []
+
+        # 统一模式: 从 UnifiedSkillLoader 获取声明式技能
+        if self._loader is not None:
+            from .unified_skill import SkillSource
+            all_skills = self._loader.list_skills()
+            for us in all_skills:
+                if us.source != SkillSource.DECLARATIVE:
+                    continue
+                if enabled_only and not us.enabled:
+                    continue
+                ws = WritingSkill(
+                    name=us.name,
+                    description=us.description,
+                    license=us.license,
+                    skill_dir=us.skill_dir,
+                    skill_file=us.skill_file,
+                    category=us.category.value if hasattr(us.category, 'value') else us.category,
+                    enabled=us.enabled,
+                    allowed_tools=us.allowed_tools,
+                    content=us.content,
+                )
+                self._skills.append(ws)
+            self._skills.sort(key=lambda s: s.name)
+            self._loaded = True
+            logger.info(f"加载 {len(self._skills)} 个写作技能（统一模式）")
+            return self._skills
+
+        # 独立模式: 直接扫描目录（向后兼容）
         for category in ("public", "custom"):
             cat_dir = self._skills_root / category
             if not cat_dir.is_dir():

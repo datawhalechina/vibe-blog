@@ -175,6 +175,7 @@ class SharedState(TypedDict):
     key_concepts: List[str]  # 提取的核心概念
     reference_links: List[str]  # 参考链接 (网络来源)
     document_references: List[dict]  # 文档来源引用
+    citation_collection: List[dict]  # 结构化引用集合（CitationCollector 输出）
     knowledge_source_stats: dict  # 知识来源统计
     
     # Instructional Design 分析 (Researcher 输出)
@@ -268,6 +269,34 @@ class SharedState(TypedDict):
     _budget_warning: bool  # Feature H: 预算警告标志
     prefetch_docs: List[dict]  # Feature G: 预取的知识库文档
 
+    # 1002.10 主动澄清机制
+    clarification_needed: bool  # 是否需要澄清
+    clarification_questions: List[dict]  # 澄清问题列表
+    clarification_responses: List[dict]  # 用户回复列表
+    clarification_round: int  # 澄清轮数（防止无限循环，max=2）
+
+    # 1002.04 系统化深度研究方法论
+    research_plan: Optional[dict]  # 结构化研究计划（维度、思路、综合检查结果）
+
+    # 1002.14 视觉能力（图片理解）
+    viewed_images: dict  # {path: {base64, mime_type}} — 已查看的图片数据
+    image_understandings: List[dict]  # 图片理解结果列表
+
+    # 1003.01 四阶段选题生成 (TopicIdeaAgent 输出)
+    knowledge_points: List[dict]  # 提取的知识点 [{knowledge_point, description}, ...]
+    topic_ideas: List[dict]  # 筛选后的选题方向 [{idea, knowledge_point}, ...]
+    topic_statement: Optional[str]  # 选题陈述 Markdown
+
+    # 1003.04 动态主题队列 (DynamicTopicQueue 序列化状态)
+    topic_queue_data: Optional[dict]  # DynamicTopicQueue.to_dict() 输出
+
+    # 1003.05 双循环架构 Analysis Loop
+    analysis_knowledge_chain: List[dict]  # [{cite_id, tool_type, query, raw_result, summary}]
+    analysis_round: int  # 当前分析轮次
+    max_analysis_rounds: int  # 最大分析轮次
+    analysis_completed: bool  # 分析是否完成
+    analysis_should_stop: bool  # LLM 判断是否停止
+
 
 def get_max_search_count(target_length: str) -> int:
     """
@@ -327,6 +356,7 @@ def create_initial_state(
         key_concepts=[],
         reference_links=[],
         document_references=[],
+        citation_collection=[],
         knowledge_source_stats={},
         # Instructional Design 分析
         instructional_analysis=None,
@@ -382,6 +412,28 @@ def create_initial_state(
         _node_budget=None,
         _budget_warning=False,
         prefetch_docs=[],
+        # 1002.10 主动澄清机制
+        clarification_needed=False,
+        clarification_questions=[],
+        clarification_responses=[],
+        clarification_round=0,
+        # 1002.04 系统化深度研究方法论
+        research_plan=None,
+        # 1002.14 视觉能力（图片理解）
+        viewed_images={},
+        image_understandings=[],
+        # 1003.01 四阶段选题生成
+        knowledge_points=[],
+        topic_ideas=[],
+        topic_statement=None,
+        # 1003.04 动态主题队列
+        topic_queue_data=None,
+        # 1003.05 双循环架构 Analysis Loop
+        analysis_knowledge_chain=[],
+        analysis_round=0,
+        max_analysis_rounds=int(os.getenv('ANALYSIS_MAX_ROUNDS', '3')),
+        analysis_completed=False,
+        analysis_should_stop=False,
         # 新增：文章长度配置
         custom_config=custom_config,
         target_sections_count=target_sections_count,

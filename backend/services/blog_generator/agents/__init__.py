@@ -11,10 +11,13 @@ from .questioner import QuestionerAgent
 from .reviewer import ReviewerAgent
 from .assembler import AssemblerAgent
 from .search_coordinator import SearchCoordinator
+from .topic_idea import TopicIdeaAgent
+from .analysis_investigator import AnalysisInvestigator
+from .analysis_note import AnalysisNoteAgent
 
 __all__ = [
     'ResearcherAgent',
-    'PlannerAgent', 
+    'PlannerAgent',
     'WriterAgent',
     'CoderAgent',
     'ArtistAgent',
@@ -22,4 +25,7 @@ __all__ = [
     'ReviewerAgent',
     'AssemblerAgent',
     'SearchCoordinator',
+    'TopicIdeaAgent',
+    'AnalysisInvestigator',
+    'AnalysisNoteAgent',
 ]

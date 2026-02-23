@@ -65,47 +65,48 @@ class BlogService:
             pass
         return None
 
-    def enhance_topic(self, topic: str, timeout: float = 3.0) -> str:
+    def enhance_topic(self, topic: str, timeout: float = 5.0,
+                      context: str = "", article_style: str = "",
+                      locale: str = "zh-CN") -> str:
         """
-        使用 LLM 优化用户输入的主题
+        使用 LangGraph 子图增强用户 prompt
 
         Args:
             topic: 用户原始输入
             timeout: 超时秒数（超时则返回原始 topic）
+            context: 附加上下文
+            article_style: 文章风格
+            locale: 语言区域
 
         Returns:
             优化后的主题字符串
         """
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "你是一个技术博客主题优化助手。用户会给你一个简短的技术主题，"
-                    "请将其优化为一个更具体、更有吸引力的博客标题。\n"
-                    "要求：\n"
-                    "1. 保留用户的核心意图\n"
-                    "2. 补充具体的技术细节或应用场景\n"
-                    "3. 使标题更适合作为一篇深度技术博客的标题\n"
-                    "4. 只返回优化后的标题文本，不要加引号或其他格式"
-                ),
-            },
-            {
-                "role": "user",
-                "content": topic,
-            },
-        ]
         try:
             import concurrent.futures
+            from services.blog_generator.prompt_enhancer.builder import (
+                build_prompt_enhancer_graph,
+            )
+
+            graph = build_prompt_enhancer_graph(self.generator.llm)
+            initial_state = {
+                "prompt": topic,
+                "context": context,
+                "article_style": article_style or None,
+                "locale": locale,
+                "output": "",
+            }
+
             with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-                future = executor.submit(self.generator.llm.chat, messages, None, "enhance_topic")
+                future = executor.submit(graph.invoke, initial_state)
                 result = future.result(timeout=timeout)
-            if result and result.strip():
-                enhanced = result.strip().strip('"\'《》「」')
-                return enhanced
+
+            enhanced = result.get("output", "").strip()
+            if enhanced:
+                return enhanced.strip('"\'《》「」')
         except concurrent.futures.TimeoutError:
-            logger.warning(f"主题优化超时({timeout}s)，返回原始主题")
+            logger.warning(f"Prompt enhancement timeout ({timeout}s)")
         except Exception as e:
-            logger.warning(f"主题优化失败，返回原始主题: {e}")
+            logger.warning(f"Prompt enhancement failed: {e}")
         return topic
 
     def _get_flask_app(self):
@@ -130,7 +131,8 @@ class BlogService:
         """
         return self.resume_generation(task_id, action=action, outline=outline)
 
-    def resume_generation(self, task_id: str, action: str = 'accept', outline: dict = None) -> bool:
+    def resume_generation(self, task_id: str, action: str = 'accept', outline: dict = None,
+                          clarification_responses: list = None) -> bool:
         """
         恢复中断的生成任务（101.113 LangGraph interrupt 方案）
 
@@ -138,8 +140,9 @@ class BlogService:
 
         Args:
             task_id: 任务 ID
-            action: 'accept' 或 'edit'
+            action: 'accept' / 'edit' / 'clarify_response'
             outline: 修改后的大纲（仅 action='edit' 时需要）
+            clarification_responses: 用户澄清回复（仅 action='clarify_response' 时需要）
 
         Returns:
             是否成功启动恢复
@@ -150,7 +153,9 @@ class BlogService:
             return False
 
         # 构建 resume 值
-        if action == 'edit' and outline:
+        if action == 'clarify_response' and clarification_responses:
+            resume_value = {"action": "clarify_response", "responses": clarification_responses}
+        elif action == 'edit' and outline:
             resume_value = {"action": "edit", "outline": outline}
         else:
             resume_value = "accept"
@@ -983,10 +988,9 @@ class BlogService:
                                 }
                             })
             
-            # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认）
+            # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认 / 主动澄清）
             snapshot = self.generator.app.get_state(config)
             if snapshot.next:  # 图还有未完成的节点 → 被 interrupt 暂停了
-                logger.info(f"图执行被 interrupt 暂停，等待用户确认大纲 [{task_id}]")
                 # 提取 interrupt 数据
                 interrupt_value = None
                 if snapshot.tasks:
@@ -995,12 +999,22 @@ class BlogService:
                             interrupt_value = task.interrupts[0].value
                             break
 
+                interrupt_type = interrupt_value.get('type', '') if interrupt_value else ''
+                logger.info(f"图执行被 interrupt 暂停 (type={interrupt_type}) [{task_id}]")
+
                 # 发送 outline_ready 事件
-                if task_manager and interrupt_value and interrupt_value.get('type') == 'confirm_outline':
+                if task_manager and interrupt_type == 'confirm_outline':
                     task_manager.send_event(task_id, 'outline_ready', {
                         'title': interrupt_value.get('title', ''),
                         'sections': interrupt_value.get('sections', []),
                         'sections_titles': interrupt_value.get('sections_titles', []),
+                    })
+
+                # 1002.10: 发送 clarification_needed 事件
+                if task_manager and interrupt_type == 'clarification_needed':
+                    task_manager.send_event(task_id, 'clarification_needed', {
+                        'questions': interrupt_value.get('questions', []),
+                        'formatted_messages': interrupt_value.get('formatted_messages', []),
                     })
 
                 # 保存任务信息，供 resume_generation 使用

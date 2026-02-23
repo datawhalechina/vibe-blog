@@ -22,6 +22,10 @@ logger = logging.getLogger(__name__)
 
 blog_bp = Blueprint('blog', __name__)
 
+# 支持的上传文件类型
+ALLOWED_EXTENSIONS = {'pdf', 'md', 'txt', 'markdown', 'ppt', 'pptx',
+                      'xls', 'xlsx', 'doc', 'docx'}
+
 
 def _record_task_to_queue(task_id: str, topic: str, article_type: str,
                           target_length: str, image_style: str = ""):
@@ -102,7 +106,7 @@ def upload_document():
 
         filename = file.filename
         ext = filename.rsplit('.', 1)[-1].lower() if '.' in filename else ''
-        if ext not in ['pdf', 'md', 'txt', 'markdown']:
+        if ext not in ALLOWED_EXTENSIONS:
             return jsonify({'success': False, 'error': f'不支持的文件类型: {ext}'}), 400
 
         doc_id = f"doc_{uuid.uuid4().hex[:12]}"
@@ -451,7 +455,7 @@ def generate_blog_sync():
 
 @blog_bp.route('/api/blog/enhance-topic', methods=['POST'])
 def enhance_topic():
-    """优化用户输入的主题（Prompt 增强）"""
+    """优化用户输入的主题（Prompt 增强器 — LangGraph 子图）"""
     try:
         data = request.get_json()
         if not data:
@@ -461,11 +465,21 @@ def enhance_topic():
         if not topic:
             return jsonify({'success': False, 'error': '请提供 topic 参数'}), 400
 
+        # 新增参数（向后兼容，均为可选）
+        context = data.get('context', '')
+        article_style = data.get('article_style', '')
+        locale = data.get('locale', 'zh-CN')
+
         blog_service = get_blog_service()
         if not blog_service:
             return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
 
-        enhanced = blog_service.enhance_topic(topic)
+        enhanced = blog_service.enhance_topic(
+            topic,
+            context=context,
+            article_style=article_style,
+            locale=locale,
+        )
 
         return jsonify({
             'success': True,
@@ -485,18 +499,25 @@ def resume_task(task_id):
         data = request.get_json() or {}
         action = data.get('action', 'accept')
         outline = data.get('outline', None)
+        clarification_responses = data.get('clarification_responses', None)
 
-        if action not in ('accept', 'edit'):
-            return jsonify({'success': False, 'error': 'action 必须是 accept 或 edit'}), 400
+        if action not in ('accept', 'edit', 'clarify_response'):
+            return jsonify({'success': False, 'error': 'action 必须是 accept、edit 或 clarify_response'}), 400
 
         if action == 'edit' and not outline:
             return jsonify({'success': False, 'error': 'edit 操作需要提供 outline'}), 400
+
+        if action == 'clarify_response' and not clarification_responses:
+            return jsonify({'success': False, 'error': 'clarify_response 操作需要提供 clarification_responses'}), 400
 
         blog_service = get_blog_service()
         if not blog_service:
             return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
 
-        success = blog_service.resume_generation(task_id, action=action, outline=outline)
+        success = blog_service.resume_generation(
+            task_id, action=action, outline=outline,
+            clarification_responses=clarification_responses,
+        )
         if not success:
             return jsonify({'success': False, 'error': '任务不存在或未在等待确认'}), 404
 

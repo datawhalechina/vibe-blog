@@ -4,6 +4,40 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-23
+
+### Added
+- ✨ **1003.01 四阶段选题生成** — TopicIdeaAgent 实现松筛→探索→严筛→陈述四阶段选题工作流，从搜索结果提取知识点并生成高质量选题方向，环境变量 `TOPIC_IDEA_ENABLED` 控制开关（默认关闭）
+- ✨ **1003.02 RAG 知识库检索** — 组合式 RAG 管线（Fluent API），支持 FixedSizeChunker 分块 + OpenAI Embedding 向量化 + DenseRetriever 余弦相似度检索，RAGRetrieverAdapter 适配 RetrieverRegistry
+- ✨ **1003.03 统一引用管理** — CitationManager 阶段化 ID（PLAN-XX/CIT-X-XX）+ ToolTrace 工具调用追踪 + 引用验证/修复 + 格式化输出，增量增强现有 CitationCollector
+- ✨ **1003.04 动态主题队列** — DynamicTopicQueue 主题块级调度（TopicStatus 状态机 + TopicBlock 数据类），支持运行时 add_block() 追加 + has_topic() 去重 + max_length 容量控制 + FIFO 调度 + 序列化，SharedState 新增 topic_queue_data 字段
+- ✨ **1003.05 双循环架构** — Analysis Loop（AnalysisInvestigator + AnalysisNoteAgent），在 researcher→planner 之间插入 LLM 自主判断的深度调查循环，结构化知识链 analysis_knowledge_chain + 自动摘要，环境变量 `ANALYSIS_LOOP_ENABLED` 控制开关（默认关闭）
+- ✨ **1003.06 代码执行沙箱** — ImportGuard AST 白名单 + WorkspaceManager 路径隔离 + subprocess 超时控制，支持同步 run_code_sync() 和异步 run_code()，环境变量 `ENABLE_CODE_VERIFY` 控制 CoderAgent 验证开关（默认关闭）
+- ✨ **1003.07 TTS 音频/Podcast 增强** — OpenAITTSProvider（6 声线 + 4096 智能截断）+ init_tts_provider 优先级回退（OpenAI→火山引擎）+ PodcastService.narrate() 单人叙述模式（friendly/academic/concise 三风格）+ _extract_key_points() 关键点提取
+- ✨ **1003.08 多语言 i18n 框架** — 后端 locale_utils.normalize_locale() 统一语言标准化（zh/en/chinese/english→zh-CN/en-US）+ 前端 vue-i18n 初始化模块 + zh-CN/en-US 双语翻译文件（33 键）+ normalizeLocale() TS 函数
+- ✨ **1003.09 素材管理系统** — NotebookService（SQLite 笔记本 CRUD + 记录管理 + 统计，级联删除 + 索引优化）+ MaterialOrganizerService（LLM 知识点提取 + 双层降级策略 + 兜底返回），30 个测试全通过
+- ✨ **1003.10 主题优化 RephraseAgent** — 多轮主题优化 Agent（conversation_history 对话追踪 + rephrase() 迭代重述 + check_satisfaction() 满意度判断），关键词匹配 + LLM 降级双层判断，9 个测试全通过
+- ✨ **1003.11 精确回答 + BaseAgent** — BaseAgent 可选基类（call_llm 重试 + call_llm_json 自动解析 + get_prompt 配置 + refresh_config 热刷新）+ TwoStageDecisionMixin 两阶段决策模式 + PrecisionAnswerAgent 精确回答提取，12 个测试全通过
+- ✨ **1003.12 前端状态持久化** — persistence.ts 纯函数工具库（StorageWrapper 版本化 + 旧格式兼容 + QuotaExceeded 处理 + persistState/mergeWithDefaults）+ usePersistentRef Vue composable（debounce 自动保存），12 个测试全通过
+- ✨ **1003.13 PDF 导出增强** — usePdfExport composable（html2canvas DOM 截图 + convertSvgsToImages SVG→PNG + splitCanvasIntoPages A4 分页 + 页码 + preprocessMarkdownForPdf 预处理），5 个测试全通过
+- ✨ **1003.15 研究深度预设** — ResearchPreset 数据类（quick/medium/deep/auto 四档预设），控制搜索轮次、来源上限、分析深度，apply_preset_to_state() 一键应用到 SharedState，9 个测试全通过
+- ✨ **1003.21 生成状态管理 Store** — Pinia generation store（GenerationStage 状态机 + TaskState 任务追踪 + LogEntry 结构化日志 + handleStageChange/handleTaskUpdate/handleProgress），8 个测试全通过
+- ✨ **1003.22 会话生命周期管理** — SessionLifecycleManager（SQLite 持久化 + Session 数据类 + SessionStatus/SessionType 枚举 + CRUD + 状态转换 + TTL 过期 + 容量上限），13 个测试全通过
+- ✨ **1003.23 文件夹同步管理** — FolderSyncService（link_folder 幂等关联 + detect_changes mtime 增量检测 + mark_synced 同步标记 + JSON 元数据持久化 + 7 种文件扩展名支持），12 个测试全通过
+- ✨ **1003.17 配置热重载** — ConfigReloader 线程安全配置缓存（版本化 reload + 失败回滚 + reload_all 批量 + get/clear），10 个测试全通过
+- ✨ **1003.18 Token 用量统计** — TokenStats 多维度聚合器（TokenUsageRecord 数据类 + by_agent/by_model/total/top_consumers），8 个测试全通过
+- ✨ **1003.19 交互式 HTML 生成** — InteractiveHTMLAgent（LLM HTML 生成 + _extract_html 代码块提取 + _validate_html 结构验证 + _generate_fallback XSS 安全降级），10 个测试全通过
+- ✨ **1003.20 创作者洞察报告** — CreatorInsightService（BlogRecord 数据类 + 主题分布 + 质量趋势 + 标签云 + 活跃度统计 + 创作建议），12 个测试全通过
+- ✨ **1003.26 LLM 调用日志** — LLMCallLogger（LLMCallRecord 数据类 + track() 上下文管理器自动计时 + get_summary 按模型聚合 + success_rate），9 个测试全通过
+- ✨ **1003.27 任务 ID 管理器** — TaskIDManager 单例（threading.Lock 线程安全 + generate 格式化 ID + idempotent task_key + update_status/cleanup），11 个测试全通过
+- ✨ **1003.28 Dashboard 活动追踪** — ActivityTracker（JSON 持久化 + ActivityType 枚举 + add_entry/get_recent/get_stats + MAX_ENTRIES 自动裁剪 + clear），11 个测试全通过
+
+### Tests
+- 🧪 **端到端验证** — 后端 265 个测试全通过，前端 470 个测试全通过
+- 🐛 **BlogInputCard 测试修复** — 更新文件类型断言以匹配扩展后的上传格式支持（.ppt/.xls/.doc 等）
+
+---
+
 ## 2026-02-22 (feature/115-frontend-enhancements)
 
 ### Added

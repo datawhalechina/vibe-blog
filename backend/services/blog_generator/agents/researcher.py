@@ -139,6 +139,27 @@ class ResearcherAgent:
                 logger.info("41.01 深度研究引擎已启用")
             except Exception as e:
                 logger.warning(f"深度研究引擎初始化失败: {e}")
+
+        # 1002.04 系统化深度研究方法论
+        self._methodology_engine = None
+        if os.environ.get('STRUCTURED_RESEARCH_ENABLED', 'false').lower() == 'true':
+            try:
+                from ..services.research_methodology import StructuredResearchMethodology
+                gap_detector = None
+                try:
+                    from ..services.knowledge_gap_detector import KnowledgeGapDetector
+                    gap_detector = KnowledgeGapDetector(llm_service=llm_client)
+                except Exception:
+                    pass
+                self._methodology_engine = StructuredResearchMethodology(
+                    llm_client=llm_client,
+                    search_service=search_service,
+                    deep_research_engine=self._deep_research_engine,
+                    gap_detector=gap_detector,
+                )
+                logger.info("1002.04 系统化深度研究方法论已启用")
+            except Exception as e:
+                logger.warning(f"方法论引擎初始化失败: {e}")
     
     def generate_search_queries(self, topic: str, target_audience: str) -> List[str]:
         """
@@ -706,8 +727,49 @@ class ResearcherAgent:
             logger.info("📋 使用原有搜索模式（无文档上传）")
             logger.info(f"📋 将使用网络搜索结果生成博客内容")
 
-            # 41.01 深度研究：在初始搜索后迭代补充
-            if self._deep_research_engine and search_results:
+            # 1002.04 系统化深度研究方法论（在 DeepResearchEngine 之上）
+            if self._methodology_engine and search_results:
+                logger.info("📐 启动系统化深度研究方法论...")
+                try:
+                    plan = self._methodology_engine.broad_exploration(topic, target_audience)
+                    search_results = self._methodology_engine.deep_dive(plan, search_results)
+                    div_result = self._methodology_engine.diversity_validation(
+                        topic, search_results, plan
+                    )
+                    search_results = div_result['results']
+                    synthesis = self._methodology_engine.synthesis_check(
+                        topic, search_results, plan
+                    )
+                    state['research_plan'] = {
+                        'dimensions': [d.name for d in plan.dimensions],
+                        'thought': plan.thought,
+                        'synthesis_passed': synthesis.passed,
+                        'info_type_coverage': {
+                            k.value: v for k, v in div_result['coverage'].items()
+                        },
+                    }
+                    if not synthesis.passed and self._deep_research_engine:
+                        logger.warning("[Phase 4] 综合检查未通过，触发深度研究补充")
+                        dr_result = self._deep_research_engine.run(
+                            topic=topic,
+                            target_audience=target_audience,
+                            initial_results=search_results,
+                        )
+                        search_results = dr_result['results']
+                        state['deep_research_stats'] = {
+                            'rounds': dr_result['rounds'],
+                            'total_queries': dr_result['total_queries'],
+                            'coverage_score': dr_result['coverage_score'],
+                        }
+                    logger.info(
+                        f"📐 方法论研究完成: {len(plan.dimensions)} 维度, "
+                        f"综合检查 {'通过' if synthesis.passed else '未通过'}"
+                    )
+                except Exception as e:
+                    logger.warning(f"方法论引擎执行失败，回退到原有流程: {e}")
+
+            # 41.01 深度研究：在初始搜索后迭代补充（方法论未启用时）
+            elif self._deep_research_engine and search_results:
                 logger.info("🔬 启动深度研究迭代...")
                 dr_result = self._deep_research_engine.run(
                     topic=topic,

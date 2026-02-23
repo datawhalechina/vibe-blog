@@ -7,6 +7,7 @@
 
 from .base import BaseSearchTool, BaseCrawlTool, SearchResult, SearchResponse
 from .registry import ToolRegistry, ToolConfig, get_tool_registry, reset_tool_registry
+from .aggregator import get_available_tools, register_builtin_tool, register_conditional_tool, sync_to_tool_manager
 
 __all__ = [
     "BaseSearchTool",
@@ -17,4 +18,8 @@ __all__ = [
     "ToolConfig",
     "get_tool_registry",
     "reset_tool_registry",
+    "get_available_tools",
+    "register_builtin_tool",
+    "register_conditional_tool",
+    "sync_to_tool_manager",
 ]

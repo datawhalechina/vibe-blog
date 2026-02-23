@@ -129,6 +129,9 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
 
     # 屏蔽 werkzeug 高频轮询日志（Dashboard 每 3s 心跳）
     logging.getLogger("werkzeug").setLevel(logging.WARNING)
+    # 屏蔽第三方库 DEBUG 噪音
+    for noisy_logger in ("fsevents", "urllib3", "asyncio", "aiosqlite", "oss2", "httpx", "httpcore"):
+        logging.getLogger(noisy_logger).setLevel(logging.WARNING)
 
     if not enable_file:
         return

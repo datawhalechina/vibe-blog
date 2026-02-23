@@ -45,6 +45,7 @@ class ToolRegistry:
         self._configs: Dict[str, ToolConfig] = {}
         self._groups: Dict[str, List[str]] = {}
         self._config_path: Optional[str] = None
+        self._config_mtime: Optional[float] = None
 
     def load_from_yaml(self, config_path: str = None) -> None:
         """从 YAML 文件加载工具配置"""
@@ -64,6 +65,12 @@ class ToolRegistry:
 
         with open(path) as f:
             data = yaml.safe_load(f) or {}
+
+        # 记录配置文件修改时间（用于热重载检测）
+        try:
+            self._config_mtime = os.path.getmtime(self._config_path)
+        except OSError:
+            self._config_mtime = None
 
         # 解析环境变量
         data = self._resolve_env_vars(data)
@@ -113,6 +120,18 @@ class ToolRegistry:
         elif isinstance(data, list):
             return [self._resolve_env_vars(item) for item in data]
         return data
+
+    # ===== 热重载检测 =====
+
+    def _is_config_stale(self) -> bool:
+        """检测配置文件是否已变更（mtime 比较）"""
+        if self._config_path is None or self._config_mtime is None:
+            return False
+        try:
+            current_mtime = os.path.getmtime(self._config_path)
+            return current_mtime > self._config_mtime
+        except OSError:
+            return False
 
     # ===== 查询接口 =====
 

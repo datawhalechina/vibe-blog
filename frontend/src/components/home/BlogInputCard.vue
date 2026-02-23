@@ -112,14 +112,14 @@
           <span>附件</span>
           <input
             type="file"
-            accept=".pdf,.md,.txt,.markdown"
+            accept=".pdf,.md,.txt,.markdown,.ppt,.pptx,.xls,.xlsx,.doc,.docx"
             multiple
             @change="handleFileUpload"
           >
         </label>
         <div v-if="showUploadTooltip" class="upload-tooltip">
           PDF 文件不超过 15 页<br>
-          支持 PDF、Markdown、TXT 格式
+          支持 PDF、PPT、Word、Excel、Markdown、TXT 格式
         </div>
         <button
           class="code-action-btn"
