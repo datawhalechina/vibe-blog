@@ -32,6 +32,10 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ✨ **1003.27 任务 ID 管理器** — TaskIDManager 单例（threading.Lock 线程安全 + generate 格式化 ID + idempotent task_key + update_status/cleanup），11 个测试全通过
 - ✨ **1003.28 Dashboard 活动追踪** — ActivityTracker（JSON 持久化 + ActivityType 枚举 + add_entry/get_recent/get_stats + MAX_ENTRIES 自动裁剪 + clear），11 个测试全通过
 
+### Tests
+- 🧪 **端到端验证** — 后端 265 个测试全通过，前端 470 个测试全通过
+- 🐛 **BlogInputCard 测试修复** — 更新文件类型断言以匹配扩展后的上传格式支持（.ppt/.xls/.doc 等）
+
 ---
 
 ## 2026-02-22 (feature/115-frontend-enhancements)
