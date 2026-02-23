@@ -177,7 +177,7 @@ describe('BlogInputCard.vue', () => {
       })
 
       const fileInput = wrapper.find('input[type="file"]')
-      expect(fileInput.attributes('accept')).toBe('.pdf,.md,.txt,.markdown')
+      expect(fileInput.attributes('accept')).toBe('.pdf,.md,.txt,.markdown,.ppt,.pptx,.xls,.xlsx,.doc,.docx')
       expect(fileInput.attributes('multiple')).toBeDefined()
     })
 
