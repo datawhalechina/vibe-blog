@@ -47,6 +47,9 @@ SSE_HOOK_JS = """
                             window.__sse_generation_done = true;
                         }
                     }
+                    if (type === 'complete') {
+                        window.__sse_generation_done = true;
+                    }
                 } catch(e) {}
                 return fn.call(this, evt);
             };

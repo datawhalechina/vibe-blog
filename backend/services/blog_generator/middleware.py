@@ -462,31 +462,143 @@ class GracefulDegradationMiddleware(ExtendedMiddleware):
 
 class TaskLogMiddleware:
     """
-    任务日志中间件 — 自动记录每个节点的执行耗时到 BlogTaskLog。
+    任务日志中间件 — 自动记录每个节点的执行耗时和 token 用量到 BlogTaskLog。
 
     利用 wrap_node 已计算的 _last_duration_ms，在 after_node 中
-    调用 task_log.log_step() 写入结构化日志。生成结束后 task log JSON
-    中即包含完整的 step 级耗时分解。
+    调用 task_log.log_step() 写入结构化日志。通过 token_tracker 快照
+    计算每个节点的 token 增量。
 
-    需要在 generator 中通过 set_task_log() 注入 BlogTaskLog 实例。
+    需要在 generator 中通过 set_task_log() / set_token_tracker() 注入。
     """
 
     def __init__(self):
         self._task_log = None
+        self._token_tracker = None
+        self._pre_input = 0
+        self._pre_output = 0
 
     def set_task_log(self, task_log):
         self._task_log = task_log
 
+    def set_token_tracker(self, token_tracker):
+        self._token_tracker = token_tracker
+
     def before_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
+        if self._token_tracker:
+            self._pre_input = self._token_tracker.total_input_tokens
+            self._pre_output = self._token_tracker.total_output_tokens
         return None
 
     def after_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
         if not self._task_log:
             return None
         duration_ms = state.get("_last_duration_ms", 0)
+        tokens = None
+        if self._token_tracker:
+            delta_in = self._token_tracker.total_input_tokens - self._pre_input
+            delta_out = self._token_tracker.total_output_tokens - self._pre_output
+            if delta_in > 0 or delta_out > 0:
+                tokens = {"input": delta_in, "output": delta_out}
         self._task_log.log_step(
             agent=node_name,
             action="node_complete",
             duration_ms=duration_ms,
+            tokens=tokens,
         )
+        return None
+
+
+# ==================== ContextCompressionMiddleware ====================
+
+
+class ContextCompressionMiddleware(ExtendedMiddleware):
+    """
+    统一上下文压缩中间件 — 在 before_node 中调用 ContextManager 执行多层压缩。
+
+    融合多维度触发（tokens/messages/fraction/ratio）+ 语义压缩 + 消息压缩。
+    与 TokenBudgetMiddleware 并存，通过环境变量选择启用哪个。
+
+    环境变量开关：CONTEXT_COMPRESSION_ENHANCED_ENABLED (default: true)
+    """
+
+    def __init__(self, context_manager=None, token_tracker=None):
+        self.context_manager = context_manager
+        self.token_tracker = token_tracker
+
+    def before_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
+        if os.getenv("CONTEXT_COMPRESSION_ENHANCED_ENABLED", "true").lower() == "false":
+            return None
+        if not self.context_manager:
+            return None
+
+        messages = state.get("_messages", [])
+        search_results = state.get("search_results", [])
+        query = state.get("topic", "")
+
+        result = self.context_manager.compress(
+            messages=messages,
+            search_results=search_results,
+            query=query,
+            node_name=node_name,
+        )
+        return result if result else None
+
+    def after_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
+        return None
+
+
+# ==================== 1002.14：VisionMiddleware ====================
+
+
+# 需要视觉注入的节点列表
+VISION_ENABLED_NODES = {"planner", "writer", "artist", "assembler"}
+
+
+class VisionMiddleware(ExtendedMiddleware):
+    """
+    节点级视觉中间件 — 在目标节点执行前注入图片理解结果。
+
+    在 before_node 中检查 state 中是否有待理解的图片，
+    自动调用 ImageUnderstandingService 分析并将结果注入 state。
+
+    环境变量开关：VISION_ENABLED (default: false)
+    """
+
+    def __init__(self, image_service=None):
+        self._image_service = image_service
+
+    def before_node(self, state: Dict[str, Any], node_name: str) -> Optional[Dict[str, Any]]:
+        """在目标节点执行前注入图片理解结果"""
+        if os.getenv("VISION_ENABLED", "false").lower() != "true":
+            return None
+
+        if node_name not in VISION_ENABLED_NODES:
+            return None
+
+        viewed_images = state.get("viewed_images", {})
+        if not viewed_images:
+            return None
+
+        if state.get("image_understandings"):
+            return None
+
+        if not self._image_service:
+            return None
+
+        logger.info(f"[VisionMiddleware] 为节点 {node_name} 注入 {len(viewed_images)} 张图片理解")
+
+        understandings = []
+        for path, img_data in viewed_images.items():
+            result = self._image_service.analyze_image(path, context=state.get("topic", ""))
+            if result:
+                understandings.append({
+                    "path": result.path,
+                    "description": result.description,
+                    "detected_text": result.detected_text,
+                    "image_type": result.image_type,
+                    "relevance_score": result.relevance_score,
+                })
+
+        if understandings:
+            return {"image_understandings": understandings}
         return None

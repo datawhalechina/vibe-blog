@@ -152,6 +152,12 @@ class Config:
     CRAWL4AI_ENABLED = os.getenv('CRAWL4AI_ENABLED', 'false').lower() == 'true'
     MATERIALS_DIR = os.getenv('MATERIALS_DIR', os.path.join(BASE_DIR, 'materials'))
 
+    # 播客生成 TTS 配置
+    VOLCENGINE_TTS_APPID = os.getenv('VOLCENGINE_TTS_APPID', '')
+    VOLCENGINE_TTS_ACCESS_TOKEN = os.getenv('VOLCENGINE_TTS_ACCESS_TOKEN', '')
+    VOLCENGINE_TTS_CLUSTER = os.getenv('VOLCENGINE_TTS_CLUSTER', 'volcano_tts')
+    PODCAST_ENABLED = os.getenv('PODCAST_ENABLED', 'true').lower() == 'true'
+
 
 class DevelopmentConfig(Config):
     """开发环境配置"""

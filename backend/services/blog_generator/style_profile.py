@@ -93,8 +93,8 @@ class StyleProfile:
             enable_knowledge_refinement=False,
             image_generation_mode="mini_section",
             tone="casual", complexity="beginner", verbosity="concise",
-            enable_fact_check=True, enable_thread_check=False,
-            enable_voice_check=False, enable_humanizer=True,
+            enable_fact_check=True, enable_thread_check=True,
+            enable_voice_check=True, enable_humanizer=True,
             enable_text_cleanup=True, enable_summary_gen=True,
             enable_ai_boost=False,
         )

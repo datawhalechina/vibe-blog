@@ -17,6 +17,9 @@ langchain-google-genai>=1.0.0
 # LangGraph 工作流引擎 (博客生成)
 langgraph>=1.0.0
 
+# MCP 协议集成（可选，用于接入社区 MCP 工具服务器）
+langchain-mcp-adapters>=0.1.0
+
 # 模板引擎 (Prompt 管理)
 jinja2>=3.1.0
 
@@ -34,6 +37,9 @@ Pillow>=10.0.0
 
 # ============ Word 导出 ============
 python-docx>=1.1.0
+
+# ============ PPT 演示文稿生成 ============
+python-pptx>=0.6.21
 
 # ============ 阿里云 OSS ============
 oss2>=2.18.0
@@ -55,3 +61,6 @@ opentelemetry-instrumentation-threading>=0.48b0
 aiosqlite>=0.19.0
 croniter>=6.0.0
 APScheduler>=3.10.0  # 保留兼容，渐进迁移后可移除
+
+# ============ 文档转换 ============
+markitdown>=0.1.0

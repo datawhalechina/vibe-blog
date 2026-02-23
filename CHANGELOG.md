@@ -4,6 +4,41 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-02-22 (feature/1002-capability-enhancement)
+
+### Added
+- ✨ **LLM 自动记忆提取** — 博客生成后自动提取事实记忆并注入 prompt，MemoryExtractor + MemoryExtractQueue + 专用 prompt 模板
+- ✨ **引用管理模块化** — CitationCollector + CitationMerger 独立模块，SharedState 新增 citation_collection 字段 + merge_citations reducer
+- ✨ **上下文压缩增强** — ContextManager 三层压缩（截断/摘要/LLM），ContextCompressionMiddleware 消息级 token 计数 + 自动触发
+- ✨ **记忆系统配置化** — BlogMemoryConfig Pydantic 模型（debounce/confidence/injection 控制），REST API /api/memory/config + /api/memory/status，全局单例 + from_env()
+- ✨ **系统化深度研究方法论** — ResearchMethodologyEngine 4 阶段框架（规划→搜索→分析→综合）+ 8 维分析 + 综合检查，ResearcherAgent 集成
+- ✨ **MCP 协议集成** — McpConfig/McpServerConfig Pydantic 模型 + build_server_params + McpToolsCache mtime 懒加载 + 优雅降级，支持 stdio/sse/streamable 三种传输
+- ✨ **主动澄清机制** — ClarificationAgent 5 种澄清类型 + generator.py clarify_topic 节点 + interrupt 交互 + SSE clarification_needed 事件
+- ✨ **文件上传文档转换** — MarkItDown 集成 PDF/PPT/Excel/Word 全格式 Markdown 转换，file_parser_service.py + 前端 accept 属性扩展
+- ✨ **子代理委托系统** — SubagentExecutor 双线程池 + SubagentRegistry 注册表 + SubagentLimitGuard 并发限制 + delegate_task 委托入口 + useSubtasks.ts 前端 SSE 状态
+- ✨ **视觉能力图片理解** — ImageUnderstandingService + VisionMiddleware + SharedState viewed_images/image_understandings 字段，VISION_ENABLED 环境变量控制
+- ✨ **Podcast 播客生成** — PodcastService 三阶段管线（脚本→TTS→混合）+ TTSService 抽象层 + 火山引擎实现 + API 路由
+- ✨ **PPT 演示文稿生成** — PPTService（SlideStyle 6 种风格 + blog_to_plan + generate_pptx）+ python-pptx 直接生成 + API 路由
+- ✨ **Prose 编辑器** — ProseEditorAgent 6 种 AI 编辑模式（continue/improve/shorter/longer/fix/zap）+ Jinja2 prompt 模板 + API 路由
+- ✨ **图表可视化 Skill** — ChartService 26 种图表类型 + ECharts API 渲染 + chart_visualization Skill 自动提取代码块生成图片
+- ✨ **Skills 可插拔系统** — UnifiedSkillLoader（SKILL.md 声明式 + 装饰器兼容）+ SkillsStateConfig + ZIP 安装 + REST API 4 端点
+- ✨ **Prompt 增强器** — prompt_enhancer 子图（意图识别 + 关键词扩展 + 上下文增强）+ blog_service enhance_topic 集成
+- ✨ **多语言 Prompt** — PromptManager locale-aware 加载（.j2 + .{locale}.j2 双版本 + fallback），locale 可选参数
+- ✨ **动态工具聚合** — ToolAggregator（config.yaml 定义 + MCP 工具 + 内置工具统一加载 + 去重 + 优先级排序）
+
+### Changed
+- 🔧 **memory/config.py** — dataclass → Pydantic BaseModel，新增 auto_extract_enabled/model_name/debounce_seconds/confidence_threshold 等配置字段
+- 🔧 **generator.py** — 集成 clarify_topic 节点、VisionMiddleware、UnifiedSkillLoader、PromptEnhancer 子图
+- 🔧 **middleware.py** — 新增 ContextCompressionMiddleware + VisionMiddleware
+- 🔧 **schemas/state.py** — SharedState 新增 citation_collection/research_plan/clarification/viewed_images/image_understandings 等字段
+- 🔧 **requirements.txt** — 新增 markitdown、python-pptx、langchain-mcp-adapters
+
+### Tests
+- 🧪 **单元测试回归** — 163 passed（基线 134 + 新增 29 进 unit 目录），0 failures
+- 🧪 **新增测试文件** — test_1002_01 ~ test_1002_17 共 18 个测试文件，覆盖全部新特性
+
+---
+
 ## 2026-02-22 (feature/115-frontend-enhancements)
 
 ### Added

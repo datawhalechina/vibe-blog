@@ -111,9 +111,12 @@ class MemoryStorage:
         category: str = "preference",
         confidence: float = 0.9,
         source: str = "",
-        max_facts: int = 200,
     ) -> Optional[str]:
-        """添加一条事实到用户记忆"""
+        """添加一条事实到用户记忆（max_facts 从全局配置读取）"""
+        from .config import get_memory_config
+        config = get_memory_config()
+        max_facts = config.max_facts
+
         memory = self.load(user_id)
         fact_id = f"fact_{uuid.uuid4().hex[:8]}"
         fact = {
@@ -165,8 +168,15 @@ class MemoryStorage:
         return self.save(user_id, memory)
 
     def format_for_injection(self, user_id: str) -> str:
-        """格式化记忆为系统提示词注入片段"""
+        """格式化记忆为系统提示词注入片段（受 injection_enabled 和 max_injection_tokens 控制）"""
+        from .config import get_memory_config
+        config = get_memory_config()
+
+        if not config.injection_enabled:
+            return ""
+
         memory = self.load(user_id)
+        max_tokens = config.max_injection_tokens
 
         parts = []
 
@@ -199,17 +209,35 @@ class MemoryStorage:
         if topic_lines:
             parts.append("主题历史:\n" + "\n".join(topic_lines))
 
-        # Key Facts
+        # Key Facts — 按 max_injection_tokens 动态截断
         facts = memory.get("facts", [])
         if facts:
-            top_facts = sorted(facts, key=lambda f: f.get("confidence", 0), reverse=True)[:10]
-            fact_lines = [f"- [{f['category']}] {f['content']}" for f in top_facts]
-            parts.append("关键事实:\n" + "\n".join(fact_lines))
+            top_facts = sorted(facts, key=lambda f: f.get("confidence", 0), reverse=True)
+            fact_lines = []
+            current_tokens = sum(self._estimate_tokens(p) for p in parts)
+            for f in top_facts:
+                line = f"- [{f['category']}] {f['content']}"
+                line_tokens = self._estimate_tokens(line)
+                if current_tokens + line_tokens > max_tokens:
+                    break
+                fact_lines.append(line)
+                current_tokens += line_tokens
+            if fact_lines:
+                parts.append("关键事实:\n" + "\n".join(fact_lines))
 
         if not parts:
             return ""
 
         return "<user-memory>\n" + "\n\n".join(parts) + "\n</user-memory>"
+
+    @staticmethod
+    def _estimate_tokens(text: str) -> int:
+        """粗略估算 token 数（中文约 1 token/1.5 字符，英文约 1 token/4 字符）"""
+        if not text:
+            return 0
+        chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
+        other_chars = len(text) - chinese_chars
+        return int(chinese_chars / 1.5 + other_chars / 4)
 
     def exists(self, user_id: str) -> bool:
         """检查用户记忆文件是否存在"""

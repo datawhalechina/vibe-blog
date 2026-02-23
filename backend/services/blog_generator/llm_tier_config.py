@@ -27,6 +27,7 @@ AGENT_LLM_TIERS = {
     'researcher': 'fast',
     'artist': 'fast',
     'summary_generator': 'fast',
+    'clarification': 'fast',
 }
 
 

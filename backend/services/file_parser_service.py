@@ -25,6 +25,9 @@ logger = logging.getLogger(__name__)
 _templates_dir = Path(__file__).parent.parent / 'infrastructure' / 'prompts' / 'shared'
 _jinja_env = Environment(loader=FileSystemLoader(str(_templates_dir)))
 
+# Office 文档格式 — 优先使用 markitdown 本地转换
+MARKITDOWN_EXTENSIONS = {'ppt', 'pptx', 'xls', 'xlsx', 'doc', 'docx'}
+
 
 class FileParserService:
     """文件解析服务，支持 MinerU OCR 解析 PDF"""
@@ -88,7 +91,20 @@ class FileParserService:
                 if on_progress:
                     on_progress(1, 1, "读取文本文件", filename)
                 return self._parse_text_file(file_path)
-            
+
+            # Office 文档优先使用 markitdown（快速本地转换）
+            if file_ext in MARKITDOWN_EXTENSIONS:
+                logger.info(f"尝试 markitdown 快速转换: {filename}")
+                if on_progress:
+                    on_progress(1, 2, "本地转换", f"正在转换 {filename}...")
+                result = self._parse_with_markitdown(file_path, filename)
+                if result and result.get('success'):
+                    if on_progress:
+                        on_progress(2, 2, "转换完成", "文档已转换为 Markdown")
+                    return result
+                # markitdown 失败，回退到 MinerU
+                logger.info(f"markitdown 失败，回退 MinerU: {filename}")
+
             # PDF 文件检查页数限制
             if file_ext == 'pdf':
                 page_count = self._get_pdf_page_count(file_path)
@@ -118,7 +134,40 @@ class FileParserService:
                 'mineru_folder': None,
                 'error': str(e)
             }
-    
+
+    def _parse_with_markitdown(self, file_path: str, filename: str) -> dict | None:
+        """使用 markitdown 本地转换 Office 文档为 Markdown
+
+        Returns:
+            dict: 成功时返回解析结果 dict
+            None: markitdown 不可用或转换异常时返回 None（触发 MinerU 回退）
+        """
+        try:
+            from markitdown import MarkItDown
+            md = MarkItDown()
+            result = md.convert(file_path)
+
+            if not result.text_content or not result.text_content.strip():
+                return {
+                    'success': False, 'batch_id': None,
+                    'markdown': None, 'images': None,
+                    'mineru_folder': None,
+                    'error': 'markitdown 转换结果为空，可能文档格式不兼容'
+                }
+
+            logger.info(f"markitdown 转换成功: {filename}, {len(result.text_content)} 字符")
+            return {
+                'success': True, 'batch_id': None,
+                'markdown': result.text_content, 'images': [],
+                'mineru_folder': None, 'error': None
+            }
+        except ImportError:
+            logger.warning("markitdown 未安装，回退到 MinerU")
+            return None
+        except Exception as e:
+            logger.warning(f"markitdown 转换失败: {e}，回退到 MinerU")
+            return None
+
     def _get_pdf_page_count(self, file_path: str) -> int:
         """获取 PDF 页数"""
         try:

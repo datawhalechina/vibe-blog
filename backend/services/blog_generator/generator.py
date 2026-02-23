@@ -20,6 +20,7 @@ from .agents.artist import ArtistAgent
 from .agents.questioner import QuestionerAgent
 from .agents.reviewer import ReviewerAgent
 from .agents.assembler import AssemblerAgent
+from .agents.clarification import ClarificationAgent
 from .agents.search_coordinator import SearchCoordinator
 from .agents.humanizer import HumanizerAgent
 from utils.session_tracker import SessionTracker
@@ -30,7 +31,7 @@ from .agents.summary_generator import SummaryGeneratorAgent
 from .middleware import (
     MiddlewarePipeline, TracingMiddleware, ReducerMiddleware,
     ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
-    TaskLogMiddleware,
+    TaskLogMiddleware, VisionMiddleware,
     ErrorTrackingMiddleware, TokenBudgetMiddleware, ContextPrefetchMiddleware,
 )
 from .context_management_middleware import ContextManagementMiddleware
@@ -128,6 +129,10 @@ class BlogGenerator:
 
         # 业务级状态追踪（69.05）
         self.tracker = SessionTracker()
+
+        # 1002.10 主动澄清机制
+        self._env_clarification = os.getenv('CLARIFICATION_ENABLED', 'true').lower() == 'true'
+        self.clarification = ClarificationAgent(_proxy('clarification')) if self._env_clarification else None
         self.summary_generator = SummaryGeneratorAgent(_proxy('summary_generator')) if self._env_summary else None
 
         # 37.12 分层架构校验器（可选）
@@ -142,7 +147,20 @@ class BlogGenerator:
 
         # 102.10 迁移：中间件管道
         self._task_log_middleware = TaskLogMiddleware()
-        self.pipeline = MiddlewarePipeline(middlewares=[
+
+        # 1002.14 视觉能力：初始化图片理解服务和中间件
+        self._image_understanding_service = None
+        self._vision_middleware = None
+        if os.getenv('VISION_ENABLED', 'false').lower() == 'true':
+            try:
+                from services.image_understanding_service import ImageUnderstandingService
+                self._image_understanding_service = ImageUnderstandingService(llm_service=llm_client)
+                self._vision_middleware = VisionMiddleware(image_service=self._image_understanding_service)
+                logger.info("1002.14 VisionMiddleware 已启用")
+            except Exception as e:
+                logger.warning(f"VisionMiddleware 初始化失败: {e}")
+
+        middleware_list = [
             TracingMiddleware(),
             self._task_log_middleware,
             ReducerMiddleware(),
@@ -158,32 +176,42 @@ class BlogGenerator:
             ContextPrefetchMiddleware(
                 knowledge_service=knowledge_service,
             ),
-        ])
+        ]
+        if self._vision_middleware:
+            middleware_list.append(self._vision_middleware)
+
+        self.pipeline = MiddlewarePipeline(middlewares=middleware_list)
 
         # 102.01 迁移：统一并行任务执行引擎
         self.executor = ParallelTaskExecutor()
 
-        # 102.06 迁移：写作方法论技能管理器
+        # 102.06 迁移：写作方法论技能管理器 + 1002.15 统一加载器
+        self._skill_loader = None
         self._writing_skill_manager = None
         if os.getenv('WRITING_SKILL_ENABLED', 'true').lower() == 'true':
             try:
+                from .skills.loader import UnifiedSkillLoader
                 from .skills.writing_skill_manager import WritingSkillManager
-                self._writing_skill_manager = WritingSkillManager()
+                self._skill_loader = UnifiedSkillLoader()
+                self._skill_loader.load(enabled_only=False)
+                self._writing_skill_manager = WritingSkillManager(loader=self._skill_loader)
                 self._writing_skill_manager.load()
-                logger.info("102.06 WritingSkillManager 已启用")
+                logger.info("1002.15 UnifiedSkillLoader + WritingSkillManager 已启用")
             except Exception as e:
-                logger.warning(f"WritingSkillManager 初始化失败: {e}")
+                logger.warning(f"Skills 系统初始化失败: {e}")
 
-        # 102.03 迁移：用户记忆存储
+        # 102.03 迁移：用户记忆存储（1002.05: 使用全局配置单例）
         self._memory_storage = None
-        if os.getenv('MEMORY_ENABLED', 'false').lower() == 'true':
-            try:
-                from .memory import MemoryStorage, BlogMemoryConfig
-                mem_config = BlogMemoryConfig.from_env()
+        try:
+            from .memory.config import get_memory_config, load_memory_config_from_env
+            load_memory_config_from_env()
+            mem_config = get_memory_config()
+            if mem_config.enabled:
+                from .memory import MemoryStorage
                 self._memory_storage = MemoryStorage(storage_path=mem_config.storage_path)
                 logger.info("102.03 MemoryStorage 已启用")
-            except Exception as e:
-                logger.warning(f"MemoryStorage 初始化失败: {e}")
+        except Exception as e:
+            logger.warning(f"MemoryStorage 初始化失败: {e}")
 
         # 构建工作流
         self.workflow = self._build_workflow()
@@ -210,6 +238,7 @@ class BlogGenerator:
         workflow = StateGraph(SharedState)
         
         # 添加节点（102.10 迁移：通过中间件管道包装）
+        workflow.add_node("clarify_topic", self.pipeline.wrap_node("clarify_topic", self._clarify_topic_node))
         workflow.add_node("researcher", self.pipeline.wrap_node("researcher", self._researcher_node))
         workflow.add_node("planner", self.pipeline.wrap_node("planner", self._planner_node))
         workflow.add_node("writer", self.pipeline.wrap_node("writer", self._writer_node))
@@ -234,7 +263,15 @@ class BlogGenerator:
         workflow.add_node("summary_generator", self.pipeline.wrap_node("summary_generator", self._summary_generator_node))
         
         # 定义边
-        workflow.add_edge(START, "researcher")
+        workflow.add_edge(START, "clarify_topic")
+        workflow.add_conditional_edges(
+            "clarify_topic",
+            self._should_clarify,
+            {
+                "clarify": "clarify_topic",  # interrupt 后用户回复，重新分析
+                "continue": "researcher",
+            }
+        )
         workflow.add_edge("researcher", "planner")
         workflow.add_edge("planner", "writer")
         
@@ -300,6 +337,60 @@ class BlogGenerator:
         
         return workflow
     
+    def _clarify_topic_node(self, state: SharedState) -> SharedState:
+        """主动澄清节点 — 分析 topic 是否需要用户补充信息"""
+        if not self.clarification:
+            state['clarification_needed'] = False
+            return state
+
+        logger.info("=== Step 0: 主动澄清检查 ===")
+        result = self.clarification.analyze(state)
+        state.update(result)
+
+        if result.get("clarification_needed"):
+            # 使用 LangGraph interrupt 中断执行，等待用户回复
+            from .agents.clarification import format_clarification_message
+            questions = result.get("clarification_questions", [])
+            interrupt_data = {
+                "type": "clarification_needed",
+                "questions": questions,
+                "formatted_messages": [
+                    format_clarification_message(
+                        question=q.get("question", ""),
+                        clarification_type=q.get("clarification_type", "missing_info"),
+                        context=q.get("context"),
+                        options=q.get("options"),
+                    )
+                    for q in questions
+                ],
+            }
+            user_response = interrupt(interrupt_data)
+
+            # 处理用户回复
+            state['clarification_round'] = state.get('clarification_round', 0) + 1
+            if isinstance(user_response, dict):
+                responses = user_response.get("responses", [])
+                state['clarification_responses'] = responses
+                # 将用户回复追加到 topic 或 source_material
+                if responses:
+                    extra_context = "; ".join(
+                        r.get("answer", "") for r in responses if r.get("answer")
+                    )
+                    if extra_context:
+                        state['source_material'] = (
+                            (state.get('source_material') or '') + "\n\n用户补充: " + extra_context
+                        ).strip()
+                        logger.info(f"用户澄清回复已注入: {extra_context[:80]}...")
+            state['clarification_needed'] = False
+
+        return state
+
+    def _should_clarify(self, state: SharedState) -> Literal["clarify", "continue"]:
+        """判断是否需要澄清（条件边）"""
+        if state.get("clarification_needed"):
+            return "clarify"
+        return "continue"
+
     def _researcher_node(self, state: SharedState) -> SharedState:
         """素材收集节点"""
         if state.get('skip_researcher'):
@@ -1140,6 +1231,8 @@ class BlogGenerator:
                 self.task_log = task_log
                 # 注入到中间件，自动记录每个节点耗时
                 self._task_log_middleware.set_task_log(task_log)
+                if token_tracker:
+                    self._task_log_middleware.set_token_tracker(token_tracker)
         except Exception:
             pass
 

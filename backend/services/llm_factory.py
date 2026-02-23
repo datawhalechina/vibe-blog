@@ -142,6 +142,7 @@ def create_llm_client(
             api_key=api_key,
             temperature=temperature,
             max_tokens=max_tokens,
+            stream_usage=True,
         )
     else:
         _ensure_openai()
