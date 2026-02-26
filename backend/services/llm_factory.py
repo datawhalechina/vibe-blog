@@ -61,6 +61,11 @@ PROVIDER_CONFIGS: Dict[str, Dict[str, Any]] = {
         'type': 'openai',
         'base_url': 'https://open.bigmodel.cn/api/paas/v4',
     },
+    'google': {
+        'env_key': 'GOOGLE_API_KEY',
+        'type': 'openai',
+        'base_url': 'https://grsai.dakka.com.cn/v1',
+    },
 }
 
 # ============ 模型白名单 ============
@@ -79,11 +84,16 @@ ALLOWED_MODELS = {
     ('qwen', 'qwen3-max-preview'),
     ('zhipu', 'glm-4-plus'),
     ('zhipu', 'glm-4'),
+    ('google', 'gemini-3.1-pro'),
+    ('google', 'gemini-3-pro'),
+    ('google', 'gemini-2.5-pro'),
 }
 
 # ============ 预设模型列表 ============
 
 AVAILABLE_MODELS_PRESET = [
+    {'provider': 'google', 'model_name': 'gemini-3.1-pro',
+     'display_name': 'Gemini 3.1 Pro', 'category': 'recommended'},
     {'provider': 'anthropic', 'model_name': 'claude-sonnet-4-20250514',
      'display_name': 'Claude 4 Sonnet', 'category': 'recommended'},
     {'provider': 'openai', 'model_name': 'gpt-4o',

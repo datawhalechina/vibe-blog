@@ -26,7 +26,7 @@ SETTINGS_SCHEMA = {
     'DEFAULT_LLM_PROVIDER': {
         'tab': 'model', 'type': 'select', 'label': 'LLM 提供商',
         'default': 'openai',
-        'options': ['openai', 'anthropic', 'deepseek', 'dashscope', 'zhipu'],
+        'options': ['openai', 'anthropic', 'deepseek', 'dashscope', 'zhipu', 'google'],
     },
     'IMAGE_CAPTION_MODEL': {
         'tab': 'model', 'type': 'str', 'label': '多模态模型',

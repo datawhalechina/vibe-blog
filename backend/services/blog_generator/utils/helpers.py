@@ -230,7 +230,11 @@ def replace_placeholders(
                 replacement = f"![{img.get('caption', '')}]({rendered_path})"
             
             result = result[:match.start()] + replacement + result[match.end():]
-    
+
+    # 清理未被替换的图片占位符（图片数量不足或生成失败的情况）
+    remaining_image_pattern = r'\[IMAGE:\s*[^\]]+\]\n?'
+    result = re.sub(remaining_image_pattern, '', result)
+
     return result
 
 

@@ -114,13 +114,24 @@ class LLMService:
         try:
             # 37.29: 尝试通过 ClientFactory 创建（支持多提供商）
             from services.llm_factory import create_llm_client, PROVIDER_CONFIGS
+            # 根据模型名动态选择 provider（gemini → google, claude → anthropic, 其他 → provider_format）
             provider = self.provider_format
+            api_key = self._openai_api_key or None
+            base_url = self._openai_api_base or None
+            if 'gemini' in model_name.lower() and 'google' in PROVIDER_CONFIGS:
+                provider = 'google'
+                api_key = None  # 让 factory 从环境变量取 GOOGLE_API_KEY
+                base_url = None  # 让 factory 用预设的 base_url
+            elif 'claude' in model_name.lower() and 'anthropic' in PROVIDER_CONFIGS:
+                provider = 'anthropic'
+                api_key = None
+                base_url = None
             if provider in PROVIDER_CONFIGS:
                 return create_llm_client(
                     provider=provider,
                     model_name=model_name,
-                    api_key=self._openai_api_key or None,
-                    base_url=self._openai_api_base or None,
+                    api_key=api_key,
+                    base_url=base_url,
                     max_tokens=self.max_tokens,
                 )
         except (ImportError, ValueError):
@@ -673,8 +684,9 @@ def _infer_provider_format(config: dict) -> str:
     if text_model:
         if 'claude' in text_model.lower():
             return 'anthropic'
+        # gemini 通过 OpenAI 兼容代理调用，走 openai format
         if 'gemini' in text_model.lower():
-            return 'gemini'
+            return 'openai'
 
     # 有 Anthropic key 且没有 OpenAI key → anthropic
     if anthropic_key and not openai_key:
