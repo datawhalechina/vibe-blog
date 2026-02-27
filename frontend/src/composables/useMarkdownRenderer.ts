@@ -39,6 +39,43 @@ marked.use(markedKatex({
  * - 配置 marked 选项
  */
 /**
+ * 修复 LaTeX 公式格式：将行内 $$...$$ 转为独占行的块级公式
+ * LLM 生成的公式经常把 $$ 写在文本同一行，marked-katex-extension 无法识别
+ */
+function fixLatexFormulas(text: string): string {
+  const lines = text.split('\n')
+  const result: string[] = []
+  let inCodeBlock = false
+
+  for (const line of lines) {
+    const stripped = line.trim()
+    if (stripped.startsWith('```')) {
+      inCodeBlock = !inCodeBlock
+      result.push(line)
+      continue
+    }
+    if (inCodeBlock) {
+      result.push(line)
+      continue
+    }
+    // 匹配行内的 $$...$$（同一行内有内容的块级公式）
+    const match = stripped.match(/^(.*?)\$\$(.+?)\$\$(.*)$/)
+    if (match) {
+      const [, before, formula, after] = match
+      if (before.trim()) result.push(before.trim())
+      result.push('')
+      result.push(`$$\n${formula.trim()}\n$$`)
+      result.push('')
+      if (after.trim()) result.push(after.trim())
+    } else {
+      result.push(line)
+    }
+  }
+
+  return result.join('\n')
+}
+
+/**
  * 修复 Markdown 分隔线格式：确保 --- 前后都有空行
  * 防止 Setext 标题误判（文本紧挨 --- 会被渲染为加粗标题）和 ---## 连写
  */
@@ -90,7 +127,7 @@ export function useMarkdownRenderer(content?: string) {
    */
   const renderedContent = computed(() => {
     if (!content) return ''
-    const fixed = fixMarkdownSeparators(content)
+    const fixed = fixLatexFormulas(fixMarkdownSeparators(content))
     return marked(fixed)
   })
 
@@ -99,7 +136,7 @@ export function useMarkdownRenderer(content?: string) {
    */
   function renderMarkdown(text: string): string {
     if (!text) return ''
-    const fixed = fixMarkdownSeparators(text)
+    const fixed = fixLatexFormulas(fixMarkdownSeparators(text))
     return marked(fixed) as string
   }
 
