@@ -28,6 +28,7 @@ marked.use(markedHighlight({
 marked.use(markedKatex({
   throwOnError: false,
   output: 'htmlAndMathml',
+  nonStandard: true,
 }))
 
 /**

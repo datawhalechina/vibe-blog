@@ -112,3 +112,6 @@ backend/test_*.py
 backend/test_*.md
 backend/data/
 backend/outputs/
+deploy.sh
+remote_deploy.sh
+deploy_only.sh
