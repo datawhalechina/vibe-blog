@@ -194,10 +194,10 @@ class TestGeneratorTrackerIntegration:
         assert "self.tracker.log_deepen_snapshot" in source
 
     def test_coder_and_artist_node_calls_tracker(self):
-        """ST14c: _coder_and_artist_node 调用 tracker.log_image_generation"""
+        """ST14c: _wait_for_images_node 调用 tracker.log_image_generation（配图异步化后 tracker 移至此处）"""
         import inspect
         from services.blog_generator.generator import BlogGenerator
-        source = inspect.getsource(BlogGenerator._coder_and_artist_node)
+        source = inspect.getsource(BlogGenerator._wait_for_images_node)
         assert "self.tracker.log_image_generation" in source
 
 

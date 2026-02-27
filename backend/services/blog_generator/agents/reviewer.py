@@ -132,9 +132,16 @@ class ReviewerAgent:
             content = section.get('content', '')
 
             # 提取子标题（只取 ### 级，## 级通常是章节自身标题，已在骨架顶行体现）
+            # 跳过代码块内的 ### 避免误判
             sub_headings = []
+            in_code_block = False
             for line in content.split('\n'):
                 stripped = line.strip()
+                if stripped.startswith('```'):
+                    in_code_block = not in_code_block
+                    continue
+                if in_code_block:
+                    continue
                 if stripped.startswith('### '):
                     heading_text = stripped[4:].strip()
                     if heading_text:

@@ -277,8 +277,14 @@ def run_r8_skeleton_prompt(_llm_client=None) -> tuple:
         content = section.get("content", "")
 
         sub_headings = []
+        in_code_block = False
         for line in content.split("\n"):
             stripped = line.strip()
+            if stripped.startswith("```"):
+                in_code_block = not in_code_block
+                continue
+            if in_code_block:
+                continue
             if stripped.startswith("### "):
                 heading_text = stripped[4:].strip()
                 if heading_text:

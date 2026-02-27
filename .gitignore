@@ -65,8 +65,6 @@ env/
 # .windsurf/
 # .shared/
 /outputs
-/results
-/zzz_draft
 
 # 日志文件
 *.log
