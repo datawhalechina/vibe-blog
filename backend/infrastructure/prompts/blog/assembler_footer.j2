@@ -11,6 +11,15 @@
 
 {{ next_steps }}
 
+{% if cited_footnotes %}
+## 参考文献
+
+{% for fn in cited_footnotes %}
+<a id="ref-{{ fn[0] }}"></a>\[{{ fn[0] }}\] [{{ fn[1] }}]({{ fn[2] }})
+
+{% endfor %}
+{% endif %}
+{% if reference_links or document_references %}
 ## 参考资料
 
 {% if document_references %}
@@ -31,4 +40,5 @@
 {{ loop.index }}. {{ link }}
 {% endif %}
 {% endfor %}
+{% endif %}
 {% endif %}

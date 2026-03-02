@@ -103,30 +103,84 @@ class AssemblerAgent:
 
         return result
 
-    def replace_source_references(self, content: str, search_results: List[Dict]) -> str:
-        """
-        Replace {source_NNN} placeholders with actual source links.
+    @staticmethod
+    def _normalize_url(url: str) -> str:
+        """Normalize URL for deduplication: lowercase, strip trailing slash."""
+        return url.strip().rstrip('/').lower() if url else ''
 
-        Args:
-            content: Markdown content with {source_NNN} placeholders
-            search_results: List of search results (1-indexed in placeholders)
+    def build_footnote_map(
+        self,
+        sections: List[Dict[str, Any]],
+        search_results: List[Dict],
+    ) -> tuple:
+        """
+        Scan all sections for {source_NNN} placeholders and build a
+        deduplicated, globally-numbered footnote mapping.
 
         Returns:
-            Content with placeholders replaced by markdown links
+            (footnote_map, footnote_list)
+            - footnote_map: {normalized_url: footnote_number}
+            - footnote_list: [(number, title, url), ...] ordered by first appearance
+        """
+        footnote_map: Dict[str, int] = {}
+        footnote_list: List[tuple] = []
+        next_number = 1
+
+        if not search_results:
+            return footnote_map, footnote_list
+
+        for section in sections:
+            content = section.get('content', '')
+            for match in re.finditer(r'\{source_(\d{1,3})\}', content):
+                idx = int(match.group(1))
+                if not (0 < idx <= len(search_results)):
+                    continue
+                source = search_results[idx - 1]
+                url = source.get('source', source.get('url', ''))
+                if not url:
+                    continue
+                norm = self._normalize_url(url)
+                if norm not in footnote_map:
+                    title = source.get('title', '来源')
+                    footnote_map[norm] = next_number
+                    footnote_list.append((next_number, title, url))
+                    next_number += 1
+
+        return footnote_map, footnote_list
+
+    def replace_source_references(
+        self,
+        content: str,
+        search_results: List[Dict],
+        footnote_map: Dict[str, int] = None,
+    ) -> str:
+        """
+        Replace {source_NNN} placeholders with numbered footnote markers.
+
+        When footnote_map is provided, produces `<sup>[[N]](#ref-N)</sup>`.
+        Falls back to the legacy inline-link format when footnote_map is None.
         """
         if not search_results:
             return content
 
         def replace_match(match):
             idx = int(match.group(1))
-            if 0 < idx <= len(search_results):
-                source = search_results[idx - 1]
-                title = source.get('title', '来源')
-                url = source.get('source', source.get('url', ''))
-                if url:
-                    return f"（[{title}]({url})）"
-                return f"（{title}）"
-            return match.group(0)  # Keep original if index out of range
+            if not (0 < idx <= len(search_results)):
+                return match.group(0)
+
+            source = search_results[idx - 1]
+            url = source.get('source', source.get('url', ''))
+
+            if footnote_map is not None and url:
+                norm = self._normalize_url(url)
+                fn = footnote_map.get(norm)
+                if fn is not None:
+                    return f'<sup>[[{fn}]](#ref-{fn})</sup>'
+
+            title = source.get('title', '来源')
+            if url:
+                return f"（[{title}]({url})）"
+            return f"（{title}）"
 
         return re.sub(r'\{source_(\d{1,3})\}', replace_match, content)
     
@@ -176,7 +230,10 @@ class AssemblerAgent:
             sections=toc_sections
         )
         
-        # 3. 组装章节内容
+        # 3. 全局收集脚注映射（Phase 1: scan & deduplicate）
+        footnote_map, footnote_list = self.build_footnote_map(sections, search_results)
+
+        # 4. 组装章节内容（Phase 2: replace placeholders）
         body_parts = []
         for section in sections:
             content = section.get('content', '')
@@ -187,30 +244,43 @@ class AssemblerAgent:
             # 替换占位符，传入章节的 image_ids 用于精确匹配
             content = replace_placeholders(content, code_blocks, images, image_ids=section_image_ids)
 
-            # 替换 {source_NNN} 为实际来源链接
+            # 替换 {source_NNN} 为编号脚注标记
             if search_results:
-                content = self.replace_source_references(content, search_results)
+                content = self.replace_source_references(content, search_results, footnote_map)
 
             body_parts.append(content)
         
         body = '\n\n---\n\n'.join(body_parts)
         
-        # 4. 生成文章尾部（支持分类展示参考来源）
+        # 5. 分离已引用和未引用的参考链接
+        reference_links = outline.get('reference_links', [])
+        cited_urls = set(footnote_map.keys())
+        uncited_references = []
+        for link in reference_links:
+            if isinstance(link, dict):
+                url = link.get('url', '')
+            else:
+                url = str(link)
+            if self._normalize_url(url) not in cited_urls:
+                uncited_references.append(link)
+
+        # 6. 生成文章尾部
         conclusion = outline.get('conclusion', {})
         footer = pm.render_assembler_footer(
             summary_points=conclusion.get('summary_points', []),
             next_steps=conclusion.get('next_steps', ''),
-            reference_links=outline.get('reference_links', []),
-            document_references=document_references or []
+            reference_links=uncited_references,
+            document_references=document_references or [],
+            cited_footnotes=footnote_list,
         )
         
-        # 5. 组装完整文档
+        # 7. 组装完整文档
         full_document = header + body + footer
         
-        # 6. 修复 Markdown 分隔线格式（防止 ---## 连写和 Setext 标题误判）
+        # 8. 修复 Markdown 分隔线格式（防止 ---## 连写和 Setext 标题误判）
         full_document = _fix_markdown_separators(full_document)
         
-        # 7. 统计信息
+        # 9. 统计信息
         word_count = len(full_document)
         image_count = len(images)
         code_block_count = len(code_blocks)
