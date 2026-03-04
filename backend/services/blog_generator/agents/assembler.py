@@ -175,7 +175,8 @@ class AssemblerAgent:
                 norm = self._normalize_url(url)
                 fn = footnote_map.get(norm)
                 if fn is not None:
-                    return f'<sup>[[{fn}]](#ref-{fn})</sup>'
+                    escaped_url = url.replace('"', '&quot;')
+                    return f'<sup><a href="#ref-{fn}" data-source-url="{escaped_url}">[{fn}]</a></sup>'
 
             title = source.get('title', '来源')
             if url:

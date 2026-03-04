@@ -2,7 +2,7 @@
  * 引用匹配工具 — 将文章中的 <a> 链接与 citations 数据匹配
  * 支持两种格式：
  *   1. 外部 URL 链接（旧格式）：<a href="https://...">标题</a>
- *   2. 脚注锚点链接（新格式）：<sup><a href="#ref-N">[N]</a></sup>
+ *   2. 脚注锚点链接（新格式）：<sup><a href="#ref-N" data-source-url="..."></a></sup>
  */
 
 export interface Citation {
@@ -23,14 +23,6 @@ function normalizeUrl(url: string): string {
   } catch {
     return url.replace(/\/+$/, '').toLowerCase()
   }
-}
-
-/**
- * 从 href="#ref-N" 中提取脚注编号 N，不匹配则返回 -1
- */
-function parseFootnoteIndex(href: string): number {
-  const m = href.match(/^#ref-(\d+)$/)
-  return m ? parseInt(m[1], 10) : -1
 }
 
 /**
@@ -69,12 +61,16 @@ export function scanCitationLinks(
   links.forEach((link) => {
     const href = link.getAttribute('href') || ''
 
-    // New format: footnote anchor #ref-N
-    const fnIndex = parseFootnoteIndex(href)
-    if (fnIndex > 0 && fnIndex <= citations.length) {
-      const citation = citations[fnIndex - 1]
-      results.push({ element: link, citation, index: fnIndex })
-      return
+    // New format: footnote anchor with data-source-url for reliable matching
+    const sourceUrl = link.getAttribute('data-source-url')
+    if (sourceUrl && href.startsWith('#ref-')) {
+      const fnMatch = href.match(/^#ref-(\d+)$/)
+      const fnIndex = fnMatch ? parseInt(fnMatch[1], 10) : 0
+      const matched = matchCitation(sourceUrl, citations)
+      if (matched) {
+        results.push({ element: link, citation: matched, index: fnIndex || (citations.indexOf(matched) + 1) })
+        return
+      }
     }
 
     // Legacy format: external URL

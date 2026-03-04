@@ -131,7 +131,9 @@ class TestReplaceSourceReferences:
         result = agent.replace_source_references(
             '效率提升 {source_001}', SEARCH_RESULTS, fn_map
         )
-        assert '<sup>[[1]](#ref-1)</sup>' in result
+        assert 'href="#ref-1"' in result
+        assert 'data-source-url="https://example.com/redis"' in result
+        assert '[1]</a></sup>' in result
         assert '{source_001}' not in result
 
     def test_same_source_same_number(self):
@@ -140,7 +142,7 @@ class TestReplaceSourceReferences:
         sections = [{'content': content}]
         fn_map, _ = agent.build_footnote_map(sections, SEARCH_RESULTS)
         result = agent.replace_source_references(content, SEARCH_RESULTS, fn_map)
-        assert result.count('<sup>[[1]](#ref-1)</sup>') == 2
+        assert result.count('href="#ref-1"') == 2
 
     def test_out_of_range_preserved(self):
         agent = _make_assembler()
@@ -168,7 +170,8 @@ class TestReplaceSourceReferences:
         assert fn_list[0][2] == 'https://example.com/cache'
 
         result = agent.replace_source_references('{source_002}', SEARCH_RESULTS, fn_map)
-        assert '<sup>[[1]](#ref-1)</sup>' in result
+        assert 'href="#ref-1"' in result
+        assert 'data-source-url="https://example.com/cache"' in result
 
 
 class TestNormalizeUrl:
