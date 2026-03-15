@@ -6,6 +6,21 @@ import re
 import hashlib
 from typing import List, Dict, Any
 from collections import OrderedDict
+from urllib.parse import urlsplit, urlunsplit
+
+
+def _normalize_url(url: str) -> str:
+    """标准化 URL，用于去重比较。"""
+    if not url:
+        return ""
+
+    try:
+        parts = urlsplit(url.strip())
+        path = parts.path.rstrip('/') or '/'
+        return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, parts.query, ''))
+    except Exception:
+        return url.strip().rstrip('/')
+
 
 
 def deduplicate_by_url(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -22,7 +37,8 @@ def deduplicate_by_url(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     unique_results = []
     
     for item in results:
-        url = item.get('url', '')
+        raw_url = item.get('url') or item.get('source') or ''
+        url = _normalize_url(raw_url)
         if url and url not in seen_urls:
             seen_urls.add(url)
             unique_results.append(item)
