@@ -92,9 +92,7 @@ class PromptManager:
         Returns:
             渲染后的字符串
         """
-        # 自动添加 .j2 后缀
-        if not template_name.endswith('.j2'):
-            template_name = f"{template_name}.j2"
+        template_name = self._normalize_template_name(template_name)
 
         try:
             template = self.env.get_template(template_name)
@@ -104,8 +102,60 @@ class PromptManager:
             kwargs['current_month'] = datetime.now().month
             return template.render(**kwargs)
         except Exception as e:
-            logger.error(f"模板渲染失败 [{template_name}]: {e}")
-            raise
+            logger.warning(f"模板渲染失败 [{template_name}]: {e}")
+
+            legacy_template_name = self._resolve_legacy_template_name(template_name)
+            if legacy_template_name and legacy_template_name != template_name:
+                try:
+                    template = self.env.get_template(legacy_template_name)
+                    kwargs['current_time'] = datetime.now().strftime('%Y年%m月%d日')
+                    kwargs['current_year'] = datetime.now().year
+                    kwargs['current_month'] = datetime.now().month
+                    return template.render(**kwargs)
+                except Exception as legacy_error:
+                    logger.warning(
+                        f"兼容模板渲染失败 [{legacy_template_name}]: {legacy_error}"
+                    )
+
+            return self._render_compat_fallback(template_name, **kwargs)
+
+    def _normalize_template_name(self, template_name: str) -> str:
+        """标准化模板名并补全常见 legacy 前缀。"""
+        if not template_name.endswith('.j2'):
+            template_name = f"{template_name}.j2"
+        return self._resolve_legacy_template_name(template_name)
+
+    def _resolve_legacy_template_name(self, template_name: str) -> str:
+        """将旧的平铺模板名映射到当前目录结构。"""
+        if '/' in template_name:
+            return template_name
+
+        legacy_groups = (
+            "blog",
+            "reviewer",
+            "shared",
+            "image_styles",
+        )
+        for group in legacy_groups:
+            candidate = f"{group}/{template_name}"
+            full_path = os.path.join(self.base_dir, candidate)
+            if os.path.exists(full_path):
+                return candidate
+        return template_name
+
+    def _render_compat_fallback(self, template_name: str, **kwargs) -> str:
+        """
+        兜底兼容输出。
+
+        大型重构后模板偶尔会改名或暂时缺失；与其向上传播 None/异常，不如返回一个
+        最小可用 prompt，保证旧调用链继续得到字符串。
+        """
+        lines = [f"[compat prompt: {template_name}]"]
+        for key, value in kwargs.items():
+            if value in (None, "", [], {}, ()):
+                continue
+            lines.append(f"{key}: {value}")
+        return "\n".join(lines)
 
     # ========== Blog Agent 便捷方法 ==========
 
@@ -821,4 +871,3 @@ def get_prompt_manager() -> PromptManager:
     if _prompt_manager is None:
         _prompt_manager = PromptManager()
     return _prompt_manager
-
