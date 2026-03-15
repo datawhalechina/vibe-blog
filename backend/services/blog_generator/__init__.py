@@ -1,23 +1,34 @@
 """
-长文博客生成器 - Multi-Agent 协同生成系统
+长文博客生成器 - Multi-Agent 协同生成系统。
 
-基于 LangGraph 实现的技术博客自动生成系统，包含以下 Agent:
-- Researcher: 联网搜索收集背景资料
-- Planner: 大纲规划
-- Writer: 内容撰写
-- Coder: 代码示例生成
-- Artist: 配图生成
-- Questioner: 追问深化
-- Reviewer: 质量审核
-- Assembler: 文档组装
+这里保留旧导出接口，但避免包导入时立刻加载 `generator.py`，否则仅导入并行执行器、
+prompt manager 等轻量模块时也会被 `langgraph` 等可选依赖阻塞。
 """
 
-from .generator import BlogGenerator
-from .services.search_service import SearchService, init_search_service, get_search_service
+from importlib import import_module
 
-__all__ = [
-    'BlogGenerator',
-    'SearchService',
-    'init_search_service',
-    'get_search_service',
-]
+_EXPORTS = {
+    "BlogGenerator": ("services.blog_generator.generator", "BlogGenerator"),
+    "SearchService": ("services.blog_generator.services.search_service", "SearchService"),
+    "init_search_service": (
+        "services.blog_generator.services.search_service",
+        "init_search_service",
+    ),
+    "get_search_service": (
+        "services.blog_generator.services.search_service",
+        "get_search_service",
+    ),
+}
+
+__all__ = list(_EXPORTS)
+
+
+def __getattr__(name):
+    if name not in _EXPORTS:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+    module_name, attr_name = _EXPORTS[name]
+    module = import_module(module_name)
+    value = getattr(module, attr_name)
+    globals()[name] = value
+    return value

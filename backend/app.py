@@ -3,7 +3,13 @@ vibe-blog 后端应用入口
 技术科普绘本生成器
 """
 import os
-from dotenv import load_dotenv
+
+try:
+    from dotenv import load_dotenv
+except ImportError:  # pragma: no cover - optional in stripped test envs
+    def load_dotenv(*args, **kwargs):
+        return False
+
 from logging_config import setup_logging
 
 # 加载 .env 文件

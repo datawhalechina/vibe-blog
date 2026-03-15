@@ -4,18 +4,6 @@ from flask import Flask
 from flask_cors import CORS
 
 from config import get_config
-from services import (
-    init_llm_service, init_image_service, init_blog_service, init_search_service,
-    get_search_service, get_llm_service, get_image_service
-)
-from services.oss_service import init_oss_service, get_oss_service
-from services.video_service import init_video_service, get_video_service
-from services.database_service import init_db_service
-from services.file_parser_service import init_file_parser
-from services.knowledge_service import init_knowledge_service, get_knowledge_service
-
-# Import Blueprints
-from api.routes import blog, media, tasks, knowledge, system, pages
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +43,19 @@ def create_app(config_class=None):
 
 def init_services(app):
     """初始化应用服务"""
+    from services import (
+        init_llm_service,
+        init_image_service,
+        get_search_service,
+        get_llm_service,
+    )
+    from services.oss_service import init_oss_service, get_oss_service
+    from services.video_service import init_video_service, get_video_service
+    from services.database_service import init_db_service
+    from services.file_parser_service import init_file_parser
+    from services.knowledge_service import init_knowledge_service, get_knowledge_service
+    from routes.blog_routes import init_blog_services
+
     # 1. LLM
     init_llm_service(app.config)
     
@@ -85,21 +86,8 @@ def init_services(app):
     )
     
     # 6. Search & Blog
-    try:
-        init_search_service(app.config)
-        search_service = get_search_service()
-        if search_service and search_service.is_available():
-            logger.info("智谱搜索服务已初始化")
-        else:
-            logger.warning("智谱搜索服务不可用，Researcher Agent 将跳过联网搜索")
-            
-        llm_service = get_llm_service()
-        knowledge_service = get_knowledge_service()
-        if llm_service and llm_service.is_available():
-            init_blog_service(llm_service, search_service, knowledge_service)
-            logger.info("博客生成服务已初始化（含知识融合支持）")
-    except Exception as e:
-        logger.warning(f"博客生成服务初始化失败: {e}")
+    # 兼容旧初始化流程：这里会额外初始化 Serper / 搜狗，并保留旧日志语义。
+    init_blog_services(app.config)
         
     # 7. File Parser
     mineru_token = app.config.get('MINERU_TOKEN', '')
@@ -149,12 +137,10 @@ def init_services(app):
 
 def register_blueprints(app):
     """注册路由蓝图"""
-    app.register_blueprint(blog.bp)
-    app.register_blueprint(media.bp)
-    app.register_blueprint(tasks.bp)
-    app.register_blueprint(knowledge.bp)
-    app.register_blueprint(system.bp)
-    app.register_blueprint(pages.bp)
+    # 兼容旧路由路径；create_app 仍保留 app factory 结构，但默认注册 legacy blueprints。
+    from routes import register_all_blueprints
+
+    register_all_blueprints(app)
     
     # Reviewer Routes (External module)
     if os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true':
