@@ -88,6 +88,9 @@ yarn-error.log
 .npm
 .eslintcache
 
+# 前端构建产物
+frontend/dist/
+
 # 操作系统
 .DS_Store
 Thumbs.db

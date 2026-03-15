@@ -476,6 +476,10 @@ _点击问题，自动跳转到原文位置，方便快速定位和修改_
 
    ```bash
    pip install -r requirements.txt
+
+   # 前端依赖
+   cd frontend
+   npm install
    ```
 
 4. **配置环境变量**
@@ -508,7 +512,13 @@ _点击问题，自动跳转到原文位置，方便快速定位和修改_
 5. **启动服务**
 
    ```bash
+   # 后端
+   cd backend
    python app.py
+
+   # 前端
+   cd frontend
+   npm run dev
    ```
 
 6. **访问应用**

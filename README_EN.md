@@ -274,6 +274,10 @@ All Agents share unified state management and Prompt template library, ensuring 
 
    ```bash
    pip install -r requirements.txt
+
+   # frontend dependencies
+   cd frontend
+   npm install
    ```
 
 4. **Configure environment variables**
@@ -305,7 +309,13 @@ All Agents share unified state management and Prompt template library, ensuring 
 5. **Start the service**
 
    ```bash
+   # backend
+   cd backend
    python app.py
+
+   # frontend
+   cd frontend
+   npm run dev
    ```
 
 6. **Access the application**
