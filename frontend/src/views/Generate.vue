@@ -117,15 +117,49 @@
               <!-- DeerFlow ScrollContainer 滚动阴影 -->
               <div class="scroll-shadow scroll-shadow-top"></div>
               <div class="scroll-shadow scroll-shadow-bottom"></div>
-              <textarea
-                v-if="isEditing"
-                ref="editTextareaRef"
-                v-model="editableContent"
-                class="edit-textarea"
-                @mouseup="handleTextSelection"
-                @keyup="handleTextSelection"
-                @scroll="closePolishDialog"
-              ></textarea>
+              <div v-if="isEditing" ref="editAreaRef" class="edit-area">
+                <div
+                  v-if="showSelectionToolbar"
+                  class="selection-toolbar"
+                  :style="{
+                    top: `${selectionToolbarPosition.top}px`,
+                    left: `${selectionToolbarPosition.left}px`,
+                  }"
+                  @mousedown.prevent
+                >
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="加粗" @click="applyMarkdownFormat('bold')">
+                    <Bold :size="15" />
+                  </Button>
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="斜体" @click="applyMarkdownFormat('italic')">
+                    <Italic :size="15" />
+                  </Button>
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="行内代码" @click="applyMarkdownFormat('code')">
+                    <Code2 :size="15" />
+                  </Button>
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="标题" @click="applyMarkdownFormat('heading')">
+                    <Heading2 :size="15" />
+                  </Button>
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="引用" @click="applyMarkdownFormat('quote')">
+                    <Quote :size="15" />
+                  </Button>
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="无序列表" @click="applyMarkdownFormat('list')">
+                    <List :size="15" />
+                  </Button>
+                  <div class="selection-toolbar-divider"></div>
+                  <Button variant="ghost" size="icon" class="h-8 w-8" title="润色" @click="openPolishDialog">
+                    <Sparkles :size="15" />
+                  </Button>
+                </div>
+                <textarea
+                  ref="editTextareaRef"
+                  v-model="editableContent"
+                  class="edit-textarea"
+                  @mouseup="handleTextSelection"
+                  @keyup="handleTextSelection"
+                  @scroll="handleEditScroll"
+                  @input="handleEditInput"
+                ></textarea>
+              </div>
               <div v-else-if="previewContent" id="preview-content" ref="previewRef" class="preview-panel" v-html="renderedHtml"></div>
               <div v-else class="preview-empty">
                 <div class="preview-empty-icon">📝</div>
@@ -179,19 +213,33 @@
       <DialogContent class="max-w-lg font-mono">
         <DialogHeader>
           <DialogTitle>润色</DialogTitle>
-          <DialogDescription>选中的文本会按你的目标由 AI 改写，并直接替换原文。</DialogDescription>
+          <DialogDescription>先生成润色结果，确认后再替换原文。</DialogDescription>
         </DialogHeader>
 
         <div class="polish-dialog-body">
-          <div class="polish-selected-text">{{ selectedTextPreview }}</div>
+          <div class="polish-panel">
+            <div class="polish-panel-label">原文</div>
+            <div class="polish-selected-text">{{ selectedTextPreview }}</div>
+          </div>
           <Input
             v-model="polishInstruction"
             placeholder="输入润色目标，例如：更专业、更简洁、更口语化"
             @keydown.enter="handlePolish"
           />
+          <div v-if="polishedTextPreview" class="polish-panel">
+            <div class="polish-panel-label">润色结果</div>
+            <div class="polish-selected-text polish-result-text">{{ polishedTextPreview }}</div>
+          </div>
           <div class="polish-dialog-actions">
             <Button variant="outline" @click="closePolishDialog">取消</Button>
-            <Button :disabled="polishLoading || !canPolish" @click="handlePolish">
+            <Button v-if="polishedTextPreview" variant="outline" :disabled="polishLoading || !canPolish" @click="handlePolish">
+              <Loader2 v-if="polishLoading" class="animate-spin" />
+              <span>{{ polishLoading ? '润色中...' : '重新润色' }}</span>
+            </Button>
+            <Button v-if="polishedTextPreview" :disabled="polishLoading" @click="applyPolishedText">
+              确认替换
+            </Button>
+            <Button v-else :disabled="polishLoading || !canPolish" @click="handlePolish">
               <Loader2 v-if="polishLoading" class="animate-spin" />
               <span>{{ polishLoading ? '润色中...' : '开始润色' }}</span>
             </Button>
@@ -212,7 +260,24 @@ import { useTypingAnimation } from '@/composables/useTypingAnimation'
 import { useResizableSplit } from '@/composables/useResizableSplit'
 import { scanCitationLinks } from '@/utils/citationMatcher'
 import type { Citation } from '@/utils/citationMatcher'
-import { Square, Pencil, Undo2, Copy, Check, GraduationCap, Settings as SettingsIcon, X as XIcon, Loader2 } from 'lucide-vue-next'
+import {
+  Square,
+  Pencil,
+  Undo2,
+  Copy,
+  Check,
+  GraduationCap,
+  Settings as SettingsIcon,
+  X as XIcon,
+  Loader2,
+  Bold,
+  Italic,
+  Code2,
+  Heading2,
+  Quote,
+  List,
+  Sparkles,
+} from 'lucide-vue-next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -259,6 +324,7 @@ const exportComposable = useExport()
 const copied = ref(false)
 const isEditing = ref(false)
 const editableContent = ref('')
+const editAreaRef = ref<HTMLElement | null>(null)
 const editTextareaRef = ref<HTMLTextAreaElement | null>(null)
 const { renderMarkdown } = useMarkdownRenderer()
 
@@ -315,18 +381,22 @@ const tooltipCitation = ref<Citation | null>(null)
 const tooltipIndex = ref(0)
 const tooltipPosition = ref({ top: 0, left: 0 })
 const showPolishDialog = ref(false)
+const showSelectionToolbar = ref(false)
 const polishInstruction = ref('')
 const polishLoading = ref(false)
+const polishedText = ref('')
 const selectedText = ref('')
 const selectionRange = ref({ start: 0, end: 0 })
+const selectionToolbarPosition = ref({ top: 0, left: 0 })
 const selectedTextPreview = computed(() => selectedText.value.trim())
+const polishedTextPreview = computed(() => polishedText.value.trim())
 const canPolish = computed(() => selectedTextPreview.value.length > 0)
 
 // 编辑模式切换（对齐 DeerFlow research-block.tsx:633）
 const toggleEdit = () => {
   if (isEditing.value) {
     // 撤销：恢复原始内容
-    closePolishDialog()
+    resetSelectionState()
     editableContent.value = ''
     isEditing.value = false
   } else {
@@ -336,34 +406,181 @@ const toggleEdit = () => {
   }
 }
 
-const closePolishDialog = () => {
+const resetSelectionState = () => {
   showPolishDialog.value = false
+  showSelectionToolbar.value = false
   polishLoading.value = false
+  polishedText.value = ''
   polishInstruction.value = ''
   selectedText.value = ''
   selectionRange.value = { start: 0, end: 0 }
 }
 
-const handleTextSelection = () => {
+const closePolishDialog = () => {
+  resetSelectionState()
+}
+
+const updateSelectionToolbarPosition = (start: number, end: number) => {
+  const textarea = editTextareaRef.value
+  const editArea = editAreaRef.value
+  if (!textarea || !editArea) return
+
+  const textareaRect = textarea.getBoundingClientRect()
+  const editAreaRect = editArea.getBoundingClientRect()
+  const mirror = document.createElement('div')
+  const mirrorStyle = window.getComputedStyle(textarea)
+
+  const styleKeys = [
+    'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
+    'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
+    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+    'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
+    'fontFamily', 'lineHeight', 'letterSpacing', 'textAlign', 'textTransform',
+    'textIndent', 'textDecoration', 'tabSize'
+  ] as const
+
+  mirror.style.position = 'fixed'
+  mirror.style.top = `${textareaRect.top}px`
+  mirror.style.left = `${textareaRect.left}px`
+  mirror.style.whiteSpace = 'pre-wrap'
+  mirror.style.wordBreak = 'break-word'
+  mirror.style.pointerEvents = 'none'
+  mirror.style.visibility = 'hidden'
+
+  styleKeys.forEach((key) => {
+    mirror.style[key] = mirrorStyle[key]
+  })
+
+  mirror.textContent = editableContent.value.slice(0, start)
+
+  const selectedSpan = document.createElement('span')
+  selectedSpan.textContent = editableContent.value.slice(start, end) || ' '
+  mirror.appendChild(selectedSpan)
+
+  document.body.appendChild(mirror)
+  mirror.scrollTop = textarea.scrollTop
+  mirror.scrollLeft = textarea.scrollLeft
+
+  const selectedRect = selectedSpan.getBoundingClientRect()
+  document.body.removeChild(mirror)
+
+  const rawTop = selectedRect.top - editAreaRect.top - 12
+  const rawLeft = selectedRect.left - editAreaRect.left + (selectedRect.width / 2)
+  const clampedLeft = Math.min(Math.max(rawLeft, 72), Math.max(editAreaRect.width - 72, 72))
+
+  selectionToolbarPosition.value = {
+    top: Math.max(rawTop, 8),
+    left: clampedLeft,
+  }
+}
+
+const handleTextSelection = async () => {
   const textarea = editTextareaRef.value
   if (!textarea) return
 
   const start = textarea.selectionStart ?? 0
   const end = textarea.selectionEnd ?? 0
   if (end <= start) {
-    closePolishDialog()
+    resetSelectionState()
     return
   }
 
   const rawSelectedText = editableContent.value.slice(start, end)
   if (!rawSelectedText.trim()) {
-    closePolishDialog()
+    resetSelectionState()
     return
   }
 
   selectionRange.value = { start, end }
   selectedText.value = rawSelectedText
+  polishedText.value = ''
+  showPolishDialog.value = false
+  await nextTick()
+  updateSelectionToolbarPosition(start, end)
+  showSelectionToolbar.value = true
+}
+
+const updateSelectionAfterEdit = async (start: number, end: number) => {
+  await nextTick()
+  const textarea = editTextareaRef.value
+  if (!textarea) return
+  textarea.focus()
+  textarea.setSelectionRange(start, end)
+  selectionRange.value = { start, end }
+  selectedText.value = editableContent.value.slice(start, end)
+  updateSelectionToolbarPosition(start, end)
+  showSelectionToolbar.value = true
+}
+
+const applyWrappedFormat = async (prefix: string, suffix: string = prefix) => {
+  const { start, end } = selectionRange.value
+  if (end <= start) return
+
+  const selection = editableContent.value.slice(start, end)
+  editableContent.value = `${editableContent.value.slice(0, start)}${prefix}${selection}${suffix}${editableContent.value.slice(end)}`
+  previewContent.value = editableContent.value
+  await updateSelectionAfterEdit(start + prefix.length, end + prefix.length)
+}
+
+const applyLinePrefixFormat = async (prefix: string) => {
+  const { start, end } = selectionRange.value
+  if (end <= start) return
+
+  const lineStart = editableContent.value.lastIndexOf('\n', start - 1) + 1
+  const selectedBlock = editableContent.value.slice(lineStart, end)
+  const formattedBlock = selectedBlock
+    .split('\n')
+    .map(line => `${prefix}${line}`)
+    .join('\n')
+
+  editableContent.value = `${editableContent.value.slice(0, lineStart)}${formattedBlock}${editableContent.value.slice(end)}`
+  previewContent.value = editableContent.value
+  await updateSelectionAfterEdit(lineStart, lineStart + formattedBlock.length)
+}
+
+const applyMarkdownFormat = async (type: 'bold' | 'italic' | 'code' | 'heading' | 'quote' | 'list') => {
+  if (!canPolish.value) return
+
+  if (type === 'bold') {
+    await applyWrappedFormat('**')
+    return
+  }
+  if (type === 'italic') {
+    await applyWrappedFormat('*')
+    return
+  }
+  if (type === 'code') {
+    await applyWrappedFormat('`')
+    return
+  }
+  if (type === 'heading') {
+    await applyLinePrefixFormat('## ')
+    return
+  }
+  if (type === 'quote') {
+    await applyLinePrefixFormat('> ')
+    return
+  }
+  await applyLinePrefixFormat('- ')
+}
+
+const openPolishDialog = () => {
+  if (!canPolish.value) return
+  polishedText.value = ''
+  showSelectionToolbar.value = false
   showPolishDialog.value = true
+}
+
+const handleEditScroll = () => {
+  showSelectionToolbar.value = false
+  if (showPolishDialog.value) {
+    closePolishDialog()
+  }
+}
+
+const handleEditInput = () => {
+  previewContent.value = editableContent.value
+  showSelectionToolbar.value = false
 }
 
 const handlePolish = async () => {
@@ -376,25 +593,33 @@ const handlePolish = async () => {
       throw new Error(result.error || '润色失败')
     }
 
-    const { start, end } = selectionRange.value
-    const polishedText = result.polished_text
-    editableContent.value = `${editableContent.value.slice(0, start)}${polishedText}${editableContent.value.slice(end)}`
-    previewContent.value = editableContent.value
-
-    closePolishDialog()
-
-    await nextTick()
-    const textarea = editTextareaRef.value
-    if (textarea) {
-      const cursor = start + polishedText.length
-      textarea.focus()
-      textarea.setSelectionRange(cursor, cursor)
-    }
-    addProgressItem('选中文本已润色并替换', 'success')
+    polishedText.value = result.polished_text
+    addProgressItem('润色结果已生成，可确认替换', 'success')
   } catch (error: any) {
     addProgressItem(`润色失败: ${error.message}`, 'error')
+  } finally {
     polishLoading.value = false
   }
+}
+
+const applyPolishedText = async () => {
+  if (!polishedTextPreview.value) return
+
+  const { start, end } = selectionRange.value
+  const nextText = polishedTextPreview.value
+  editableContent.value = `${editableContent.value.slice(0, start)}${nextText}${editableContent.value.slice(end)}`
+  previewContent.value = editableContent.value
+
+  resetSelectionState()
+
+  await nextTick()
+  const textarea = editTextareaRef.value
+  if (textarea) {
+    const cursor = start + nextText.length
+    textarea.focus()
+    textarea.setSelectionRange(cursor, cursor)
+  }
+  addProgressItem('选中文本已润色并替换', 'success')
 }
 
 // 复制到剪贴板
@@ -519,7 +744,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
-  closePolishDialog()
+  resetSelectionState()
   tooltipVisible.value = false
   if (hoverShowTimer) clearTimeout(hoverShowTimer)
   if (hoverHideTimer) clearTimeout(hoverHideTimer)
@@ -789,8 +1014,6 @@ onUnmounted(() => {
 .edit-textarea {
   width: 100%;
   height: 100%;
-  max-width: 800px;
-  margin: 16px auto 0;
   display: block;
   padding: 20px;
   background: var(--color-bg-base);
@@ -803,6 +1026,35 @@ onUnmounted(() => {
   resize: none;
   outline: none;
   box-sizing: border-box;
+}
+
+.edit-area {
+  position: relative;
+  max-width: 800px;
+  height: 100%;
+  margin: 16px auto 0;
+}
+
+.selection-toolbar {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--color-bg-elevated) 88%, white 12%);
+  box-shadow: var(--shadow-md, 0 10px 30px rgba(15, 23, 42, 0.12));
+  backdrop-filter: blur(12px);
+  transform: translate(-50%, calc(-100% - 8px));
+}
+
+.selection-toolbar-divider {
+  width: 1px;
+  height: 20px;
+  margin: 0 4px;
+  background: var(--color-border);
 }
 
 .edit-textarea:focus {
@@ -827,6 +1079,22 @@ onUnmounted(() => {
   line-height: 1.7;
   font-size: 13px;
   white-space: pre-wrap;
+}
+
+.polish-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.polish-panel-label {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.polish-result-text {
+  color: var(--color-text-primary);
+  background: color-mix(in srgb, var(--color-primary-light) 30%, var(--color-bg-base) 70%);
 }
 
 .polish-dialog-actions {
