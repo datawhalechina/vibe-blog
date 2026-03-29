@@ -151,7 +151,7 @@ def create_app(config_class=None):
         asyncio.run(queue_manager.init())
 
         init_queue_routes(queue_manager)
-        app.queue_manager = queue_manager
+        app.queue_manager = queue_manager  # type: ignore
 
         cron_scheduler = CronScheduler(queue_manager, db_path=db_path)
         asyncio.run(cron_scheduler.start())
