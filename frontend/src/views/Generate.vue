@@ -382,6 +382,8 @@ const showSelectionToolbar = ref(false)
 const polishInstruction = ref('')
 const polishLoading = ref(false)
 const polishedText = ref('')
+const polishRequestId = ref(0)
+const polishAbortController = ref<AbortController | null>(null)
 const selectedText = ref('')
 const selectionRange = ref({ start: 0, end: 0 })
 const selectionToolbarPosition = ref({ top: 0, left: 0 })
@@ -403,7 +405,14 @@ const toggleEdit = () => {
   }
 }
 
+const invalidatePolishRequest = () => {
+  polishRequestId.value += 1
+  polishAbortController.value?.abort()
+  polishAbortController.value = null
+}
+
 const resetSelectionState = () => {
+  invalidatePolishRequest()
   showPolishDialog.value = false
   showSelectionToolbar.value = false
   polishLoading.value = false
@@ -411,6 +420,22 @@ const resetSelectionState = () => {
   polishInstruction.value = ''
   selectedText.value = ''
   selectionRange.value = { start: 0, end: 0 }
+}
+
+const isPolishRequestStillValid = (
+  requestId: number,
+  start: number,
+  end: number,
+  expectedSelectedText: string
+) => {
+  return (
+    polishRequestId.value === requestId &&
+    isEditing.value &&
+    showPolishDialog.value &&
+    selectionRange.value.start === start &&
+    selectionRange.value.end === end &&
+    selectedTextPreview.value === expectedSelectedText
+  )
 }
 
 const closePolishDialog = () => {
@@ -619,19 +644,37 @@ const handleEditInput = () => {
 const handlePolish = async () => {
   if (!canPolish.value || polishLoading.value) return
 
+  const requestId = polishRequestId.value + 1
+  const expectedSelectedText = selectedTextPreview.value
+  const expectedInstruction = polishInstruction.value.trim()
+  const { start, end } = selectionRange.value
+
+  polishRequestId.value = requestId
+  polishAbortController.value?.abort()
+  const controller = new AbortController()
+  polishAbortController.value = controller
   polishLoading.value = true
   try {
-    const result = await api.polishSelectedText(selectedTextPreview.value, polishInstruction.value.trim())
+    const result = await api.polishSelectedText(expectedSelectedText, expectedInstruction, controller.signal)
     if (!result.success || !result.polished_text) {
       throw new Error(result.error || '润色失败')
+    }
+    if (!isPolishRequestStillValid(requestId, start, end, expectedSelectedText)) {
+      return
     }
 
     polishedText.value = result.polished_text
     addProgressItem('润色结果已生成，可确认替换', 'success')
   } catch (error: any) {
+    if (error?.name === 'AbortError' || !isPolishRequestStillValid(requestId, start, end, expectedSelectedText)) {
+      return
+    }
     addProgressItem(`润色失败: ${error.message}`, 'error')
   } finally {
-    polishLoading.value = false
+    if (polishRequestId.value === requestId) {
+      polishLoading.value = false
+      polishAbortController.value = null
+    }
   }
 }
 

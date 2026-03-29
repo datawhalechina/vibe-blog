@@ -70,10 +70,15 @@ export async function enhanceTopic(topic: string): Promise<{ success: boolean; e
   return response.json()
 }
 
-export async function polishSelectedText(selectedText: string, instruction: string): Promise<{ success: boolean; polished_text?: string; error?: string }> {
+export async function polishSelectedText(
+  selectedText: string,
+  instruction: string,
+  signal?: AbortSignal
+): Promise<{ success: boolean; polished_text?: string; error?: string }> {
   const response = await fetch(`${API_BASE}/api/blog/polish-selection`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
+    signal,
     body: JSON.stringify({
       selected_text: selectedText,
       instruction,
