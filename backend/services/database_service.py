@@ -862,6 +862,26 @@ class DatabaseService:
         if updated:
             logger.info(f"更新博客摘要: {history_id}")
         return updated
+
+    def update_history_markdown(self, history_id: str, markdown_content: str) -> bool:
+        """
+        更新博客正文 Markdown
+
+        Args:
+            history_id: 博客 ID
+            markdown_content: 最新 Markdown 内容
+        """
+        with self.get_connection() as conn:
+            cursor = conn.execute('''
+                UPDATE history_records
+                SET markdown_content = ?
+                WHERE id = ?
+            ''', (markdown_content, history_id))
+            updated = cursor.rowcount > 0
+
+        if updated:
+            logger.info(f"更新博客正文: {history_id}, 长度={len(markdown_content)}")
+        return updated
     
     def update_history_book_id(self, history_id: str, book_id: str) -> bool:
         """

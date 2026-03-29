@@ -6,6 +6,7 @@ import os
 import uuid
 import logging
 import threading
+from pathlib import Path
 
 from flask import Blueprint, jsonify, request, current_app
 
@@ -17,6 +18,7 @@ from services import (
 from services.database_service import get_db_service
 from services.file_parser_service import get_file_parser
 from services.knowledge_service import get_knowledge_service
+from utils.atomic_write import atomic_write
 
 logger = logging.getLogger(__name__)
 
@@ -478,6 +480,35 @@ def enhance_topic():
         return jsonify({'success': False, 'error': str(e)}), 500
 
 
+@blog_bp.route('/api/blog/polish-selection', methods=['POST'])
+def polish_selection():
+    """对选中的局部文本进行润色"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '请提供 JSON 数据'}), 400
+        selected_text = (data.get('selected_text') or '').strip()
+        instruction = (data.get('instruction') or '').strip()
+
+        if not selected_text:
+            return jsonify({'success': False, 'error': '请提供 selected_text 参数'}), 400
+
+        blog_service = get_blog_service()
+        if not blog_service:
+            return jsonify({'success': False, 'error': '博客生成服务不可用'}), 500
+
+        polished_text = blog_service.polish_selection(selected_text, instruction=instruction)
+
+        return jsonify({
+            'success': True,
+            'polished_text': polished_text or selected_text,
+        })
+
+    except Exception as e:
+        logger.error(f"文本润色失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
 @blog_bp.route('/api/tasks/<task_id>/resume', methods=['POST'])
 def resume_task(task_id):
     """恢复中断的任务（101.113 LangGraph interrupt 方案）"""
@@ -539,4 +570,67 @@ def evaluate_article(blog_id):
 
     except Exception as e:
         logger.error(f"文章评估失败: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+@blog_bp.route('/api/blog/<blog_id>/content', methods=['PUT'])
+def update_blog_content(blog_id):
+    """更新博客正文，并在可用时同步回写原始 outputs Markdown 文件"""
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '请提供 JSON 数据'}), 400
+
+        markdown = data.get('markdown', '')
+        saved_path = data.get('saved_path', '')
+
+        if not isinstance(markdown, str) or not markdown.strip():
+            return jsonify({'success': False, 'error': 'markdown 不能为空'}), 400
+
+        db_service = get_db_service()
+        blog = db_service.get_history(blog_id)
+        if not blog:
+            return jsonify({'success': False, 'error': '文章不存在'}), 404
+
+        updated = db_service.update_history_markdown(blog_id, markdown)
+        if not updated:
+            return jsonify({'success': False, 'error': '更新正文失败'}), 500
+
+        file_updated = False
+        if isinstance(saved_path, str) and saved_path.strip():
+            requested_path = Path(saved_path).resolve()
+            outputs_dir = Path(os.path.dirname(os.path.dirname(__file__))) / 'outputs'
+            outputs_dir = outputs_dir.resolve()
+
+            try:
+                if os.path.commonpath([str(requested_path), str(outputs_dir)]) != str(outputs_dir):
+                    return jsonify({'success': False, 'error': '保存路径不合法'}), 400
+            except ValueError:
+                return jsonify({'success': False, 'error': '保存路径不合法'}), 400
+
+            if not requested_path.exists():
+                return jsonify({'success': False, 'error': '原始 Markdown 文件不存在'}), 404
+
+            # 确保目标是常规 Markdown 文件，而不是目录或特殊文件
+            if not requested_path.is_file():
+                return jsonify({'success': False, 'error': '原始 Markdown 文件不是常规文件'}), 400
+
+            if requested_path.suffix.lower() not in {'.md', '.markdown'}:
+                return jsonify({'success': False, 'error': '仅支持 .md 或 .markdown 文件'}), 400
+
+            try:
+                atomic_write(str(requested_path), markdown, encoding='utf-8')
+            except (OSError, IOError) as e:
+                logger.error(f"写入 Markdown 文件失败: {e}", exc_info=True)
+                return jsonify({'success': False, 'error': '写入原始 Markdown 文件失败'}), 500
+            file_updated = True
+
+        return jsonify({
+            'success': True,
+            'blog_id': blog_id,
+            'file_updated': file_updated,
+        })
+
+    except Exception as e:
+        logger.error(f"更新博客正文失败: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500

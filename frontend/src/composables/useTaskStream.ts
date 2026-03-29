@@ -30,6 +30,7 @@ export function useTaskStream() {
   const statusBadge = ref('')
   const currentTaskId = ref('')
   const previewContent = ref('')
+  const savedOutputPath = ref('')
   const outlineData = ref<OutlineData | null>(null)
   const waitingForOutline = ref(false)
   const citations = ref<Citation[]>([])
@@ -103,6 +104,7 @@ export function useTaskStream() {
     sectionContentMap.clear()
     sectionOrder = []
     previewContent.value = ''
+    savedOutputPath.value = ''
     citations.value = []
     completedBlogId.value = ''
     const es = api.createTaskStream(taskId)
@@ -318,6 +320,7 @@ export function useTaskStream() {
       if (d.markdown) {
         previewContent.value = d.markdown
       }
+      savedOutputPath.value = d.saved_path || ''
 
       completedBlogId.value = d.id || d.book_id || ''
 
@@ -395,6 +398,7 @@ export function useTaskStream() {
     statusBadge.value = ''
     currentTaskId.value = ''
     previewContent.value = ''
+    savedOutputPath.value = ''
     outlineData.value = null
     waitingForOutline.value = false
     citations.value = []
@@ -424,6 +428,7 @@ export function useTaskStream() {
     statusBadge,
     currentTaskId,
     previewContent,
+    savedOutputPath,
     outlineData,
     waitingForOutline,
     citations,

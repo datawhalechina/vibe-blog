@@ -132,6 +132,56 @@ class BlogService:
             logger.warning(f"[enhance_topic] 失败: {e}，返回原始主题")
         return topic
 
+    def polish_selection(self, selected_text: str, instruction: str = "") -> str:
+        """
+        对用户选中的局部文本做轻量润色。
+
+        Args:
+            selected_text: 用户选中的原文
+            instruction: 用户输入的润色目标
+
+        Returns:
+            润色后的文本；失败时返回原文
+        """
+        selected_text = (selected_text or "").strip()
+        instruction = (instruction or "").strip()
+        if not selected_text:
+            return ""
+
+        messages = [
+            {
+                "role": "system",
+                "content": (
+                    "你是一个中文技术写作润色助手。"
+                    "你只处理用户给出的选中文本，不要扩写整篇文章，不要解释你的修改。"
+                    "输出必须是可直接替换原文的纯文本，不要加引号，不要使用 markdown 代码块。"
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    f"润色目标：{instruction or '提升表达清晰度、流畅度与准确性'}\n\n"
+                    f"待润色文本：\n{selected_text}\n\n"
+                    "请只返回润色后的文本，保持原意。"
+                ),
+            },
+        ]
+
+        try:
+            result = self.generator.llm.chat(messages, caller="polish_selection")
+            if not result:
+                return selected_text
+
+            polished = result.strip()
+            if polished.startswith("```") and polished.endswith("```"):
+                lines = polished.splitlines()
+                if len(lines) >= 3:
+                    polished = "\n".join(lines[1:-1]).strip()
+            return polished or selected_text
+        except Exception as e:
+            logger.warning(f"文本润色失败，返回原文: {e}")
+            return selected_text
+
     def _get_flask_app(self):
         """安全获取当前 Flask app 引用（用于 resume 线程）"""
         try:
