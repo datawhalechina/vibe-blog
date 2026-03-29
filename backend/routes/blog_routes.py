@@ -484,7 +484,9 @@ def enhance_topic():
 def polish_selection():
     """对选中的局部文本进行润色"""
     try:
-        data = request.get_json() or {}
+        data = request.get_json()
+        if not data:
+            return jsonify({'success': False, 'error': '请提供 JSON 数据'}), 400
         selected_text = (data.get('selected_text') or '').strip()
         instruction = (data.get('instruction') or '').strip()
 
