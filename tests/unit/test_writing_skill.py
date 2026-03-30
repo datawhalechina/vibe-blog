@@ -4,10 +4,7 @@
 """
 
 import os
-import sys
 import pytest
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
 from services.blog_generator.skills.writing_skill_manager import (
     WritingSkill,

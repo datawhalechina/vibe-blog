@@ -56,3 +56,50 @@ test = [
     "pytest-flask>=1.3.0",
     "pytest-xdist>=3.5.0",
 ]
+
+
+[tool.pytest.ini_options]
+pythonpath = [".", "vibe-blog/backend"]
+testpaths = ["tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+# 命令行选项（addopts）
+addopts = [
+    "-v",
+    "--strict-markers",
+    "--tb=short",
+    "--cov=services",
+    "--cov=routes",
+    "--cov=utils",
+    "--cov=app",
+    "--cov-report=term-missing",
+    "--cov-report=html",
+    "--cov-report=json",
+    "--cov-report=lcov",
+]
+
+# 标记（markers）
+markers = [
+    "unit: Unit tests (fast, no external dependencies)",
+    "integration: Integration tests (may use database, file system)",
+    "api: API endpoint tests (Flask test client)",
+    "llm: Tests that require LLM API calls (expensive, skip in CI)",
+    "slow: Slow tests (skip by default)",
+]
+
+# asyncio 配置
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+
+# 警告过滤
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+    "ignore::ResourceWarning",
+]
+
+# 覆盖率阈值（属于 coverage 工具，不在 pytest.ini_options 内）
+[tool.coverage.report]
+fail_under = 55

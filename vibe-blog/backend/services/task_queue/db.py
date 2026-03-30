@@ -33,7 +33,7 @@ class TaskDB:
         """初始化数据库表"""
         schema_path = Path(__file__).parent / "schema.sql"
         async with aiosqlite.connect(self.db_path) as db:
-            with open(schema_path) as f:
+            with open(schema_path, encoding='utf-8') as f:
                 await db.executescript(f.read())
             await db.commit()
 

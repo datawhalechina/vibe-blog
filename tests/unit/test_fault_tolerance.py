@@ -7,7 +7,6 @@ import pytest
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
 from utils.dangling_tool_call_fixer import fix_dangling_tool_calls
 from utils.atomic_write import atomic_write

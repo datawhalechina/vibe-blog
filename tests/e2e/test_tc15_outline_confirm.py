@@ -7,7 +7,7 @@ TC-15: 大纲确认交互测试
 
 注意：此测试需要真实后端运行，大纲确认通过 POST /api/tasks/{taskId}/resume 通知后端。
 """
-from e2e_utils import (
+from tests.backend.e2e_utils import (
     find_element,
     fill_input,
     cancel_task,

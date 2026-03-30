@@ -3,7 +3,7 @@ TC-12: 错误处理（P2）
 
 验证：空主题/纯空格时生成按钮 disabled
 """
-from e2e_utils import find_element, GENERATE_BTN_SELECTORS
+from tests.backend.e2e_utils import find_element, GENERATE_BTN_SELECTORS
 
 
 def test_empty_topic_disabled(page, base_url):

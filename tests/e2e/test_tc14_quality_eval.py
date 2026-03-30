@@ -40,7 +40,7 @@ def _get_blog_id(backend_url: str):
 @pytest.fixture(scope="module")
 def evaluate_result():
     """调用一次评估接口，缓存结果供多个测试复用"""
-    from e2e_utils import BACKEND_URL
+    from tests.backend.e2e_utils import BACKEND_URL
     blog_id = _get_blog_id(BACKEND_URL)
     if not blog_id:
         pytest.skip("无历史记录，跳过评估 API 测试")

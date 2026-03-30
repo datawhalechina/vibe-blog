@@ -4,12 +4,10 @@
 """
 
 import os
-import sys
 import time
 import pytest
 from unittest.mock import patch
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
 from services.blog_generator.middleware import (
     MiddlewarePipeline,

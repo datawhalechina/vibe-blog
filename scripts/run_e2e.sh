@@ -27,8 +27,8 @@ NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-BACKEND_DIR="$PROJECT_ROOT/backend"
-FRONTEND_DIR="$PROJECT_ROOT/frontend"
+BACKEND_DIR="$PROJECT_ROOT/vibe-blog/backend"
+FRONTEND_DIR="$PROJECT_ROOT/vibe-blog/frontend"
 E2E_DIR="$PROJECT_ROOT/tests/e2e"
 SCREENSHOT_DIR="$BACKEND_DIR/outputs/e2e_screenshots"
 LOG_DIR="$PROJECT_ROOT/logs"

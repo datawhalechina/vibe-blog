@@ -62,7 +62,7 @@ class ToolRegistry:
             logger.warning(f"工具配置文件不存在: {config_path}")
             return
 
-        with open(path) as f:
+        with open(path, encoding="utf-8") as f:
             data = yaml.safe_load(f) or {}
 
         # 解析环境变量

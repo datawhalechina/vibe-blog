@@ -7,7 +7,7 @@ TC-2: 博客生成主流程（P0 — 最关键）
   → 验证详情页内容（标题/章节/正文/图片/代码块）
   → 后端数据校验 → 特性验证 → 控制台错误检查
 """
-from e2e_utils import (
+from tests.backend.e2e_utils import (
     find_element,
     fill_input,
     clear_input,

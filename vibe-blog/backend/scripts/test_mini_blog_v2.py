@@ -11,16 +11,11 @@ Mini 博客动画 v2 集成测试脚本
     python -m backend.scripts.test_mini_blog_v2 --topic "Python 装饰器入门"
 """
 
-import asyncio
 import logging
 import argparse
-import sys
-import os
 from pathlib import Path
 from datetime import datetime
 
-# 添加项目根目录到 Python 路径
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 
 logging.basicConfig(
     level=logging.INFO,
@@ -35,10 +30,10 @@ def test_mini_blog(topic: str):
     load_dotenv()
     
     import os
-    from backend.services.blog_generator.blog_service import init_blog_service, get_blog_service
-    from backend.services.llm_service import init_llm_service
-    from backend.services.image_service import init_image_service
-    from backend.services.blog_generator.services.search_service import init_search_service
+    from services.blog_generator.blog_service import init_blog_service, get_blog_service
+    from services.llm_service import init_llm_service
+    from services.image_service import init_image_service
+    from services.blog_generator.services.search_service import init_search_service
     
     # 构建配置
     config = {

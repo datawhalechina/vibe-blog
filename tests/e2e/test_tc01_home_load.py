@@ -3,7 +3,7 @@ TC-1: 首页加载与基础渲染（P0）
 
 验证：导航栏、输入卡片、生成按钮状态、主题切换、滚动提示
 """
-from e2e_utils import find_element, fill_input, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
+from tests.backend.e2e_utils import find_element, fill_input, INPUT_SELECTORS, GENERATE_BTN_SELECTORS
 
 
 def test_home_page_loads(page, base_url, take_screenshot):

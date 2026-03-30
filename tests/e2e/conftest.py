@@ -10,17 +10,11 @@ vibe-blog E2E 测试 — 共享 Playwright Fixtures
 - RUN_E2E_TESTS=1 全局门控
 """
 import os
-import sys
 import time
 import json
 import pytest
 
-# 将 backend 和 backend/tests 加入 path 以复用 e2e_utils
-_backend_dir = os.path.join(os.path.dirname(__file__), '..', '..', 'backend')
-sys.path.insert(0, _backend_dir)
-sys.path.insert(0, os.path.join(_backend_dir, 'tests'))
-
-from e2e_utils import (
+from tests.backend.e2e_utils import (
     SSE_HOOK_JS,
     FRONTEND_URL,
     BACKEND_URL,
@@ -33,7 +27,10 @@ def pytest_collection_modifyitems(config, items):
     if not os.environ.get("RUN_E2E_TESTS"):
         skip = pytest.mark.skip(reason="E2E tests require RUN_E2E_TESTS=1")
         for item in items:
-            item.add_marker(skip)
+            # 只跳过 tests/e2e 目录下的测试
+            if "tests/e2e" in item.location[0].replace("\\", "/"):
+                print("跳过的e2e", item.location[0])
+                item.add_marker(skip)
 
 
 # ── Fixtures ──
@@ -55,7 +52,7 @@ def browser():
 def screenshot_dir():
     """截图输出目录"""
     d = os.path.join(
-        os.path.dirname(__file__), '..', '..', 'backend', 'outputs', 'e2e_screenshots'
+        os.path.dirname(__file__), '..', '..', 'vibe-blog', 'backend', 'outputs', 'e2e_screenshots'
     )
     os.makedirs(d, exist_ok=True)
     return d

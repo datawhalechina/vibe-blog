@@ -13,7 +13,7 @@ TC-16: 全链路闭环验证（P0 — 串联所有孤岛）
   2. 详情页 → 质量评估（TC-14 用 mock）
   3. 跨页面数据一致性（各测试独立运行）
 """
-from e2e_utils import (
+from tests.backend.e2e_utils import (
     find_element,
     fill_input,
     INPUT_SELECTORS,

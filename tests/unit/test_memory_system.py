@@ -5,12 +5,9 @@
 """
 
 import json
-import os
-import sys
 import time
 import pytest
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..', 'backend'))
 
 from services.blog_generator.memory.storage import MemoryStorage, create_empty_memory
 from services.blog_generator.memory.config import BlogMemoryConfig
