@@ -59,9 +59,9 @@ class ParallelTaskExecutor:
 
     def __init__(
         self,
-        max_workers: int = None,
+        max_workers: Optional[int] = None,
         default_timeout: int = 300,
-        on_task_event: Callable[[dict], None] = None,
+        on_task_event: Optional[Callable[[dict], None]] = None,
         enable_parallel: bool = True,
     ):
         self.max_workers = max_workers or int(
@@ -69,7 +69,11 @@ class ParallelTaskExecutor:
         )
         self.default_timeout = default_timeout
         self.on_task_event = on_task_event
-        self._use_parallel = enable_parallel
+        # TRACE_ENABLED=true 时强制串行执行，便于链路追踪
+        if os.environ.get("TRACE_ENABLED", "").lower() == "true":
+            self._use_parallel = False
+        else:
+            self._use_parallel = enable_parallel
         if self._use_parallel and self.max_workers < 3:
             self.max_workers = 3
 
