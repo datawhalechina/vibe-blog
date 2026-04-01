@@ -47,8 +47,6 @@ def test_sanitize_mermaid():
     assert '-->' in result and '--> -->' not in result, f"应修复重复箭头: {result}"
     print("  [PASS] 修复重复箭头")
 
-    return True
-
 
 def test_validate_mermaid():
     """测试语法校验"""
@@ -85,8 +83,6 @@ def test_validate_mermaid():
     assert is_valid, f"sequenceDiagram 应通过: {msg}"
     print("  [PASS] sequenceDiagram 通过校验")
 
-    return True
-
 
 def test_full_pipeline():
     """测试完整修复链（含 sanitize + validate）"""
@@ -107,8 +103,6 @@ def test_full_pipeline():
     assert '```' not in sanitized, "应移除 ``` 标记"
     print("  [PASS] 完整修复链工作正常")
 
-    return True
-
 
 def main():
     print("=" * 60)
@@ -125,9 +119,7 @@ def main():
     for name, test_fn in tests:
         print(f"\n--- {name} ---")
         try:
-            result = test_fn()
-            if not result:
-                all_pass = False
+            test_fn()
         except Exception as e:
             print(f"  [FAIL] 异常: {e}")
             all_pass = False

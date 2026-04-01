@@ -49,7 +49,7 @@ logger = logging.getLogger(__name__)
 # ========== 数据结构 ==========
 
 @dataclass
-class TestResult:
+class ResultData:
     """测试结果"""
     passed: bool = False
     task_id: str = ""
@@ -147,7 +147,7 @@ class ImageStyleE2ETest:
         self,
         task_id: str,
         timeout: int = 600
-    ) -> TestResult:
+    ) -> ResultData:
         """
         监听 SSE 事件流，收集测试数据
 
@@ -156,9 +156,9 @@ class ImageStyleE2ETest:
             timeout: 超时时间（秒），默认 10 分钟
 
         Returns:
-            TestResult
+            ResultData
         """
-        result = TestResult(task_id=task_id)
+        result = ResultData(task_id=task_id)
         start_time = time.time()
 
         sse_url = f"{self.base_url}/api/tasks/{task_id}/stream"
@@ -285,7 +285,7 @@ class ImageStyleE2ETest:
         image_style: str = "cartoon",
         target_length: str = "mini",
         timeout: int = 600
-    ) -> TestResult:
+    ) -> ResultData:
         """
         运行完整的端到端测试
 
@@ -296,9 +296,9 @@ class ImageStyleE2ETest:
             timeout: 超时时间
 
         Returns:
-            TestResult
+            ResultData
         """
-        result = TestResult(style_used=image_style)
+        result = ResultData(style_used=image_style)
 
         # Step 1: 检查服务器
         logger.info("=" * 60)
@@ -341,7 +341,7 @@ class ImageStyleE2ETest:
 
         return result
 
-    def _validate(self, result: TestResult, expected_style: str) -> bool:
+    def _validate(self, result: ResultData, expected_style: str) -> bool:
         """验证测试结果"""
         all_passed = True
 
@@ -377,7 +377,7 @@ class ImageStyleE2ETest:
 
         return all_passed
 
-    def _print_report(self, result: TestResult, topic: str, style: str):
+    def _print_report(self, result: ResultData, topic: str, style: str):
         """输出测试报告"""
         print()
         print("=" * 60)

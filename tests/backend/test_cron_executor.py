@@ -88,7 +88,6 @@ class TestExecute:
         assert task.generation.topic == "AI"
 
 
-@pytest.mark.asyncio
 class TestApplyResult:
     def test_success_resets_errors(self, executor, sample_job):
         sample_job.state.consecutive_errors = 3
