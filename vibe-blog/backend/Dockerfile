@@ -18,16 +18,17 @@ ENV PATH="/root/.local/bin:$PATH"
 RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources 2>/dev/null || \
     sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list 2>/dev/null || true
 
-# 安装基础系统依赖
+# 安装基础系统依赖（包含 file 命令）
 RUN apt-get update && apt-get install -y \
     gcc \
     curl \
+    wget \
     git \
+    file \
     && rm -rf /var/lib/apt/lists/*
 
-# 安装 uv (快速的 Python 包管理器)
-RUN curl -LsSf https://astral.sh/uv/install.sh | sh && \
-    ln -s /root/.local/bin/uv /usr/local/bin/uv && \
+# 安装 uv (快速的 Python 包管理器，仅用于依赖安装)
+RUN pip install --no-cache-dir uv==0.11.3 && \
     uv --version
 
 # 条件安装 Playwright 系统依赖
@@ -54,16 +55,16 @@ RUN if [ "$ENABLE_PUBLISHER" = "true" ]; then \
 
 # 复制 pyproject.toml 和 uv.lock 并使用 uv 安装 Python 依赖
 COPY pyproject.toml uv.lock ./
-RUN uv sync --frozen --no-dev && \
-    uv cache clean --all
+RUN uv sync --frozen --no-dev --no-editable && \
+    uv cache clean
 
 # 条件安装 Playwright 浏览器（仅 Chromium，约 167 MB）
 RUN if [ "$ENABLE_PUBLISHER" = "true" ]; then \
-    uv run playwright install chromium; \
+    /app/.venv/bin/playwright install chromium; \
     fi
 
-# 复制后端代码
-COPY . .
+# 复制后端代码（从构建上下文的 vibe-blog/backend 目录复制）
+COPY vibe-blog/backend/. .
 
 # 暴露端口
 EXPOSE 5000
@@ -71,9 +72,9 @@ EXPOSE 5000
 # 设置应用环境变量
 ENV FLASK_APP=app.py
 ENV FLASK_ENV=production
+ENV PYTHONPATH=/app
 
-# 启动应用（使用 uv run 运行 gunicorn）
-# uv run 确保使用 uv 管理的 Python 环境
+# 启动应用（使用虚拟环境中的 Python 直接运行 gunicorn）
 # workers=1 + threads=4: 单进程多线程，确保任务状态共享，支持4个并发请求
 # timeout=600: 博客生成任务需要较长时间
-CMD ["uv", "run", "gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--worker-class", "gthread", "--timeout", "600", "--access-logfile", "-", "--error-logfile", "-", "app:create_app()"]
+CMD ["/app/.venv/bin/python", "-m", "gunicorn", "--bind", "0.0.0.0:5000", "--workers", "1", "--threads", "4", "--worker-class", "gthread", "--timeout", "600", "--access-logfile", "-", "--error-logfile", "-", "app:app"]

@@ -222,7 +222,10 @@ def create_app(config_class=None):
     return app
 
 
+# 为 gunicorn 提供 WSGI 应用对象
+app = create_app()
+
+
 # 开发服务器入口
 if __name__ == '__main__':
-    app = create_app()
     app.run(host='0.0.0.0', port=5001, debug=True)
