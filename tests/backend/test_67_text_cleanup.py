@@ -6,8 +6,7 @@
 纯正则测试，不需要 LLM。
 
 用法：
-  cd backend
-  python -m pytest tests/test_67_text_cleanup.py -v
+  pytest tests/backend/test_67_text_cleanup.py -v
 """
 
 from utils.text_cleanup import apply_full_cleanup

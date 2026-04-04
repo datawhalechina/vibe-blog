@@ -13,7 +13,7 @@ A. 字段完整性（narrative_mode / narrative_flow / narrative_role）
 B. 模式匹配（主题 → 期望模式）
 
 用法：
-  cd backend && python tests/test_70_1_1_planner_narrative.py
+  uv run tests/backend/test_70_1_1_planner_narrative.py
 """
 
 import os

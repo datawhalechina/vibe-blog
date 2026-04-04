@@ -22,8 +22,7 @@ VoiceChecker 检查项：
 通过标准：8 项中至少 6 项 pass
 
 用法：
-  cd backend
-  python tests/test_70_consistency_check_eval.py
+  uv run tests/backend/test_70_consistency_check_eval.py
 """
 
 import os

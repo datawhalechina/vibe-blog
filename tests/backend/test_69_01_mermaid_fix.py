@@ -8,8 +8,7 @@
   3. 修复链整体工作正常
 
 用法：
-  cd backend
-  python tests/test_69_01_mermaid_fix.py
+  pytest tests/backend/test_69_01_mermaid_fix.py
 """
 
 import logging

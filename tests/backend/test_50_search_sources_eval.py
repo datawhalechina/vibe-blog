@@ -15,8 +15,7 @@
 通过标准：6 项中至少 4 项 pass
 
 用法：
-  cd backend
-  python tests/test_50_search_sources_eval.py
+  pytest tests/backend/test_50_search_sources_eval.py
 """
 
 import sys

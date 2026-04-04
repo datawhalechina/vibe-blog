@@ -9,16 +9,16 @@
 
 使用方法：
     # 需要先启动 vibe-blog 后端服务
-    python -m pytest tests/test_image_style_e2e.py -v -s
+    uv run tests/backend/test_image_style_e2e.py -v -s
 
     # 或直接运行
-    python tests/test_image_style_e2e.py --base-url http://localhost:5001 --style academic
+    uv run tests/backend/test_image_style_eval.py --base-url http://localhost:5001 --style academic
 
     # 指定主题和风格
-    python tests/test_image_style_e2e.py --topic "Python 装饰器" --style cartoon
+    uv run tests/backend/test_image_style_eval.py --topic "Python 装饰器" --style cartoon
 
 环境要求：
-    pip install requests sseclient-py
+    uv add requests sseclient-py --optional test
 """
 
 import os

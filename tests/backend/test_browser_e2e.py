@@ -15,16 +15,16 @@ Playwright 浏览器端到端测试：自动打开浏览器 → 输入主题 →
     playwright install chromium
 
     # 运行测试（headed 模式，可以看到浏览器操作）
-    python tests/test_browser_e2e.py --headed
+    uv run tests/backend/test_browser_e2e.py --headed
 
     # 无头模式
-    python tests/test_browser_e2e.py
+    uv run tests/backend/test_browser_e2e.py
 
     # 指定主题和风格
-    python tests/test_browser_e2e.py --topic "LangGraph 入门" --style academic --headed
+    uv run tests/backend/test_browser_e2e.py --topic "LangGraph 入门" --style academic --headed
 
     # 使用 pytest 运行
-    pytest tests/test_browser_e2e.py -v -s
+    pytest tests/backend/test_browser_e2e.py -v -s
 """
 
 import os

@@ -6,7 +6,7 @@ Playwright 验证脚本：生成 mini 文章并检查 Markdown 排版问题
 2. 文本紧挨 --- 导致 Setext 标题（加粗）问题是否修复
 
 使用方法：
-    python tests/test_markdown_fix.py --headed
+    uv run tests/backend/test_markdown_fix.py --headed
 """
 
 import os

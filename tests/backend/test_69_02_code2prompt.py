@@ -13,8 +13,7 @@
   E8 PromptManager.render_code2prompt 方法存在
 
 用法：
-  cd backend
-  python -m pytest tests/test_69_02_code2prompt.py -v
+  pytest tests/backend/test_69_02_code2prompt.py -v
 """
 
 from unittest.mock import MagicMock, patch

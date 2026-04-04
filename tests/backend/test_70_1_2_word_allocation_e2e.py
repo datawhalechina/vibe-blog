@@ -16,10 +16,10 @@
     - 比例合理：至少 2/3 主题的字数分配符合推荐比例
 
 用法：
-    cd backend && python tests/test_70_1_2_word_allocation_e2e.py --headed
-    cd backend && python tests/test_70_1_2_word_allocation_e2e.py --headed --cases 1
-    cd backend && python tests/test_70_1_2_word_allocation_e2e.py  # 无头模式
-    cd backend && python tests/test_70_1_2_word_allocation_e2e.py --api-only  # 仅 API 模式
+    uv run tests/backend/test_70_1_2_word_allocation_e2e.py --headed
+    uv run tests/backend/test_70_1_2_word_allocation_e2e.py --headed --cases 1
+    uv run tests/backend/test_70_1_2_word_allocation_e2e.py  # 无头模式
+    uv run tests/backend/test_70_1_2_word_allocation_e2e.py --api-only  # 仅 API 模式
 
 注意：
     - 本测试使用 Playwright 进行真实浏览器自动化
@@ -35,7 +35,7 @@ import logging
 import requests
 
 # 添加当前目录到 Python 路径，以便导入 e2e_utils
-from tests.backend.e2e_utils import (
+from e2e_utils import (
     SSE_HOOK_JS, run_playwright_generation, cancel_task,
     BACKEND_URL, FRONTEND_URL
 )

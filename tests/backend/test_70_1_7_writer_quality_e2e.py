@@ -17,11 +17,11 @@
 
 用法：
     # 仅模板渲染验证（秒级，不需要前后端服务）
-    cd backend && python tests/test_70_1_7_writer_quality_e2e.py --render-only
+    uv run tests/backend/test_70_1_7_writer_quality_e2e.py --render-only
 
     # 完整 E2E 验证（需要前后端服务）
-    cd backend && python tests/test_70_1_7_writer_quality_e2e.py --headed
-    cd backend && python tests/test_70_1_7_writer_quality_e2e.py  # 无头模式
+    uv run tests/backend/test_70_1_7_writer_quality_eval.py --headed
+    uv run tests/backend/test_70_1_7_writer_quality_eval.py  # 无头模式
 """
 
 import sys
