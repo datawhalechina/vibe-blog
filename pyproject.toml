@@ -103,7 +103,7 @@ filterwarnings = [
 
 # 覆盖率阈值（属于 coverage 工具，不在 pytest.ini_options 内）
 [tool.coverage.run]
-data_file = "vibe-blog/coverage/.coverage"
+data_file = "./coverage/.coverage"
 source = [
     "vibe-blog/backend/services",
     "vibe-blog/backend/utils",
@@ -140,10 +140,10 @@ exclude_lines = [
 
 
 [tool.coverage.html]
-directory = "vibe-blog/coverage"
+directory = "./coverage"
 
 [tool.coverage.json]
-output = "vibe-blog/coverage/coverage.json"
+output = "./coverage/coverage.json"
 
 [tool.coverage.lcov]
-output = "vibe-blog/coverage/coverage.lcov"
+output = "./coverage/coverage.lcov"

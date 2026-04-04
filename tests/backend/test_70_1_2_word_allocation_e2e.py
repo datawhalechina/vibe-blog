@@ -35,7 +35,8 @@ import logging
 import requests
 
 # 添加当前目录到 Python 路径，以便导入 e2e_utils
-from e2e_utils import (
+# 使用绝对导入以兼容 pytest 和直接运行
+from tests.backend.e2e_utils import (
     SSE_HOOK_JS, run_playwright_generation, cancel_task,
     BACKEND_URL, FRONTEND_URL
 )

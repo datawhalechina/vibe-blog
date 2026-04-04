@@ -164,7 +164,7 @@ def run_e2e_field_check(headed: bool = False) -> dict:
         return {"passed": False, "details": []}
 
     # 导入共享的 E2E 工具
-    from tests.e2e_utils import SSE_HOOK_JS, run_playwright_generation, cancel_task
+    from tests.backend.e2e_utils import SSE_HOOK_JS, run_playwright_generation, cancel_task
 
     topic = "什么是 RAG"
     results = []
