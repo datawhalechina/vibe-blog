@@ -14,7 +14,7 @@ from .search_coordinator import SearchCoordinator
 
 __all__ = [
     'ResearcherAgent',
-    'PlannerAgent', 
+    'PlannerAgent',
     'WriterAgent',
     'CoderAgent',
     'ArtistAgent',

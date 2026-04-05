@@ -89,6 +89,10 @@ class ImageEnhancementPipeline:
         from .prompts import get_prompt_manager
 
         pm = get_prompt_manager()
+        if not pm or not hasattr(pm, 'render_code2prompt'):
+            logger.warning("code2prompt: PromptManager 不可用，跳过增强")
+            return None
+        
         prompt = pm.render_code2prompt(
             code=code,
             render_method=render_method,
@@ -98,7 +102,11 @@ class ImageEnhancementPipeline:
 
         try:
             response = self.llm.chat(messages=[{"role": "user", "content": prompt}])
-            result = response.strip()
+            if response is None:
+                logger.warning("code2prompt: LLM 返回空响应，跳过增强")
+                return None
+
+            result = str(response).strip()
             if len(result) < 50:
                 logger.warning("code2prompt: LLM 返回内容过短，跳过增强")
                 return None

@@ -15,8 +15,10 @@
 用法：
   pytest tests/backend/test_69_02_code2prompt.py -v
 """
-
+import sys
+from pathlib import Path
 from unittest.mock import MagicMock, patch
+import types
 
 
 from services.blog_generator.image_enhancement import (
@@ -157,6 +159,31 @@ class TestImageEnhancementPipeline:
     def test_enhance_short_llm_response_returns_none(self):
         """LLM 返回内容过短时跳过增强"""
         self.mock_llm.chat.return_value = "太短了"
+
+        result = self.pipeline.enhance(
+            code="flowchart TB\n    A --> B",
+            render_method="mermaid",
+            caption="测试",
+        )
+        assert result is None
+
+    def test_enhance_returns_none_when_prompt_manager_unavailable(self):
+        """PromptManager 不可用时直接降级，不调用 LLM"""
+        fake_module = types.SimpleNamespace(get_prompt_manager=lambda: None)
+
+        with patch.dict(sys.modules, {"services.blog_generator.prompts": fake_module}):
+            result = self.pipeline.enhance(
+                code="flowchart TB\n    A --> B",
+                render_method="mermaid",
+                caption="测试",
+            )
+
+        assert result is None
+        assert not self.mock_llm.chat.called
+
+    def test_enhance_none_llm_response_returns_none(self):
+        """LLM 返回 None 时降级返回 None"""
+        self.mock_llm.chat.return_value = None
 
         result = self.pipeline.enhance(
             code="flowchart TB\n    A --> B",

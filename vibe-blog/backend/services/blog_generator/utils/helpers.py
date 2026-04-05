@@ -6,6 +6,21 @@ import re
 import hashlib
 from typing import List, Dict, Any
 from collections import OrderedDict
+from urllib.parse import urlsplit, urlunsplit
+
+
+def _normalize_url(url: str) -> str:
+    """标准化 URL，用于去重比较。"""
+    if not url:
+        return ""
+
+    try:
+        parts = urlsplit(url.strip())
+        path = parts.path.rstrip('/') or '/'
+        return urlunsplit((parts.scheme.lower(), parts.netloc.lower(), path, parts.query, ''))
+    except Exception:
+        return url.strip().rstrip('/')
+
 
 
 def deduplicate_by_url(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -22,7 +37,8 @@ def deduplicate_by_url(results: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     unique_results = []
     
     for item in results:
-        url = item.get('url', '')
+        raw_url = item.get('url') or item.get('source') or ''
+        url = _normalize_url(raw_url)
         if url and url not in seen_urls:
             seen_urls.add(url)
             unique_results.append(item)
@@ -70,9 +86,17 @@ def generate_anchor_id(title: str) -> str:
     Returns:
         锚点 ID
     """
+    title = (title or '').strip()
+
     # 移除特殊字符，转换为小写，空格替换为连字符
     anchor = re.sub(r'[^\w\s-]', '', title.lower())
-    anchor = re.sub(r'\s+', '-', anchor.strip())
+    anchor = re.sub(r'[-\s]+', '-', anchor).strip('-')
+
+    # 纯符号/纯中文等场景下，兜底生成稳定锚点，避免返回空串
+    if not anchor:
+        digest = hashlib.md5(title.encode('utf-8')).hexdigest()[:8] if title else 'section'
+        anchor = f"section-{digest}"
+
     return anchor
 
 

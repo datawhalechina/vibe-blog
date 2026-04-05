@@ -1,0 +1,194 @@
+import os
+import logging
+from flask import Flask
+from flask_cors import CORS
+
+from config import get_config
+
+logger = logging.getLogger(__name__)
+
+def create_app(config_class=None):
+    """创建 Flask 应用"""
+    app = Flask(__name__, 
+                static_folder=os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static'))
+    
+    # 加载配置
+    if config_class is None:
+        config_class = get_config()
+    app.config.from_object(config_class)
+    
+    # 设置日志级别
+    log_level = getattr(logging, app.config.get('LOG_LEVEL', 'INFO'))
+    logging.getLogger().setLevel(log_level)
+    
+    # CORS
+    CORS(app, origins=app.config.get('CORS_ORIGINS', ['*']))
+    
+    # 确保目录存在
+    try:
+        os.makedirs(app.config.get('OUTPUT_FOLDER', 'outputs'), exist_ok=True)
+        os.makedirs(os.path.join(app.config.get('OUTPUT_FOLDER', 'outputs'), 'images'), exist_ok=True)
+        os.makedirs(os.path.join(app.config.get('OUTPUT_FOLDER', 'outputs'), 'videos'), exist_ok=True)
+    except (OSError, IOError):
+        pass
+    
+    # 初始化各种服务
+    init_services(app)
+
+    # 注册 Blueprints
+    register_blueprints(app)
+
+    # 健康检查
+    @app.route('/health')
+    def health_check():
+        return {'status': 'ok', 'service': 'banana-blog'}
+
+    logger.info("Vibe Blog 后端应用已启动")
+    return app
+
+def init_services(app):
+    """初始化应用服务"""
+    from services import (
+        init_llm_service,
+        init_image_service,
+        get_search_service,
+        get_llm_service,
+    )
+    from services.oss_service import init_oss_service, get_oss_service
+    from services.video_service import init_video_service, get_video_service
+    from services.database_service import init_db_service
+    from services.file_parser_service import init_file_parser
+    from services.knowledge_service import init_knowledge_service
+    from routes.blog_routes import init_blog_services
+
+    # 1. LLM
+    init_llm_service(app.config)
+    
+    # 2. Image
+    app.config['IMAGE_OUTPUT_FOLDER'] = os.path.join(app.config.get('OUTPUT_FOLDER', 'outputs'), 'images')
+    init_image_service(app.config)
+    
+    # 3. OSS
+    init_oss_service(app.config)
+    oss_service = get_oss_service()
+    if oss_service and oss_service.is_available:
+        logger.info("OSS 服务已初始化")
+    else:
+        logger.warning("OSS 服务不可用，封面动画功能将受限")
+        
+    # 4. Video
+    init_video_service(app.config)
+    video_service = get_video_service()
+    if video_service and video_service.is_available():
+        logger.info("视频生成服务已初始化")
+    else:
+        logger.warning("视频生成服务不可用")
+        
+    # 5. DB & Knowledge
+    init_db_service()
+    init_knowledge_service(
+        max_content_length=app.config.get('KNOWLEDGE_MAX_CONTENT_LENGTH', 8000)
+    )
+    
+    # 6. Search & Blog
+    # 兼容旧初始化流程：这里会额外初始化 Serper / 搜狗，并保留旧日志语义。
+    init_blog_services(app.config)
+        
+    # 7. File Parser
+    mineru_token = app.config.get('MINERU_TOKEN', '')
+    if mineru_token:
+        # Uploads relative to backend root
+        upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
+        try:
+            os.makedirs(upload_folder, exist_ok=True)
+        except (OSError, IOError):
+             # Vercel fallback
+            import tempfile
+            upload_folder = tempfile.gettempdir()
+            logger.warning(f"无法创建 uploads 目录，使用临时目录: {upload_folder}")
+        
+        init_file_parser(
+            mineru_token=mineru_token,
+            mineru_api_base=app.config.get('MINERU_API_BASE', 'https://mineru.net'),
+            upload_folder=upload_folder,
+            pdf_max_pages=int(os.getenv('PDF_MAX_PAGES', '15'))
+        )
+        logger.info("文件解析服务已初始化")
+    else:
+        logger.warning("MINERU_TOKEN 未配置，PDF 解析功能不可用")
+
+    # 8. TaskQueue + CronScheduler (Optional)
+    try:
+        import asyncio
+        from services.task_queue import TaskQueueManager
+        from services.task_queue.cron_scheduler import CronScheduler
+        from routes.queue_routes import init_queue_routes
+        from routes.scheduler_routes import init_scheduler_routes
+
+        backend_dir = os.path.dirname(os.path.dirname(__file__))
+        db_path = os.path.join(backend_dir, 'data', 'task_queue.db')
+        queue_manager = TaskQueueManager(db_path=db_path, max_concurrent=2)
+        asyncio.run(queue_manager.init())
+
+        init_queue_routes(queue_manager)
+        app.queue_manager = queue_manager
+
+        cron_scheduler = CronScheduler(queue_manager, db_path=db_path)
+        asyncio.run(cron_scheduler.start())
+        init_scheduler_routes(cron_scheduler)
+
+        logger.info("任务排队系统已初始化 (TaskQueueManager + CronScheduler)")
+    except Exception as e:
+        logger.warning(f"任务排队系统初始化失败 (可选模块): {e}")
+
+    # 9. Chat / Writing Session (Optional)
+    try:
+        from services.chat.writing_session import WritingSessionManager
+        from services.chat.agent_dispatcher import AgentDispatcher
+        from routes.chat_routes import init_chat_service
+
+        backend_dir = os.path.dirname(os.path.dirname(__file__))
+        chat_db_path = os.path.join(backend_dir, 'data', 'writing_sessions.db')
+        os.makedirs(os.path.dirname(chat_db_path), exist_ok=True)
+        chat_session_mgr = WritingSessionManager(db_path=chat_db_path)
+        chat_dispatcher = AgentDispatcher(
+            llm_client=get_llm_service(),
+            search_service=get_search_service(),
+        )
+        init_chat_service(chat_session_mgr, chat_dispatcher)
+        logger.info("对话式写作服务已初始化")
+    except Exception as e:
+        logger.warning(f"对话式写作服务初始化失败 (可选模块): {e}")
+
+    # 10. Reviewer (Optional)
+    if os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true':
+        try:
+            from vibe_reviewer import init_reviewer_service
+
+            reviewer_search_service = None
+            try:
+                reviewer_search_service = get_search_service()
+            except Exception:
+                pass
+
+            init_reviewer_service(
+                llm_service=get_llm_service(),
+                search_service=reviewer_search_service,
+            )
+            logger.info("vibe-reviewer 模块已初始化")
+        except Exception as e:
+            logger.warning(f"vibe-reviewer 模块初始化失败: {e}")
+
+def register_blueprints(app):
+    """注册路由蓝图"""
+    from routes import register_all_blueprints
+
+    register_all_blueprints(app)
+    
+    # Reviewer Routes (External module)
+    if os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true':
+        try:
+            from vibe_reviewer.api import register_reviewer_routes
+            register_reviewer_routes(app)
+        except ImportError:
+            pass

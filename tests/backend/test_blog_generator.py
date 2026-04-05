@@ -109,6 +109,40 @@ class TestHelpers:
         assert " " not in anchor
         assert "？" not in anchor
     
+    def test_deduplicate_by_url_normalizes_trailing_slash_and_source(self):
+        """测试 URL 去重支持 source 字段和尾斜杠标准化"""
+        from services.blog_generator.utils.helpers import deduplicate_by_url
+
+        results = [
+            {"url": "https://example.com/path", "title": "A"},
+            {"url": "https://example.com/path/", "title": "A duplicate"},
+            {"source": "https://example.com/other/", "title": "B"},
+            {"url": "https://example.com/other", "title": "B duplicate"},
+        ]
+
+        unique = deduplicate_by_url(results)
+
+        assert len(unique) == 2
+        assert unique[0]['title'] == 'A'
+        assert unique[1]['title'] == 'B'
+
+    def test_generate_anchor_id_falls_back_for_symbol_only_title(self):
+        """测试标题清洗后为空时仍生成稳定锚点"""
+        from services.blog_generator.utils.helpers import generate_anchor_id
+
+        anchor = generate_anchor_id("？？？！！！")
+
+        assert anchor.startswith('section-')
+        assert len(anchor) > len('section-')
+
+    def test_generate_anchor_id_collapses_duplicate_separators(self):
+        """测试连续空格和连字符会被收敛"""
+        from services.blog_generator.utils.helpers import generate_anchor_id
+
+        anchor = generate_anchor_id(" Hello   --  World ")
+
+        assert anchor == 'hello-world'
+    
     def test_estimate_reading_time(self):
         """测试阅读时间估算"""
         from services.blog_generator.utils.helpers import estimate_reading_time
