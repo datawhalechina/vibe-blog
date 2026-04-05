@@ -90,7 +90,8 @@ yarn-error.log
 .eslintcache
 
 # 前端构建产物
-frontend/dist/
+vibe-blog/frontend/dist/
+vibe-blog/frontend/.vite
 
 # 操作系统
 .DS_Store
