@@ -267,7 +267,7 @@ class TestRealSkillFiles:
 
     @pytest.fixture
     def real_skills_root(self):
-        root = os.path.join(os.path.dirname(__file__), '..', '..', 'backend', 'skills')
+        root = os.path.join(os.path.dirname(__file__), '..', '..', 'vibe-blog', 'backend', 'skills')
         if os.path.isdir(root):
             return root
         pytest.skip("实际 skills 目录不存在")
