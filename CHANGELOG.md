@@ -6,6 +6,9 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ## 2026-07-20
 
+### Added
+- ✨ **uv 可复现依赖环境** — 新增 `pyproject.toml` 与锁文件，后端 CI 改用 uv 冻结安装，同时保留现有 requirements 和部署流程。
+
 ### Changed
 - 🔧 **覆盖率产物治理** — 停止跟踪根目录和前端生成的 coverage 报告，并补充通用忽略规则。
 
@@ -15,6 +18,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Tests
 - ✨ **导入顺序回归** — 新增临时 Assembler 模块不残留的回归断言，并验证与 code2prompt 测试的双向执行顺序。
+- ✨ **Python 版本矩阵** — 使用锁定依赖继续验证 Python 3.10、3.11 和 3.12 的非 LLM 测试。
 
 ---
 
