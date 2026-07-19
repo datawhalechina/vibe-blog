@@ -4,6 +4,13 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-20
+
+### Changed
+- 🔧 **覆盖率产物治理** — 停止跟踪根目录和前端生成的 coverage 报告，并补充通用忽略规则。
+
+---
+
 ## 2026-02-27 (PR #100 + Optimizations)
 
 ### Fixed
