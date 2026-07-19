@@ -9,6 +9,7 @@
 *.key
 
 # 测试覆盖率产物
+coverage/
 .coverage
 coverage.json
 coverage.lcov
