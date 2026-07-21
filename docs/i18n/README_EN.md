@@ -1,10 +1,10 @@
 <div align="center">
 
-<img width="256" src="./docs/assets/brand/vibe-blog.png">
+<img width="256" src="../assets/brand/vibe-blog.png">
 
 _Turn complex tech into stories everyone can understand._
 
-**[中文](README.md) | English**
+**[中文](../../README.md) | English**
 
 <p>
 
@@ -27,9 +27,9 @@ _If this project is useful to you, please star🌟 & fork🍴_
 
 </div>
 
-🧪 **Testing guide**: See [docs/testing/README.md](./docs/testing/README.md) for local tests, E2E, and CI rules.
+🧪 **Testing guide**: See [docs/testing/README.md](../testing/README.md) for local tests, E2E, and CI rules.
 
-🗃️ **Deprecated features**: See [docs/deprecated/README.md](./docs/deprecated/README.md) for features removed from the primary product path.
+🗃️ **Deprecated features**: See [docs/deprecated/README.md](../deprecated/README.md) for features removed from the primary product path.
 
 ## ✨ Project Origin
 
@@ -57,7 +57,7 @@ vibe-blog was born to solve these problems. Based on multi-Agent collaborative a
 
 ### Homepage - Clean and Elegant Input Interface
 
-![Homepage](./docs/assets/screenshots/首页图.png)
+![Homepage](../assets/screenshots/首页图.png)
 
 _Input topic, select article type and length, generate with one click_
 
@@ -82,32 +82,32 @@ _Input topic, select article type and length, generate with one click_
 <div align="center">
 <table>
 <tr>
-<td><img src="./backend/outputs/images/中间运行过程图-1.png" width="400"/></td>
-<td><img src="./backend/outputs/images/中间运行过程图-2.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-1.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-2.png" width="400"/></td>
 </tr>
 <tr>
 <td align="center"><b>Step 1: Material Collection</b><br>Intelligent web search for resources</td>
 <td align="center"><b>Step 2-3: Outline Planning & Content Writing</b><br>Generate structured outline, write by chapter</td>
 </tr>
 <tr>
-<td><img src="./backend/outputs/images/中间运行过程图-4.png" width="400"/></td>
-<td><img src="./backend/outputs/images/中间运行过程图-5.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-4.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-5.png" width="400"/></td>
 </tr>
 <tr>
 <td align="center"><b>Step 4: Depth Questioning</b><br>Check content depth, supplement details</td>
 <td align="center"><b>Step 5: Code Generation</b><br>Generate runnable example code</td>
 </tr>
 <tr>
-<td><img src="./backend/outputs/images/中间运行过程图-6.png" width="400"/></td>
-<td><img src="./backend/outputs/images/中间运行过程图-7.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-6.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-7.png" width="400"/></td>
 </tr>
 <tr>
 <td align="center"><b>Step 6: Image Generation</b><br>Mermaid diagrams + AI images</td>
 <td align="center"><b>Step 7: Quality Review</b><br>Score and provide improvement suggestions</td>
 </tr>
 <tr>
-<td><img src="./backend/outputs/images/中间运行过程图-8.png" width="400"/></td>
-<td><img src="./backend/outputs/images/中间运行过程图-9.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-8.png" width="400"/></td>
+<td><img src="../../backend/outputs/images/中间运行过程图-9.png" width="400"/></td>
 </tr>
 <tr>
 <td align="center"><b>Step 8: Document Assembly</b><br>Assemble complete document, extract summary</td>
@@ -118,7 +118,7 @@ _Input topic, select article type and length, generate with one click_
 
 ### Blog Results - Professional Technical Articles
 
-![Blog Results](./docs/assets/screenshots/技术博客结果图.png)
+![Blog Results](../assets/screenshots/技术博客结果图.png)
 
 _Complete blog content preview, supports image export and Markdown download_
 
@@ -128,12 +128,12 @@ _Complete blog content preview, supports image export and Markdown download_
 
 | Blog Title                                                                                           |                                            Local Preview                                             |                                 CSDN                                 |
 | :--------------------------------------------------------------------------------------------------- | :--------------------------------------------------------------------------------------------------: | :------------------------------------------------------------------: |
-| **Triton Deployment Practical Guide: From Design Principles to Production**                          |     [Markdown](./backend/outputs/Triton%20部署实战指南_从设计思想到生产落地_20251231_034839.md)      | [View](https://blog.csdn.net/ll1042668699/article/details/156437086) |
-| **vLLM Inference Engine Deep Dive: Core Acceleration Mechanisms and Component Principles**           | [Markdown](./backend/outputs/vLLM推理引擎深度拆解_核心加速机制与组件原理实战指南_20251231_031953.md) | [View](https://blog.csdn.net/ll1042668699/article/details/156436798) |
-| **Message Queue Getting Started: Building an Async Communication System from Scratch**               |        [Markdown](./backend/outputs/消息队列入门实战_从零搭建异步通信系统_20251230_045909.md)        | [View](https://blog.csdn.net/ll1042668699/article/details/156406666) |
-| **Distributed Lock Practical Guide: Master High-Concurrency Resource Synchronization in 30 Minutes** |  [Markdown](./backend/outputs/分布式锁实战指南_30分钟掌握高并发下的资源同步控制_20251230_052151.md)  | [View](https://blog.csdn.net/ll1042668699/article/details/156406394) |
-| **RAG Evolution Illustrated: Traditional RAG vs Graph RAG Architecture Comparison**                  | [Markdown](./backend/outputs/图解RAG进化_传统RAG%20vs%20Graph%20RAG架构实战对比_20251231_042358.md)  | [View](https://blog.csdn.net/ll1042668699/article/details/156437897) |
-| **Redis Quick Start Tutorial: Building a High-Performance Cache System from Scratch**                |   [Markdown](./backend/outputs/Redis%20快速上手实战教程_从零搭建高性能缓存系统_20251230_043948.md)   | [View](https://blog.csdn.net/ll1042668699/article/details/156438172) |
+| **Triton Deployment Practical Guide: From Design Principles to Production**                          |     [Markdown](../../backend/outputs/Triton%20部署实战指南_从设计思想到生产落地_20251231_034839.md)      | [View](https://blog.csdn.net/ll1042668699/article/details/156437086) |
+| **vLLM Inference Engine Deep Dive: Core Acceleration Mechanisms and Component Principles**           | [Markdown](../../backend/outputs/vLLM推理引擎深度拆解_核心加速机制与组件原理实战指南_20251231_031953.md) | [View](https://blog.csdn.net/ll1042668699/article/details/156436798) |
+| **Message Queue Getting Started: Building an Async Communication System from Scratch**               |        [Markdown](../../backend/outputs/消息队列入门实战_从零搭建异步通信系统_20251230_045909.md)        | [View](https://blog.csdn.net/ll1042668699/article/details/156406666) |
+| **Distributed Lock Practical Guide: Master High-Concurrency Resource Synchronization in 30 Minutes** |  [Markdown](../../backend/outputs/分布式锁实战指南_30分钟掌握高并发下的资源同步控制_20251230_052151.md)  | [View](https://blog.csdn.net/ll1042668699/article/details/156406394) |
+| **RAG Evolution Illustrated: Traditional RAG vs Graph RAG Architecture Comparison**                  | [Markdown](../../backend/outputs/图解RAG进化_传统RAG%20vs%20Graph%20RAG架构实战对比_20251231_042358.md)  | [View](https://blog.csdn.net/ll1042668699/article/details/156437897) |
+| **Redis Quick Start Tutorial: Building a High-Performance Cache System from Scratch**                |   [Markdown](../../backend/outputs/Redis%20快速上手实战教程_从零搭建高性能缓存系统_20251230_043948.md)   | [View](https://blog.csdn.net/ll1042668699/article/details/156438172) |
 
 ## 🎯 Feature Introduction
 
@@ -141,7 +141,7 @@ _Complete blog content preview, supports image export and Markdown download_
 
 <div align="center">
 
-<img width="800" src="./docs/assets/diagrams/multi-agent-architecture.png">
+<img width="800" src="../assets/diagrams/multi-agent-architecture.png">
 
 </div>
 
@@ -203,7 +203,7 @@ All Agents share unified state management and Prompt template library, ensuring 
 
 > ⚡️ **Recommended**: Docker deployment (simple, consistent)
 >
-> 📖 Full Guide: [Docker Deployment Guide](./docker/DOCKER_DEPLOY.md)
+> 📖 Full Guide: [Docker Deployment Guide](../../docker/DOCKER_DEPLOY.md)
 
 ### Method 1: Docker Deployment (Recommended)
 

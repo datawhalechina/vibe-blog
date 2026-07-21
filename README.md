@@ -6,7 +6,7 @@
 
 _Turn complex tech into stories everyone can understand._
 
-**中文 | [English](README_EN.md)**
+**中文 | [English](docs/i18n/README_EN.md)**
 
 <p>
 

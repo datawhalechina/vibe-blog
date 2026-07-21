@@ -7,6 +7,8 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-22
 
 ### Changed
+- 🔧 **英文文档迁移计划** — 明确将英文 README 归入 `docs/i18n/` 并逐项更新与验证相对链接。
+- 🔧 **英文文档归位** — 将 `README_EN.md` 迁入 `docs/i18n/`，同步更新语言切换、文档资源、示例和部署指南链接。
 - 🔧 **WhatsApp 集成迁移计划** — 明确将独立 Node.js 网关归入 `integrations/` 并保持本地启动兼容。
 - 🔧 **WhatsApp 集成归位** — 将独立 Node.js 网关迁入 `integrations/whatsapp-gateway/`，同步启动路径并兼容迁移本地认证数据。
 
