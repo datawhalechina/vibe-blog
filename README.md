@@ -34,6 +34,8 @@ _如果该项目对你有用, 欢迎 star🌟 & fork🍴_
 
 📝 **更新日志**：查看 [CHANGELOG.md](./CHANGELOG.md) 了解完整版本历史。
 
+🧪 **测试指南**：查看 [docs/testing/README.md](./docs/testing/README.md) 了解本地测试、E2E 和 CI 规则。
+
 ---
 
 <br>

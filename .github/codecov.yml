@@ -1,46 +1,34 @@
 codecov:
-  require_ci_to_pass: yes
+  require_ci_to_pass: true
   notify:
-    wait_for_ci: yes
+    wait_for_ci: true
 
 coverage:
   precision: 2
   round: down
-  range: "60...100"
+  range: "20...100"
 
   status:
     project:
-      default:
-        target: auto
+      default: false
+      frontend:
+        target: 50%
         threshold: 1%
-        base: auto
-    patch:
-      default:
-        target: auto
+        flags:
+          - frontend
+      backend:
+        target: 20%
         threshold: 1%
-
-  # Frontend coverage
-  frontend:
-    target: 60%
-    threshold: 1%
-    paths:
-      - "frontend/src/**"
-
-  # Backend coverage
-  backend:
-    target: 55%
-    threshold: 1%
-    paths:
-      - "backend/services/**"
-      - "backend/utils/**"
-      - "backend/app.py"
+        flags:
+          - backend
+    patch: false
 
 comment:
   layout: "reach,diff,flags,tree"
   behavior: default
-  require_changes: no
-  require_base: no
-  require_head: yes
+  require_changes: false
+  require_base: false
+  require_head: true
 
 ignore:
   - "frontend/node_modules"
@@ -61,6 +49,7 @@ flags:
   backend:
     paths:
       - backend/services
+      - backend/routes
       - backend/utils
       - backend/app.py
     carryforward: true

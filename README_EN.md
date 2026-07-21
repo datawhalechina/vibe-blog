@@ -27,6 +27,8 @@ _If this project is useful to you, please star🌟 & fork🍴_
 
 </div>
 
+🧪 **Testing guide**: See [docs/testing/README.md](./docs/testing/README.md) for local tests, E2E, and CI rules.
+
 ## ✨ Project Origin
 
 Have you ever been stuck in this situation: you want to write a technical blog, but don't know how to make it understandable for non-technical readers; you have lots of technical knowledge in mind, but struggle to explain it with vivid metaphors?

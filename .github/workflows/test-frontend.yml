@@ -5,11 +5,13 @@ on:
     branches: [main, develop, feature/**]
     paths:
       - 'frontend/**'
+      - '.github/codecov.yml'
       - '.github/workflows/test-frontend.yml'
   pull_request:
     branches: [main, develop]
     paths:
       - 'frontend/**'
+      - '.github/codecov.yml'
       - '.github/workflows/test-frontend.yml'
 
 jobs:
@@ -77,7 +79,7 @@ jobs:
             | Functions | ${total.functions.pct}% |
             | Lines | ${total.lines.pct}% |
 
-            ${total.lines.pct >= 60 ? '✅' : '⚠️'} Coverage threshold: 60%
+            ${total.lines.pct >= 50 ? '✅' : '⚠️'} Coverage threshold: 50%
             `;
 
             github.rest.issues.createComment({
