@@ -1,6 +1,6 @@
 <div align="center">
 
-<img width="256" src="./logo/vibe-blog.png">
+<img width="256" src="./docs/assets/brand/vibe-blog.png">
 
 _Turn complex tech into stories everyone can understand._
 
@@ -55,7 +55,7 @@ vibe-blog was born to solve these problems. Based on multi-Agent collaborative a
 
 ### Homepage - Clean and Elegant Input Interface
 
-![Homepage](./backend/outputs/images/首页图.png)
+![Homepage](./docs/assets/screenshots/首页图.png)
 
 _Input topic, select article type and length, generate with one click_
 
@@ -116,7 +116,7 @@ _Input topic, select article type and length, generate with one click_
 
 ### Blog Results - Professional Technical Articles
 
-![Blog Results](./backend/outputs/images/技术博客结果图.png)
+![Blog Results](./docs/assets/screenshots/技术博客结果图.png)
 
 _Complete blog content preview, supports image export and Markdown download_
 
@@ -139,7 +139,7 @@ _Complete blog content preview, supports image export and Markdown download_
 
 <div align="center">
 
-<img width="800" src="./logo/multi-agent-architecture.png">
+<img width="800" src="./docs/assets/diagrams/multi-agent-architecture.png">
 
 </div>
 
@@ -420,7 +420,7 @@ banana-blog/
 │           │   └── helpers.py            # Utility functions
 │           └── services/
 │               └── search_service.py     # Zhipu search service
-├── logo/                                 # Logo resources
+├── docs/assets/                          # Documentation images and brand assets
 └── README.md
 ```
 
