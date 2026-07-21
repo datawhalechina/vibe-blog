@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-21
 
 ### Changed
+- 🔧 **文档资源迁移计划** — 明确将 README 图片从根目录 `logo/` 归入分类后的 `docs/assets/` 并逐项校验链接。
 - 🔧 **测试文档组织** — 将维护中的测试指南迁移到 `docs/testing/`，删除过时的测试实施总结，并从中英文 README 提供统一入口。
 - 🔧 **Codecov 配置归位** — 将仓库级 Codecov 配置迁移到 `.github/`，修正无效的状态结构并与当前前后端覆盖率门槛对齐。
 - 🔧 **仓库结构演进设计** — 明确技术分层、services 能力细分、统一运行目录与渐进兼容迁移的多 PR 路线。
