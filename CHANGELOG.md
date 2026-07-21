@@ -12,6 +12,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - 🔧 **仓库结构演进设计** — 明确技术分层、services 能力细分、统一运行目录与渐进兼容迁移的多 PR 路线。
 - 🔧 **本地工具目录治理** — 停止跟踪并忽略 UI/UX Skill 与 Windsurf Skill 本地资源，同时保留 GitHub Actions 配置。
 - 🔧 **后端项目根迁移设计** — 明确移除 Vercel 支持并将 uv 项目配置迁入 `backend/` 的范围、行为变化和验证步骤。
+- 🔧 **Vercel 部署清理** — 删除 Vercel 配置、Serverless 入口及只读运行环境降级逻辑，统一使用本地与 Docker 后端入口。
 
 ### Tests
 - ✨ **Codecov 配置验证** — 配置变更会触发前后端测试工作流，并通过 Codecov 官方验证接口与本地 YAML 解析检查。

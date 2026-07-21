@@ -99,13 +99,7 @@ def init_services(app):
     if mineru_token:
         # Uploads relative to backend root
         upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
-        try:
-            os.makedirs(upload_folder, exist_ok=True)
-        except (OSError, IOError):
-             # Vercel fallback
-            import tempfile
-            upload_folder = tempfile.gettempdir()
-            logger.warning(f"无法创建 uploads 目录，使用临时目录: {upload_folder}")
+        os.makedirs(upload_folder, exist_ok=True)
         
         init_file_parser(
             mineru_token=mineru_token,
