@@ -7,6 +7,8 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-21
 
 ### Changed
+- 🔧 **E2E 工具迁移计划** — 明确将专用测试运行与日志分析脚本归入 `tests/e2e/tools/` 的路径和验证方式。
+- 🔧 **E2E 工具归位** — 将测试运行与日志分析脚本迁入 `tests/e2e/tools/`，同步适配后端 uv 项目路径和维护文档。
 - 🔧 **文档资源迁移计划** — 明确将 README 图片从根目录 `logo/` 归入分类后的 `docs/assets/` 并逐项校验链接。
 - 🔧 **文档资源归位** — 将品牌图、截图、架构图、示例和社区图片分类迁入 `docs/assets/`，同步更新中英文 README 引用。
 - 🔧 **测试文档组织** — 将维护中的测试指南迁移到 `docs/testing/`，删除过时的测试实施总结，并从中英文 README 提供统一入口。
