@@ -23,7 +23,6 @@ class DatabaseService:
         
         Args:
             db_path: 数据库文件路径，默认为 backend/data/banana_blog.db
-                    在 Vercel 等只读环境中，自动使用内存数据库
         """
         if db_path is None:
             # 默认路径: backend/data/banana_blog.db
@@ -32,13 +31,7 @@ class DatabaseService:
         
         self.db_path = db_path
         
-        # 尝试创建目录，如果失败则使用内存数据库
-        try:
-            Path(db_path).parent.mkdir(parents=True, exist_ok=True)
-        except (OSError, IOError):
-            # Vercel 环境是只读的，使用内存数据库
-            logger.warning(f"无法创建数据库目录，使用内存数据库")
-            self.db_path = ":memory:"
+        Path(db_path).parent.mkdir(parents=True, exist_ok=True)
         
         # 初始化表
         self._init_tables()

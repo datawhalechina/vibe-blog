@@ -12,8 +12,10 @@ This guide describes the maintained test commands and CI behavior for the Flask 
 Install the backend runtime and test dependencies from the locked environment:
 
 ```bash
-uv sync --extra test --frozen
+uv sync --project backend --extra test --frozen
 ```
+
+The uv-managed environment is stored at `backend/.venv/`. Existing checkouts may remove a stale root-level `.venv/` after the first successful backend sync.
 
 Install frontend dependencies:
 
@@ -28,15 +30,15 @@ Run the non-LLM suite used by CI:
 
 ```bash
 cd backend
-uv run --project .. pytest -m "not llm"
+uv run pytest -m "not llm"
 ```
 
 Run a focused file or test:
 
 ```bash
 cd backend
-uv run --project .. pytest tests/unit/test_database_service.py -v
-uv run --project .. pytest tests/unit/test_database_service.py::TestDocumentOperations::test_create_document -v
+uv run pytest tests/unit/test_database_service.py -v
+uv run pytest tests/unit/test_database_service.py::TestDocumentOperations::test_create_document -v
 ```
 
 Useful markers declared in `backend/pytest.ini`:
@@ -76,10 +78,10 @@ E2E tests require the Flask backend on port 5001 and the Vite frontend on port 5
 Install the Chromium browser once after syncing Python dependencies:
 
 ```bash
-uv run playwright install chromium
+uv run --project backend playwright install chromium
 ```
 
-Linux CI or container environments may use `uv run playwright install --with-deps chromium` to install required system libraries as well.
+Linux CI or container environments may use `uv run --project backend playwright install --with-deps chromium` to install required system libraries as well.
 
 Start both services in one terminal:
 
@@ -90,15 +92,15 @@ bash docker/start-local.sh
 Run the complete headless suite in another terminal:
 
 ```bash
-RUN_E2E_TESTS=1 uv run pytest tests/e2e/ -v
+RUN_E2E_TESTS=1 uv run --project backend pytest tests/e2e/ -v
 ```
 
 Optional controls:
 
 ```bash
-RUN_E2E_TESTS=1 E2E_HEADED=1 uv run pytest tests/e2e/ -v
-RUN_E2E_TESTS=1 E2E_SLOW_MO=100 uv run pytest tests/e2e/ -v
-RUN_E2E_TESTS=1 uv run pytest tests/e2e/test_tc01_home_load.py -v
+RUN_E2E_TESTS=1 E2E_HEADED=1 uv run --project backend pytest tests/e2e/ -v
+RUN_E2E_TESTS=1 E2E_SLOW_MO=100 uv run --project backend pytest tests/e2e/ -v
+RUN_E2E_TESTS=1 uv run --project backend pytest tests/e2e/test_tc01_home_load.py -v
 ```
 
 E2E screenshots are written to `backend/outputs/e2e_screenshots/` and must not be committed.
@@ -108,7 +110,7 @@ E2E screenshots are written to `backend/outputs/e2e_screenshots/` and must not b
 | Workflow | Runtime | Command | Enforced coverage gate |
 | --- | --- | --- | --- |
 | Frontend Tests | Node.js 20 | `npm test` and `npm run test:coverage` | 50% in `frontend/vitest.config.ts` |
-| Backend Tests | Python 3.10, 3.11, 3.12 | `uv sync --frozen`, then non-LLM pytest | 20% in the workflow |
+| Backend Tests | Python 3.10, 3.11, 3.12 | `cd backend && uv sync --frozen`, then non-LLM pytest | 20% in the workflow |
 
 Both workflows upload coverage reports to Codecov with separate `frontend` and `backend` flags. Repository-level Codecov behavior is configured in `.github/codecov.yml`.
 

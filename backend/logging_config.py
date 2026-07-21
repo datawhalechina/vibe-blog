@@ -136,26 +136,21 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
     if not enable_file:
         return
 
-    # 文件 handler：在只读环境（如 Vercel）下自动跳过
-    try:
-        base_dir = os.path.dirname(os.path.realpath(__file__))
-        # 统一日志目录到 vibe-blog/logs/（与启动脚本一致）
-        project_root = os.path.dirname(base_dir)
-        resolved_log_dir = log_dir or os.path.join(project_root, "logs")
-        os.makedirs(resolved_log_dir, exist_ok=True)
+    base_dir = os.path.dirname(os.path.realpath(__file__))
+    # 统一日志目录到 vibe-blog/logs/（与启动脚本一致）
+    project_root = os.path.dirname(base_dir)
+    resolved_log_dir = log_dir or os.path.join(project_root, "logs")
+    os.makedirs(resolved_log_dir, exist_ok=True)
 
-        log_file = os.path.join(resolved_log_dir, "app.log")
-        file_handler = RotatingFileHandler(
-            log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
-        )
-        file_handler.setLevel(logging.DEBUG)
-        file_handler.setFormatter(plain_formatter)
-        file_handler.addFilter(task_filter)
-        file_handler._vibe_blog_handler = True  # type: ignore[attr-defined]
-        root_logger.addHandler(file_handler)
-    except (OSError, IOError):
-        # 只读文件系统：保留控制台日志即可
-        return
+    log_file = os.path.join(resolved_log_dir, "app.log")
+    file_handler = RotatingFileHandler(
+        log_file, maxBytes=10 * 1024 * 1024, backupCount=5, encoding="utf-8"
+    )
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(plain_formatter)
+    file_handler.addFilter(task_filter)
+    file_handler._vibe_blog_handler = True  # type: ignore[attr-defined]
+    root_logger.addHandler(file_handler)
 
 
 def get_logger(name: str) -> logging.Logger:
@@ -215,4 +210,3 @@ def remove_task_logger(handler: logging.Handler) -> None:
         handler.close()
     except Exception:
         pass
-
