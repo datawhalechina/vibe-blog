@@ -9,12 +9,12 @@
 #   3. 收集截图和日志到 outputs 目录
 #
 # 用法：
-#   bash scripts/run_e2e.sh              # 完整流程（检查服务 + 跑测试）
-#   bash scripts/run_e2e.sh --restart    # 强制重启服务后跑测试
-#   bash scripts/run_e2e.sh --test-only  # 跳过服务检查，直接跑测试
-#   bash scripts/run_e2e.sh --smoke      # 只跑 smoke 测试（TC-01 + TC-02）
-#   bash scripts/run_e2e.sh --chain      # 全链路闭环测试（TC-16）
-#   bash scripts/run_e2e.sh --headed     # 有头模式（显示浏览器窗口）
+#   bash tests/e2e/tools/run_e2e.sh              # 完整流程（检查服务 + 跑测试）
+#   bash tests/e2e/tools/run_e2e.sh --restart    # 强制重启服务后跑测试
+#   bash tests/e2e/tools/run_e2e.sh --test-only  # 跳过服务检查，直接跑测试
+#   bash tests/e2e/tools/run_e2e.sh --smoke      # 只跑 smoke 测试（TC-01 + TC-02）
+#   bash tests/e2e/tools/run_e2e.sh --chain      # 全链路闭环测试（TC-16）
+#   bash tests/e2e/tools/run_e2e.sh --headed     # 有头模式（显示浏览器窗口）
 # ============================================================
 
 set -e
@@ -26,12 +26,13 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 E2E_DIR="$PROJECT_ROOT/tests/e2e"
 SCREENSHOT_DIR="$BACKEND_DIR/outputs/e2e_screenshots"
 LOG_DIR="$PROJECT_ROOT/logs"
+UV_RUN=(uv run --project "$BACKEND_DIR")
 
 BACKEND_PORT=5001
 FRONTEND_PORT=5173
@@ -118,7 +119,7 @@ if [ "$TEST_ONLY" = false ]; then
         echo -e "${YELLOW}后端未运行，启动中...${NC}"
         mkdir -p "$LOG_DIR"
         TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-        cd "$BACKEND_DIR" && python app.py > "$LOG_DIR/backend_e2e_${TIMESTAMP}.log" 2>&1 &
+        cd "$BACKEND_DIR" && "${UV_RUN[@]}" python app.py > "$LOG_DIR/backend_e2e_${TIMESTAMP}.log" 2>&1 &
         BACKEND_PID=$!
         STARTED_BACKEND=true
     else
@@ -186,17 +187,17 @@ cd "$PROJECT_ROOT"
 
 if [ "$SMOKE" = true ]; then
     echo -e "  运行 smoke 测试 (TC-01 + TC-02)..."
-    python -m pytest tests/e2e/test_tc01_home_load.py tests/e2e/test_tc02_blog_gen.py \
+    "${UV_RUN[@]}" pytest tests/e2e/test_tc01_home_load.py tests/e2e/test_tc02_blog_gen.py \
         -v --tb=short $EXTRA_PYTEST_ARGS 2>&1 | tee "$LOG_DIR/e2e_result_$(date +%H%M%S).log"
     TEST_EXIT=$?
 elif [ "$CHAIN" = true ]; then
     echo -e "  运行全链路闭环测试 (TC-16)..."
-    python -m pytest tests/e2e/test_tc16_full_chain.py \
+    "${UV_RUN[@]}" pytest tests/e2e/test_tc16_full_chain.py \
         -v --tb=short $EXTRA_PYTEST_ARGS 2>&1 | tee "$LOG_DIR/e2e_result_$(date +%H%M%S).log"
     TEST_EXIT=$?
 else
     echo -e "  运行完整 E2E 测试..."
-    python -m pytest tests/e2e/ \
+    "${UV_RUN[@]}" pytest tests/e2e/ \
         -v --tb=short $EXTRA_PYTEST_ARGS 2>&1 | tee "$LOG_DIR/e2e_result_$(date +%H%M%S).log"
     TEST_EXIT=$?
 fi
@@ -217,10 +218,10 @@ echo -e "  日志: ${LOG_COUNT} 个 → $SCREENSHOT_DIR"
 
 echo -e "\n${BLUE}[Step 5] 日志分析${NC}"
 ANALYSIS_REPORT="$LOG_DIR/e2e_analysis_$(date +%H%M%S).json"
-python "$SCRIPT_DIR/analyze_e2e_logs.py" --since 10m --output "$ANALYSIS_REPORT" 2>/dev/null
+"${UV_RUN[@]}" python "$SCRIPT_DIR/analyze_logs.py" --since 10m --output "$ANALYSIS_REPORT" 2>/dev/null
 if [ -f "$ANALYSIS_REPORT" ]; then
-    HEALTH=$(python -c "import json; d=json.load(open('$ANALYSIS_REPORT')); print(d.get('health',{}).get('status','UNKNOWN'))" 2>/dev/null || echo "UNKNOWN")
-    ISSUES=$(python -c "import json; d=json.load(open('$ANALYSIS_REPORT')); print(d.get('health',{}).get('total_issues',0))" 2>/dev/null || echo "?")
+    HEALTH=$("${UV_RUN[@]}" python -c "import json; d=json.load(open('$ANALYSIS_REPORT')); print(d.get('health',{}).get('status','UNKNOWN'))" 2>/dev/null || echo "UNKNOWN")
+    ISSUES=$("${UV_RUN[@]}" python -c "import json; d=json.load(open('$ANALYSIS_REPORT')); print(d.get('health',{}).get('total_issues',0))" 2>/dev/null || echo "?")
     if [ "$HEALTH" = "GREEN" ]; then
         echo -e "  ${GREEN}健康度: $HEALTH (问题: $ISSUES)${NC}"
     elif [ "$HEALTH" = "RED" ]; then
