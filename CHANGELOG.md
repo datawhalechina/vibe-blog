@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-21
 
 ### Changed
+- 🔧 **vibe-reviewer 文档弃用** — 从当前功能介绍、完成清单和详细目录树中移除教程评估模块，并在 `docs/deprecated/` 记录保留范围与后续删除条件。
 - 🔧 **文档资源迁移计划** — 明确将 README 图片从根目录 `logo/` 归入分类后的 `docs/assets/` 并逐项校验链接。
 - 🔧 **文档资源归位** — 将品牌图、截图、架构图、示例和社区图片分类迁入 `docs/assets/`，同步更新中英文 README 引用。
 - 🔧 **测试文档组织** — 将维护中的测试指南迁移到 `docs/testing/`，删除过时的测试实施总结，并从中英文 README 提供统一入口。
