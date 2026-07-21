@@ -400,7 +400,7 @@ async function connectWhatsApp() {
   if (!state.creds.registered) {
     logger.error('❌ WhatsApp 未认证！请先运行: node src/auth.js');
     logger.info('认证步骤：');
-    logger.info('  1. cd whatsapp-gateway');
+    logger.info('  1. cd integrations/whatsapp-gateway');
     logger.info('  2. node src/auth.js');
     logger.info('  3. 用手机 WhatsApp 扫描二维码');
     process.exit(1);

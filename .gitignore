@@ -23,6 +23,9 @@ backend/coverage.lcov
 # 缓存数据库（可能含敏感信息）
 backend/cache/
 
+# WhatsApp 网关旧路径（迁移期间保护本地认证数据）
+whatsapp-gateway/store/
+
 # Python
 __pycache__/
 *.py[cod]
