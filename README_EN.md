@@ -29,6 +29,8 @@ _If this project is useful to you, please star🌟 & fork🍴_
 
 🧪 **Testing guide**: See [docs/testing/README.md](./docs/testing/README.md) for local tests, E2E, and CI rules.
 
+🗃️ **Deprecated features**: See [docs/deprecated/README.md](./docs/deprecated/README.md) for features removed from the primary product path.
+
 ## ✨ Project Origin
 
 Have you ever been stuck in this situation: you want to write a technical blog, but don't know how to make it understandable for non-technical readers; you have lots of technical knowledge in mind, but struggle to explain it with vivid metaphors?
@@ -420,7 +422,9 @@ banana-blog/
 │           │   └── helpers.py            # Utility functions
 │           └── services/
 │               └── search_service.py     # Zhipu search service
-├── docs/assets/                          # Documentation images and brand assets
+├── docs/
+│   ├── assets/                           # Documentation images and brand assets
+│   └── deprecated/                       # Deprecated feature inventory
 └── README.md
 ```
 

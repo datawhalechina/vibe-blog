@@ -36,6 +36,8 @@ _如果该项目对你有用, 欢迎 star🌟 & fork🍴_
 
 🧪 **测试指南**：查看 [docs/testing/README.md](./docs/testing/README.md) 了解本地测试、E2E 和 CI 规则。
 
+🗃️ **已弃用功能**：查看 [docs/deprecated/README.md](./docs/deprecated/README.md) 了解退出主要产品路径的历史功能。
+
 ---
 
 <br>
@@ -170,46 +172,6 @@ _输入主题，选择文章类型和长度，一键生成_
 
 _完整博客内容预览，支持导出图片和下载 Markdown_
 
-### vibe-reviewer - 技术教程质量评估工具
-
-<div align="center">
-<img width="700" src="./docs/assets/screenshots/vibe-reviewer-entry.png">
-</div>
-
-vibe-reviewer 是一个专为技术教程和博客设计的 AI 质量评估工具。通过多维度深度检查，帮助你在发布前发现内容问题、提升文章质量。支持 Git 仓库批量评估，适用于开源教程项目的质量把控。
-
-<div align="center">
-<img width="700" src="./docs/assets/screenshots/vibe-reviewer-front.png">
-</div>
-
-**核心能力：**
-
-| 功能               | 说明                                             |
-| ------------------ | ------------------------------------------------ |
-| **多维度质量检测** | 从准确性、逻辑性、完整性、可读性四个维度评估内容 |
-| **中文可读性分析** | 基于句长、段落结构、文档结构的专业可读性评分     |
-| **搜索增强评估**   | 联网搜索验证技术内容的准确性和时效性             |
-| **精准问题定位**   | 点击问题自动跳转到原文位置，支持高亮显示         |
-| **三栏对比视图**   | 左侧文件列表、中间 Markdown 渲染、右侧问题批注   |
-| **报告导出**       | 支持导出评估报告为 Markdown 格式                 |
-
-**使用方式：**
-
-1. 输入 Git 仓库地址（支持 GitHub/Gitee）
-2. 选择评估深度（快速/标准/深度）
-3. 系统自动克隆仓库、解析文档、逐一评估
-4. 查看评估报告，点击问题跳转到原文位置
-
-> 💡 **应用场景**：开源教程项目发布前的质量审核、技术博客的内容校验、团队文档的规范检查。
-
-**问题定位功能展示：**
-
-<div align="center">
-<img width="700" src="./docs/assets/screenshots/vibe-reviewer-example.png">
-</div>
-
-_点击问题，自动跳转到原文位置，方便快速定位和修改_
-
 ---
 
 ### 技术知识共创平台 - 博客聚合成书 🆕
@@ -329,11 +291,10 @@ _点击问题，自动跳转到原文位置，方便快速定位和修改_
 | 10  | ✅   | 历史文章记录                     | 自动保存生成历史，支持查看和删除                                                                                         |
 | 11  | ✅   | AI 科普绘本风格                  | 支持将技术内容转化为通俗易懂的科普绘本                                                                                   |
 | 12  | ✅   | 在线体验                         | 域名申请中，当前可先加入项目内测讨论群, 群里有IP链接                                                                     |
-| 13  | ✅   | **教程评估模块 (vibe-reviewer)** | Git 仓库教程质量评估：深度检查 + 质量审核 + 可读性分析，支持搜索增强评估、SSE 实时进度、Markdown 报告导出                |
-| 14  | ✅   | **自动配图**      | 8 种配图风格（Style）+ 6 种插图类型（Type）：内容信号自动推荐、兼容性降级，Type 决定结构骨架，Style 决定视觉皮肤        |
-| 15  | ✅   | **智能书籍构建系统**             | 一键扫描聚合博客成书籍、智能大纲生成、书籍首页生成、Docsify 阅读器、博客归属标签                                         |
-| 16  | ✅   | **CSDN 一键发布**                | 基于 Playwright 浏览器自动化，支持 Cookie 认证、智能标签、封面图处理                                                     |
-| 17  | ✅   | **Langfuse LLM 调用链路追踪**    | 集成 Langfuse Cloud，自动追踪每个 Agent 的 LLM 调用，支持 Trace 视图、耗时统计、Token 费用分析                           |
+| 13  | ✅   | **自动配图**                     | 8 种配图风格（Style）+ 6 种插图类型（Type）：内容信号自动推荐、兼容性降级，Type 决定结构骨架，Style 决定视觉皮肤        |
+| 14  | ✅   | **智能书籍构建系统**             | 一键扫描聚合博客成书籍、智能大纲生成、书籍首页生成、Docsify 阅读器、博客归属标签                                         |
+| 15  | ✅   | **CSDN 一键发布**                | 基于 Playwright 浏览器自动化，支持 Cookie 认证、智能标签、封面图处理                                                     |
+| 16  | ✅   | **Langfuse LLM 调用链路追踪**    | 集成 Langfuse Cloud，自动追踪每个 Agent 的 LLM 调用，支持 Trace 视图、耗时统计、Token 费用分析                           |
 
 <details>
 <summary><b>🚀 未来规划（6 大方向，点击展开）</b></summary>
@@ -615,27 +576,9 @@ banana-blog/
 │           │   └── helpers.py            # 工具函数
 │           └── services/
 │               └── search_service.py     # 智谱搜索服务
-│   └── vibe_reviewer/                    # 教程评估模块 (vibe-reviewer)
-│       ├── __init__.py                   # 模块入口
-│       ├── reviewer_service.py           # 评估服务核心
-│       ├── schemas.py                    # 数据模型定义
-│       ├── api/
-│       │   └── routes.py                 # API 路由 (SSE 进度推送 + 报告导出)
-│       ├── models/
-│       │   └── reviewer_models.py        # SQLite 数据库模型
-│       ├── pipeline/                     # 评估流水线
-│       │   ├── content_analyzer.py       # 内容分析器
-│       │   ├── depth_checker.py          # 深度检查器
-│       │   ├── quality_reviewer.py       # 质量审核器
-│       │   ├── readability_checker.py    # 可读性检查器
-│       │   ├── search_agent.py           # 搜索增强 Agent
-│       │   └── reference_manager.py      # 参考资料管理
-│       └── templates/                    # Jinja2 Prompt 模板
-│           ├── analyze_content.j2        # 内容分析 Prompt
-│           ├── depth_check.j2            # 深度检查 Prompt
-│           ├── quality_review.j2         # 质量审核 Prompt
-│           └── readability_check.j2      # 可读性检查 Prompt
-├── docs/assets/                          # 文档图片与品牌资源
+├── docs/
+│   ├── assets/                           # 文档图片与品牌资源
+│   └── deprecated/                       # 已弃用功能清单与历史资源
 └── README.md
 ```
 
