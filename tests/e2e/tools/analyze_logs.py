@@ -12,9 +12,9 @@ E2E 日志分析器 — vibe-blog-browser-test 日志监控子代理的核心脚
   stdout JSON 格式的分析报告，供主代理解析。
 
 用法：
-  python scripts/analyze_e2e_logs.py                          # 分析最近一次测试
-  python scripts/analyze_e2e_logs.py --task-id <id>           # 分析指定任务
-  python scripts/analyze_e2e_logs.py --since 5m               # 分析最近 5 分钟的日志
+  uv run --project backend python tests/e2e/tools/analyze_logs.py
+  uv run --project backend python tests/e2e/tools/analyze_logs.py --task-id <id>
+  uv run --project backend python tests/e2e/tools/analyze_logs.py --since 5m
 """
 import argparse
 import json
@@ -24,7 +24,7 @@ import sys
 from datetime import datetime, timedelta
 from pathlib import Path
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = PROJECT_ROOT / "backend"
 LOGS_DIR = PROJECT_ROOT / "logs"
 TASK_LOGS_DIR = LOGS_DIR / "blog_tasks"

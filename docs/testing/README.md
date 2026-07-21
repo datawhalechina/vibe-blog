@@ -83,6 +83,14 @@ uv run --project backend playwright install chromium
 
 Linux CI or container environments may use `uv run --project backend playwright install --with-deps chromium` to install required system libraries as well.
 
+Use the repository-provided runner to manage services, execute the selected E2E scope, and analyze logs:
+
+```bash
+bash tests/e2e/tools/run_e2e.sh
+bash tests/e2e/tools/run_e2e.sh --smoke
+bash tests/e2e/tools/run_e2e.sh --test-only
+```
+
 Start both services in one terminal:
 
 ```bash
@@ -104,6 +112,12 @@ RUN_E2E_TESTS=1 uv run --project backend pytest tests/e2e/test_tc01_home_load.py
 ```
 
 E2E screenshots are written to `backend/outputs/e2e_screenshots/` and must not be committed.
+
+Analyze the latest E2E and application logs independently:
+
+```bash
+uv run --project backend python tests/e2e/tools/analyze_logs.py --since 10m
+```
 
 ## CI And Coverage
 
