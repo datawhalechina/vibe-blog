@@ -26,7 +26,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
-WHATSAPP_DIR="$PROJECT_ROOT/whatsapp-gateway"
+WHATSAPP_DIR="$PROJECT_ROOT/integrations/whatsapp-gateway"
+LEGACY_WHATSAPP_DIR="$PROJECT_ROOT/whatsapp-gateway"
 LOG_DIR="$PROJECT_ROOT/logs"
 
 # 时间戳（精确到秒）
@@ -180,6 +181,20 @@ echo -e "   日志: $FRONTEND_LOG"
 # 6. 启动 WhatsApp 网关（可选）
 if [ "$ENABLE_WHATSAPP" = "true" ] && [ -d "$WHATSAPP_DIR" ]; then
     echo -e "\n${BLUE}[6/6] 启动 WhatsApp 网关${NC}"
+
+    # Git 不会随目录重命名移动被忽略的本地认证数据。
+    if [ -d "$LEGACY_WHATSAPP_DIR/store" ]; then
+        if [ ! -e "$WHATSAPP_DIR/store" ]; then
+            if mv "$LEGACY_WHATSAPP_DIR/store" "$WHATSAPP_DIR/store"; then
+                echo -e "${GREEN}✓ 已迁移旧 WhatsApp 认证数据${NC}"
+            else
+                echo -e "${YELLOW}⚠️  无法自动迁移旧认证数据: $LEGACY_WHATSAPP_DIR/store${NC}"
+            fi
+        else
+            echo -e "${YELLOW}⚠️  检测到新旧两份 WhatsApp 数据，未自动覆盖旧目录:${NC}"
+            echo -e "   $LEGACY_WHATSAPP_DIR/store"
+        fi
+    fi
     
     # 检查 node_modules
     if [ ! -d "$WHATSAPP_DIR/node_modules" ]; then

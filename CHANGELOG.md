@@ -4,6 +4,12 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-22
+
+### Changed
+- 🔧 **WhatsApp 集成迁移计划** — 明确将独立 Node.js 网关归入 `integrations/` 并保持本地启动兼容。
+- 🔧 **WhatsApp 集成归位** — 将独立 Node.js 网关迁入 `integrations/whatsapp-gateway/`，同步启动路径并兼容迁移本地认证数据。
+
 ## 2026-07-21
 
 ### Changed
