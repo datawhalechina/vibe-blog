@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from infrastructure.paths import RuntimePaths
 
 
@@ -36,3 +38,16 @@ def test_preserves_absolute_runtime_override(tmp_path: Path) -> None:
     )
 
     assert paths.runtime_root == target
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_empty_runtime_override_uses_default(
+    tmp_path: Path,
+    value: str,
+) -> None:
+    paths = RuntimePaths.from_env(
+        {"VIBE_RUNTIME_DIR": value},
+        project_root=tmp_path,
+    )
+
+    assert paths.runtime_root == tmp_path / "var"

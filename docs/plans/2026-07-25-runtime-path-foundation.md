@@ -54,6 +54,18 @@ def test_preserves_absolute_runtime_override(tmp_path: Path) -> None:
         project_root=tmp_path / "project",
     )
     assert paths.runtime_root == target
+
+
+@pytest.mark.parametrize("value", ["", "   "])
+def test_empty_runtime_override_uses_default(
+    tmp_path: Path,
+    value: str,
+) -> None:
+    paths = RuntimePaths.from_env(
+        {"VIBE_RUNTIME_DIR": value},
+        project_root=tmp_path,
+    )
+    assert paths.runtime_root == tmp_path / "var"
 ```
 
 **Step 3: Run tests and verify RED**
@@ -107,7 +119,10 @@ class RuntimePaths:
     ) -> "RuntimePaths":
         env = os.environ if environ is None else environ
         root = (project_root or _PROJECT_ROOT).resolve()
-        runtime_root = Path(env.get("VIBE_RUNTIME_DIR", "var")).expanduser()
+        runtime_value = env.get("VIBE_RUNTIME_DIR", "var")
+        if not runtime_value.strip():
+            runtime_value = "var"
+        runtime_root = Path(runtime_value).expanduser()
         if not runtime_root.is_absolute():
             runtime_root = root / runtime_root
         runtime_root = runtime_root.resolve()
@@ -139,7 +154,7 @@ cd backend
 UV_CACHE_DIR=/private/tmp/vibe-blog-uv-cache-runtime-paths uv run --frozen pytest tests/unit/test_runtime_paths.py -v
 ```
 
-Expected: 3 tests pass.
+Expected: 5 tests pass.
 
 ### Task 3: Document the boundary
 

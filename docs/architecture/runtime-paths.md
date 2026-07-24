@@ -21,7 +21,8 @@ VIBE_RUNTIME_DIR=/srv/vibe-blog/state
 ```
 
 A relative override is resolved from the repository root. An absolute override
-is preserved.
+is preserved. Empty and whitespace-only values are treated as unset and fall
+back to the repository `var/` directory.
 
 ## Compatibility Contract
 
