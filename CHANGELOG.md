@@ -8,6 +8,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Changed
 - 🔧 **运行路径基础计划** — 明确以无副作用配置对象建立 `var/` 运行目录边界，并通过完整回归和浏览器 E2E 验证原有逻辑。
+- 🔧 **运行路径配置边界** — 新增统一的 `RuntimePaths` 解析对象与兼容约定，不改变现有日志、输出、上传和缓存调用路径。
 
 ## 2026-07-22
 
