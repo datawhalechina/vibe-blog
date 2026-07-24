@@ -4,6 +4,11 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-25
+
+### Changed
+- 🔧 **运行路径基础计划** — 明确以无副作用配置对象建立 `var/` 运行目录边界，并通过完整回归和浏览器 E2E 验证原有逻辑。
+
 ## 2026-07-22
 
 ### Changed
