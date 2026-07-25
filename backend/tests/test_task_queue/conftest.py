@@ -9,14 +9,8 @@ task_queue 测试 — 共享 Fixtures
 - sample_task: 示例 BlogTask
 """
 import asyncio
-import os
-import sys
 import pytest
 import pytest_asyncio
-
-# 将 backend 加入 path
-_backend_dir = os.path.join(os.path.dirname(__file__), '..', '..')
-sys.path.insert(0, _backend_dir)
 
 from services.task_queue.models import (
     BlogTask, BlogGenerationConfig, TriggerConfig, PublishConfig,

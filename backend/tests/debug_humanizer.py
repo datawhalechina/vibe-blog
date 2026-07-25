@@ -3,7 +3,6 @@
 验证 qwen3.5-plus 对 response_format={"type": "json_object"} 的支持情况
 """
 import sys, os, json, time
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), '..', '.env'))

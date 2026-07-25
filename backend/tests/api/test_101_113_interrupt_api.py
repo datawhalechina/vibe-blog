@@ -16,13 +16,6 @@ from unittest.mock import patch, MagicMock
 @pytest.fixture
 def app():
     """创建 Flask 测试应用"""
-    import sys
-    import os
-    # 确保 backend 在 sys.path 中
-    backend_dir = os.path.join(os.path.dirname(__file__), '..', '..')
-    if backend_dir not in sys.path:
-        sys.path.insert(0, os.path.abspath(backend_dir))
-
     from flask import Flask
     from routes.blog_routes import blog_bp
 

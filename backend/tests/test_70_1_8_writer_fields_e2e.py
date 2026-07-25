@@ -33,7 +33,6 @@ import argparse
 import logging
 import requests
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)

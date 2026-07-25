@@ -6,7 +6,6 @@ TDD: 修复前应失败（红），修复后应通过（绿）。
 """
 import sys
 import os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 import pytest
 from unittest.mock import patch, MagicMock

@@ -1,16 +1,9 @@
 """
 Shared pytest fixtures for VibeBlog backend tests.
 """
-import os
-import sys
 import pytest
 from unittest.mock import Mock, MagicMock
 from typing import Generator
-
-# Add backend directory to Python path
-backend_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.insert(0, backend_dir)
-
 
 # ============ Flask App Fixtures ============
 
