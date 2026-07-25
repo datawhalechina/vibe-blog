@@ -22,7 +22,6 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 import types
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.blog_generator.image_enhancement import (
     ImageEnhancementPipeline,

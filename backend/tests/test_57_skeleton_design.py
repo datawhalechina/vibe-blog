@@ -634,7 +634,6 @@ def call_judge(topic_config: dict, article: str) -> dict:
         response_text = result.get("response", result.get("content", ""))
     else:
         logger.warning(f"  ⚠️ /api/chat 不可用 ({resp.status_code})，尝试直接调用 LLM...")
-        sys.path.insert(0, str(Path(__file__).parent.parent))
         from services.llm_service import get_llm_service
         llm = get_llm_service()
         response_text = llm.chat(
@@ -780,5 +779,4 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     main()

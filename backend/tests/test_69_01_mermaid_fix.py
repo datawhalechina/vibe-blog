@@ -19,7 +19,6 @@ from pathlib import Path
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 logger = logging.getLogger(__name__)
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
 def test_sanitize_mermaid():

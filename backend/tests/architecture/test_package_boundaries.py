@@ -86,3 +86,28 @@ def test_lower_layers_do_not_import_upper_layers(package, forbidden):
             violations.append(f"{relative_path}: {sorted(illegal)}")
 
     assert not violations, "Invalid dependency direction:\n" + "\n".join(violations)
+
+
+def _is_sys_path_mutation(node: ast.Call) -> bool:
+    function = node.func
+    return (
+        isinstance(function, ast.Attribute)
+        and function.attr in {"insert", "append"}
+        and isinstance(function.value, ast.Attribute)
+        and function.value.attr == "path"
+        and isinstance(function.value.value, ast.Name)
+        and function.value.value.id == "sys"
+    )
+
+
+def test_tests_do_not_mutate_python_import_path():
+    violations = []
+    paths = [BACKEND_ROOT / "conftest.py", *(BACKEND_ROOT / "tests").rglob("*.py")]
+
+    for path in paths:
+        tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call) and _is_sys_path_mutation(node):
+                violations.append(f"{path.relative_to(BACKEND_ROOT)}:{node.lineno}")
+
+    assert not violations, "Tests must use pytest pythonpath configuration:\n" + "\n".join(violations)

@@ -17,7 +17,6 @@
 import sys
 from pathlib import Path
 
-sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from services.blog_generator.style_profile import StyleProfile
 from services.blog_generator.workflow_registry import WorkflowRegistry
