@@ -17,7 +17,7 @@ from services import (
     get_task_manager,
 )
 from services.database_service import get_db_service
-from services.oss_service import get_oss_service
+from services.publishing import get_oss_service
 from services.media import get_video_service
 
 logger = logging.getLogger(__name__)
@@ -45,7 +45,7 @@ def xhs_generate():
         task_manager = get_task_manager()
         task_manager.create_task(task_id, 'xhs_generate')
 
-        from services.xhs_service import XHSService
+        from services.publishing import XHSService
 
         xhs_service = XHSService(
             llm_client=get_llm_service(),
@@ -174,7 +174,7 @@ def xhs_explanation_video():
         bgm_url = data.get('bgm_url')
         video_model = data.get('video_model', 'veo3')
 
-        from services.xhs_service import XHSService
+        from services.publishing import XHSService
         xhs_service = XHSService(
             llm_client=get_llm_service(),
             image_service=get_image_service(),
@@ -227,7 +227,7 @@ def xhs_outline():
         count = data.get('count', 4)
         content = data.get('content')
 
-        from services.xhs_service import XHSService
+        from services.publishing import XHSService
 
         xhs_service = XHSService(
             llm_client=get_llm_service(),
@@ -309,7 +309,7 @@ def xhs_publish():
         if not local_images:
             return jsonify({'success': False, 'error': '没有可用的图片'}), 400
 
-        from services.publishers.publisher import Publisher
+        from services.publishing import Publisher
 
         publisher = Publisher()
 
