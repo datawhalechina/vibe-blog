@@ -1,15 +1,11 @@
-"""
-图片风格管理模块
+"""Compatibility alias for :mod:`services.media.image_styles`."""
 
-提供多风格博客配图的管理功能，支持：
-- 风格配置管理（styles.yaml）
-- Jinja2 Prompt 模板渲染
-- 风格列表查询（供前端下拉框使用）
-- Type × Style 二维渲染系统
-- 内容信号自动推荐插图类型
-"""
+import sys
 
-from .manager import ImageStyleManager, get_style_manager
-from .type_signals import auto_recommend_type
+from services.media import image_styles as _implementation
+from services.media.image_styles import manager as _manager
+from services.media.image_styles import type_signals as _type_signals
 
-__all__ = ['ImageStyleManager', 'get_style_manager', 'auto_recommend_type']
+sys.modules[f"{__name__}.manager"] = _manager
+sys.modules[f"{__name__}.type_signals"] = _type_signals
+sys.modules[__name__] = _implementation
