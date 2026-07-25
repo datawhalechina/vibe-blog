@@ -8,11 +8,12 @@ from typing import Optional, Dict, Any, List
 
 from services.blog_generator.agents import (
     ResearcherAgent, PlannerAgent, WriterAgent, CoderAgent,
-    ArtistAgent, ReviewerAgent, AssemblerAgent, SearchCoordinator,
+    ArtistAgent, AssemblerAgent, SearchCoordinator,
 )
 from services.blog_generator.agents.factcheck import FactCheckAgent
 from services.blog_generator.agents.humanizer import HumanizerAgent
 from services.chat.writing_session import WritingSession
+from services.review import ReviewerAgent
 
 logger = logging.getLogger(__name__)
 

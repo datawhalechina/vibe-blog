@@ -35,10 +35,10 @@ def test_mini_blog(topic: str):
     load_dotenv()
     
     import os
-    from backend.services.blog_generator.blog_service import init_blog_service, get_blog_service
+    from backend.services.blog_generation import init_blog_service, get_blog_service
     from backend.services.llm import init_llm_service
     from backend.services.media import init_image_service
-    from backend.services.blog_generator.services.search_service import init_search_service
+    from backend.services.blog_generation import init_search_service
     
     # 构建配置
     config = {
