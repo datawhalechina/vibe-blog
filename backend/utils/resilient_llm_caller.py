@@ -268,7 +268,7 @@ def resilient_chat(
 def _rate_limit_hook():
     """调用全局限流器"""
     try:
-        from services.llm_service import _rate_limit
+        from services.llm.service import _rate_limit
         _rate_limit()
     except ImportError:
         pass

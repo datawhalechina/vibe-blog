@@ -82,7 +82,7 @@ class BlogService:
             优化后的主题字符串
         """
         from langchain_core.messages import SystemMessage, HumanMessage
-        from services.llm_service import _strip_thinking
+        from services.llm.service import _strip_thinking
 
         system_content = (
             "你是一个技术博客主题优化助手。用户会给你一个简短的技术关键词或主题，"
