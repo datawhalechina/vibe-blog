@@ -34,9 +34,6 @@
 
       <!-- Actions -->
       <div class="card-actions">
-        <button class="action-btn" title="编辑" @click="$emit('edit', job)">
-          <Pencil :size="14" />
-        </button>
         <button class="action-btn" :title="job.enabled ? '暂停' : '恢复'" @click="$emit('toggle', job)">
           <Pause v-if="job.enabled" :size="14" />
           <Play v-else :size="14" />
@@ -57,7 +54,7 @@
 
 <script setup lang="ts">
 import {
-  Clock, CalendarClock, AlertTriangle, Pencil,
+  Clock, CalendarClock, AlertTriangle,
   Pause, Play, Zap, RotateCcw, Trash2
 } from 'lucide-vue-next'
 import CronStatusBadge from './CronStatusBadge.vue'
@@ -65,7 +62,6 @@ import type { CronJobView } from '@/composables/useCronJobs'
 
 defineProps<{ job: CronJobView }>()
 defineEmits<{
-  edit: [job: CronJobView]
   toggle: [job: CronJobView]
   delete: [job: CronJobView]
   retry: [job: CronJobView]

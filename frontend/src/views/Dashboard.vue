@@ -1,193 +1,277 @@
 <template>
   <div class="dashboard-container" :class="{ 'dark-mode': isDarkMode }">
-    <AppNavbar :app-config="{ title: '任务中心' }" />
+    <AppNavbar :app-config="{ features: {} }" />
 
-    <div class="dashboard-content">
-      <h1 class="dashboard-title">任务中心</h1>
+    <main class="dashboard-content">
+      <header class="page-header">
+        <div>
+          <p class="page-path">$ pwd: ~ / dashboard</p>
+          <h1 class="dashboard-title">$ task-center --view={{ activeTab }}</h1>
+        </div>
+        <div class="view-tabs" role="tablist" aria-label="任务中心视图">
+          <button
+            class="tab-button"
+            :class="{ active: activeTab === 'queue' }"
+            role="tab"
+            :aria-selected="activeTab === 'queue'"
+            data-tab="queue"
+            @click="setTab('queue')"
+          >
+            <ListTodo :size="15" />
+            <span>Queue</span>
+          </button>
+          <button
+            class="tab-button"
+            :class="{ active: activeTab === 'cron' }"
+            role="tab"
+            :aria-selected="activeTab === 'cron'"
+            data-tab="cron"
+            @click="setTab('cron')"
+          >
+            <CalendarClock :size="15" />
+            <span>Cron</span>
+          </button>
+        </div>
+      </header>
 
-      <!-- 统计卡片 -->
-      <div class="stats-grid">
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.running_count }}</div>
-          <div class="stat-label">处理中</div>
+      <section v-if="activeTab === 'queue'" class="view-panel" data-view="queue">
+        <div v-if="queueFeedback" class="status-message" role="status">
+          {{ queueFeedback }}
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.queued_count }}</div>
-          <div class="stat-label">等待中</div>
+        <div v-if="queueLoading" class="loading-state">
+          <LoaderCircle :size="24" class="spin" />
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.completed_today }}</div>
-          <div class="stat-label">今日完成</div>
+        <div v-else-if="queueError" class="error-state" role="alert">
+          <AlertTriangle :size="20" />
+          <span>{{ queueError }}</span>
+          <button class="icon-button" title="重试" @click="refreshQueue">
+            <RefreshCw :size="15" />
+          </button>
         </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.failed_count }}</div>
-          <div class="stat-label">失败</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-value">{{ stats.cancelled_count }}</div>
-          <div class="stat-label">已取消</div>
-        </div>
-      </div>
-
-      <!-- 处理中的任务 -->
-      <section class="task-section" v-if="running.length">
-        <h2>处理中</h2>
-        <div class="task-list">
-          <div class="task-card running" v-for="task in running" :key="task.id">
-            <div class="task-header">
-              <span class="task-name">{{ task.name }}</span>
-              <span class="task-stage">{{ task.current_stage || '准备中...' }}</span>
+        <template v-else>
+          <div class="stats-grid">
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.running_count }}</div>
+              <div class="stat-label">处理中</div>
             </div>
-            <div class="progress-bar">
-              <div class="progress-fill" :style="{ width: (task.progress || 0) + '%' }"></div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.queued_count }}</div>
+              <div class="stat-label">等待中</div>
             </div>
-            <div class="task-footer">
-              <span class="task-detail">{{ task.stage_detail || task.generation?.topic }}</span>
-              <span class="task-progress-text">{{ task.progress || 0 }}%</span>
-              <button class="btn-cancel" @click="cancelTask(task.id)">取消</button>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.completed_today }}</div>
+              <div class="stat-label">今日完成</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.failed_count }}</div>
+              <div class="stat-label">失败</div>
+            </div>
+            <div class="stat-card">
+              <div class="stat-value">{{ stats.cancelled_count }}</div>
+              <div class="stat-label">已取消</div>
             </div>
           </div>
-        </div>
-      </section>
 
-      <!-- 等待中的任务 -->
-      <section class="task-section" v-if="queued.length">
-        <h2>等待中</h2>
-        <div class="task-list">
-          <div class="task-card queued" v-for="task in queued" :key="task.id">
-            <div class="task-header">
-              <span class="task-name">{{ task.name }}</span>
-              <span class="task-badge queued-badge">排队 #{{ task.queue_position }}</span>
+          <section v-if="running.length" class="task-section">
+            <h2>$ queue --status=running</h2>
+            <div class="task-list">
+              <article v-for="task in running" :key="task.id" class="task-card running">
+                <div class="task-header">
+                  <span class="task-name">{{ task.name }}</span>
+                  <span class="task-stage">{{ task.current_stage || '准备中...' }}</span>
+                </div>
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: (task.progress || 0) + '%' }"></div>
+                </div>
+                <div class="task-footer">
+                  <span class="task-detail">{{ task.stage_detail || task.generation?.topic }}</span>
+                  <span class="task-progress-text">{{ task.progress || 0 }}%</span>
+                  <button class="text-button danger" @click="cancelTask(task.id)">取消</button>
+                </div>
+              </article>
             </div>
-            <div class="task-footer">
-              <span class="task-detail">{{ task.generation?.topic }}</span>
-              <button class="btn-cancel" @click="cancelTask(task.id)">取消</button>
+          </section>
+
+          <section v-if="queued.length" class="task-section">
+            <h2>$ queue --status=waiting</h2>
+            <div class="task-list">
+              <article v-for="task in queued" :key="task.id" class="task-card queued">
+                <div class="task-header">
+                  <span class="task-name">{{ task.name }}</span>
+                  <span class="task-badge queued-badge">排队 #{{ task.queue_position }}</span>
+                </div>
+                <div class="task-footer">
+                  <span class="task-detail">{{ task.generation?.topic }}</span>
+                  <button class="text-button danger" @click="cancelTask(task.id)">取消</button>
+                </div>
+              </article>
             </div>
+          </section>
+
+          <section v-if="history.length" class="task-section">
+            <h2>$ queue --recent</h2>
+            <div class="task-list">
+              <article v-for="record in history" :key="record.task_id" class="task-card completed">
+                <div class="task-header">
+                  <span class="task-name">{{ record.task_name }}</span>
+                  <span
+                    class="task-badge"
+                    :class="record.status === 'completed' ? 'success-badge' : 'fail-badge'"
+                  >
+                    {{ record.status === 'completed' ? '成功' : '失败' }}
+                  </span>
+                </div>
+                <div class="task-footer">
+                  <span class="task-detail">耗时 {{ formatDuration(record.duration_ms) }}</span>
+                  <span class="task-time">{{ formatTime(record.completed_at) }}</span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section v-if="failed.length" class="task-section">
+            <h2>$ queue --status=failed</h2>
+            <div class="task-list">
+              <article v-for="task in failed" :key="task.id" class="task-card failed">
+                <div class="task-header">
+                  <span class="task-name">{{ task.name }}</span>
+                  <span class="task-badge fail-badge">失败</span>
+                </div>
+                <div class="task-footer">
+                  <span class="task-detail">{{ task.stage_detail || task.generation?.topic }}</span>
+                  <span class="task-time">{{ formatTime(task.completed_at || task.created_at) }}</span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <section v-if="cancelled.length" class="task-section">
+            <h2>$ queue --status=cancelled</h2>
+            <div class="task-list">
+              <article v-for="task in cancelled" :key="task.id" class="task-card cancelled">
+                <div class="task-header">
+                  <span class="task-name">{{ task.name }}</span>
+                  <span class="task-badge cancelled-badge">已取消</span>
+                </div>
+                <div class="task-footer">
+                  <span class="task-detail">{{ task.generation?.topic }}</span>
+                  <span class="task-time">{{ formatTime(task.completed_at || task.created_at) }}</span>
+                </div>
+              </article>
+            </div>
+          </section>
+
+          <div v-if="!hasQueueContent" class="empty-state">
+            <ListTodo :size="36" />
+            <p>// 当前没有排队或近期任务</p>
           </div>
-        </div>
+        </template>
       </section>
 
-      <!-- 最近完成 -->
-      <section class="task-section" v-if="history.length">
-        <h2>最近完成</h2>
-        <div class="task-list">
-          <div class="task-card completed" v-for="record in history" :key="record.task_id">
-            <div class="task-header">
-              <span class="task-name">{{ record.task_name }}</span>
-              <span class="task-badge" :class="record.status === 'completed' ? 'success-badge' : 'fail-badge'">
-                {{ record.status === 'completed' ? '成功' : '失败' }}
-              </span>
-            </div>
-            <div class="task-footer">
-              <span class="task-detail">耗时 {{ formatDuration(record.duration_ms) }}</span>
-              <span class="task-time">{{ formatTime(record.completed_at) }}</span>
-            </div>
+      <section v-else class="view-panel" data-view="cron">
+        <div class="cron-toolbar">
+          <div class="cron-stats">
+            <span><strong>{{ activeCount }}</strong> 运行中</span>
+            <span><strong>{{ pausedCount }}</strong> 已暂停</span>
+            <span class="error-count"><strong>{{ errorCount }}</strong> 异常</span>
           </div>
-        </div>
-      </section>
-
-      <!-- 失败的任务 -->
-      <section class="task-section" v-if="failed.length">
-        <h2>失败</h2>
-        <div class="task-list">
-          <div class="task-card failed" v-for="task in failed" :key="task.id">
-            <div class="task-header">
-              <span class="task-name">{{ task.name }}</span>
-              <span class="task-badge fail-badge">失败</span>
-            </div>
-            <div class="task-footer">
-              <span class="task-detail">{{ task.stage_detail || task.generation?.topic }}</span>
-              <span class="task-time">{{ formatTime(task.completed_at || task.created_at) }}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 已取消的任务 -->
-      <section class="task-section" v-if="cancelled.length">
-        <h2>已取消</h2>
-        <div class="task-list">
-          <div class="task-card cancelled" v-for="task in cancelled" :key="task.id">
-            <div class="task-header">
-              <span class="task-name">{{ task.name }}</span>
-              <span class="task-badge cancelled-badge">已取消</span>
-            </div>
-            <div class="task-footer">
-              <span class="task-detail">{{ task.generation?.topic }}</span>
-              <span class="task-time">{{ formatTime(task.completed_at || task.created_at) }}</span>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- 定时任务 -->
-      <section class="task-section">
-        <div class="section-header">
-          <h2>定时任务</h2>
-          <button class="btn-add" @click="showScheduleForm = !showScheduleForm">
-            {{ showScheduleForm ? '收起' : '+ 新建' }}
+          <button class="primary-button" @click="openDrawer()">
+            <Plus :size="15" />
+            <span>new-task</span>
           </button>
         </div>
 
-        <!-- 新建定时任务表单 -->
-        <div class="schedule-form" v-if="showScheduleForm">
-          <div class="form-row">
-            <input v-model="scheduleForm.name" placeholder="任务名称" class="form-input" />
-            <input v-model="scheduleForm.topic" placeholder="博客主题" class="form-input" />
-          </div>
-          <div class="form-row">
-            <input v-model="scheduleForm.scheduleText" placeholder="调度时间，如：每天上午9点" class="form-input flex-2" />
-            <button class="btn-parse" @click="parseScheduleText">解析</button>
-          </div>
-          <div class="parsed-result" v-if="parsedSchedule">
-            <span v-if="parsedSchedule.type !== 'error'">{{ parsedSchedule.description }}</span>
-            <span v-else class="error-text">{{ parsedSchedule.error }}</span>
-          </div>
-          <button class="btn-create" @click="createScheduledTask" :disabled="!canCreateSchedule">创建定时任务</button>
+        <div v-if="cronFeedback" class="status-message" role="status">
+          {{ cronFeedback }}
+        </div>
+        <div v-if="cronError" class="error-state" role="alert">
+          <AlertTriangle :size="20" />
+          <span>{{ cronError }}</span>
+          <button class="icon-button" title="重试" @click="refreshCron">
+            <RefreshCw :size="15" />
+          </button>
+        </div>
+        <div v-if="cronLoading" class="loading-state">
+          <LoaderCircle :size="24" class="spin" />
+        </div>
+        <div v-else-if="jobs.length" class="cron-job-list">
+          <CronJobCard
+            v-for="job in jobs"
+            :key="job.id"
+            :job="job"
+            @toggle="toggleCron"
+            @delete="handleDelete"
+            @retry="(item) => retryCron(item.id)"
+            @run="(item) => runCron(item.id)"
+          />
+        </div>
+        <div v-else-if="!cronError" class="empty-state">
+          <CalendarOff :size="36" />
+          <p>// 暂无定时任务</p>
+          <button class="primary-button" @click="openDrawer()">
+            <Plus :size="15" />
+            <span>创建第一个任务</span>
+          </button>
         </div>
 
-        <!-- 定时任务列表 -->
-        <div class="task-list" v-if="scheduledTasks.length">
-          <div class="task-card scheduled" v-for="st in scheduledTasks" :key="st.id">
-            <div class="task-header">
-              <span class="task-name">{{ st.name }}</span>
-              <span class="task-badge" :class="st.enabled ? 'active-badge' : 'paused-badge'">
-                {{ st.enabled ? '运行中' : '已暂停' }}
-              </span>
-            </div>
-            <div class="task-footer">
-              <span class="task-detail">
-                {{ st.next_run_at ? '下次: ' + formatTime(st.next_run_at) : '已暂停' }}
-                <span v-if="st.last_status === 'error'" class="error-text" style="margin-left: 8px">
-                  ⚠ {{ st.last_error || '执行失败' }} (连续{{ st.consecutive_errors }}次)
-                </span>
-              </span>
-              <div class="task-actions">
-                <button v-if="st.last_status === 'error'" class="btn-sm" @click="retrySchedule(st.id)">重试</button>
-                <button class="btn-sm" @click="toggleSchedule(st)">
-                  {{ st.enabled ? '暂停' : '恢复' }}
-                </button>
-                <button class="btn-sm btn-danger" @click="deleteSchedule(st.id)">删除</button>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div class="empty-hint" v-else-if="!showScheduleForm">暂无定时任务</div>
+        <CronJobDrawer
+          :visible="drawerVisible"
+          @close="drawerVisible = false"
+          @save="handleSave"
+          @delete="handleDelete"
+        />
       </section>
-    </div>
+    </main>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, reactive, computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  AlertTriangle,
+  CalendarClock,
+  CalendarOff,
+  ListTodo,
+  LoaderCircle,
+  Plus,
+  RefreshCw,
+} from 'lucide-vue-next'
 import AppNavbar from '../components/home/AppNavbar.vue'
+import CronJobCard from '../components/cron/CronJobCard.vue'
+import CronJobDrawer from '../components/cron/CronJobDrawer.vue'
+import { useCronJobs } from '../composables/useCronJobs'
+import type { CronJobView } from '../composables/useCronJobs'
 import { useThemeStore } from '../stores/theme'
 
-const API_BASE = ''
+type DashboardTab = 'queue' | 'cron'
+
+interface QueueTask {
+  id: string
+  name: string
+  current_stage?: string
+  stage_detail?: string
+  progress?: number
+  queue_position?: number
+  created_at?: string
+  completed_at?: string
+  generation?: { topic?: string }
+}
+
+interface QueueHistoryRecord {
+  task_id: string
+  task_name: string
+  status: string
+  duration_ms: number
+  completed_at: string
+}
+
+const route = useRoute()
+const router = useRouter()
 const themeStore = useThemeStore()
 const isDarkMode = computed(() => themeStore.isDark)
+const activeTab = computed<DashboardTab>(() => route.query.tab === 'cron' ? 'cron' : 'queue')
 
-// --- 响应式状态 ---
 const stats = reactive({
   running_count: 0,
   queued_count: 0,
@@ -195,363 +279,478 @@ const stats = reactive({
   failed_count: 0,
   cancelled_count: 0,
 })
-const running = ref<any[]>([])
-const queued = ref<any[]>([])
-const failed = ref<any[]>([])
-const cancelled = ref<any[]>([])
-const history = ref<any[]>([])
-const scheduledTasks = ref<any[]>([])
-
-// 定时任务表单
-const showScheduleForm = ref(false)
-const scheduleForm = reactive({ name: '', topic: '', scheduleText: '' })
-const parsedSchedule = ref<any>(null)
-const canCreateSchedule = computed(() =>
-  scheduleForm.name && scheduleForm.topic && parsedSchedule.value?.type !== 'error' && parsedSchedule.value
+const running = ref<QueueTask[]>([])
+const queued = ref<QueueTask[]>([])
+const failed = ref<QueueTask[]>([])
+const cancelled = ref<QueueTask[]>([])
+const history = ref<QueueHistoryRecord[]>([])
+const queueLoading = ref(true)
+const queueError = ref('')
+const queueFeedback = ref('')
+const hasQueueContent = computed(() =>
+  running.value.length
+  + queued.value.length
+  + failed.value.length
+  + cancelled.value.length
+  + history.value.length > 0
 )
 
-let pollTimer: ReturnType<typeof setInterval> | null = null
+const {
+  jobs,
+  loading: cronLoading,
+  error: cronError,
+  feedback: cronFeedback,
+  activeCount,
+  pausedCount,
+  errorCount,
+  refresh: refreshCron,
+  create: createCron,
+  remove: removeCron,
+  toggle: toggleCron,
+  retry: retryCron,
+  run: runCron,
+  clearFeedback: clearCronFeedback,
+} = useCronJobs(5000)
 
-// --- API 调用 ---
-async function fetchSnapshot() {
-  try {
-    const res = await fetch(`${API_BASE}/api/queue/tasks`)
-    const data = await res.json()
-    Object.assign(stats, data.stats || {})
-    running.value = data.running || []
-    queued.value = data.queued || []
-    failed.value = data.failed || []
-    cancelled.value = data.cancelled || []
-  } catch { /* 静默 */ }
+const drawerVisible = ref(false)
+let queuePollTimer: ReturnType<typeof setInterval> | null = null
+
+function setTab(tab: DashboardTab) {
+  if (tab === activeTab.value) return
+  const query = { ...route.query }
+  if (tab === 'cron') query.tab = 'cron'
+  else delete query.tab
+  router.replace({ path: '/dashboard', query })
 }
 
-async function fetchHistory() {
-  try {
-    const res = await fetch(`${API_BASE}/api/queue/history?limit=10`)
-    const data = await res.json()
-    history.value = data.history || data || []
-  } catch { /* 静默 */ }
+async function fetchJson<T>(url: string): Promise<T> {
+  const response = await fetch(url)
+  if (!response.ok) throw new Error('HTTP ' + response.status)
+  return response.json()
 }
 
-async function fetchScheduledTasks() {
+async function refreshQueue() {
+  queueError.value = ''
   try {
-    const res = await fetch(`${API_BASE}/api/scheduler/tasks`)
-    const data = await res.json()
-    scheduledTasks.value = Array.isArray(data) ? data : []
-  } catch { /* 静默 */ }
-}
-
-async function cancelTask(taskId: string) {
-  await fetch(`${API_BASE}/api/queue/tasks/${taskId}`, { method: 'DELETE' })
-  await fetchSnapshot()
-}
-
-async function parseScheduleText() {
-  try {
-    const res = await fetch(`${API_BASE}/api/scheduler/parse-schedule`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: scheduleForm.scheduleText }),
-    })
-    parsedSchedule.value = await res.json()
+    const [snapshot, recent] = await Promise.all([
+      fetchJson<Record<string, any>>('/api/queue/tasks'),
+      fetchJson<{ history?: QueueHistoryRecord[] } | QueueHistoryRecord[]>('/api/queue/history?limit=10'),
+    ])
+    Object.assign(stats, snapshot.stats || {})
+    running.value = snapshot.running || []
+    queued.value = snapshot.queued || []
+    failed.value = snapshot.failed || []
+    cancelled.value = snapshot.cancelled || []
+    history.value = Array.isArray(recent) ? recent : recent.history || []
   } catch {
-    parsedSchedule.value = { type: 'error', error: '解析失败' }
+    queueError.value = '加载队列任务失败，请重试'
+  } finally {
+    queueLoading.value = false
   }
 }
 
-async function createScheduledTask() {
-  if (!canCreateSchedule.value || !parsedSchedule.value) return
-  const trigger = parsedSchedule.value.type === 'cron'
-    ? { type: 'cron', cron_expression: parsedSchedule.value.cron_expression }
-    : { type: 'once', scheduled_at: parsedSchedule.value.scheduled_at }
-  await fetch(`${API_BASE}/api/scheduler/tasks`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      name: scheduleForm.name,
-      trigger,
-      generation: { topic: scheduleForm.topic },
-    }),
-  })
-  scheduleForm.name = ''
-  scheduleForm.topic = ''
-  scheduleForm.scheduleText = ''
-  parsedSchedule.value = null
-  showScheduleForm.value = false
-  await fetchScheduledTasks()
+async function cancelTask(taskId: string) {
+  queueError.value = ''
+  queueFeedback.value = ''
+  try {
+    const response = await fetch('/api/queue/tasks/' + taskId, { method: 'DELETE' })
+    if (!response.ok) throw new Error('HTTP ' + response.status)
+    queueFeedback.value = '队列任务已取消'
+    await refreshQueue()
+  } catch {
+    queueError.value = '取消队列任务失败，请重试'
+  }
 }
 
-async function toggleSchedule(st: any) {
-  const action = st.enabled ? 'pause' : 'resume'
-  await fetch(`${API_BASE}/api/scheduler/tasks/${st.id}/${action}`, { method: 'POST' })
-  await fetchScheduledTasks()
+function openDrawer() {
+  clearCronFeedback()
+  drawerVisible.value = true
 }
 
-async function retrySchedule(id: string) {
-  await fetch(`${API_BASE}/api/scheduler/tasks/${id}/retry`, { method: 'POST' })
-  await fetchScheduledTasks()
+async function handleSave(payload: Record<string, any>) {
+  if (await createCron(payload)) drawerVisible.value = false
 }
 
-async function deleteSchedule(id: string) {
-  await fetch(`${API_BASE}/api/scheduler/tasks/${id}`, { method: 'DELETE' })
-  await fetchScheduledTasks()
+async function handleDelete(job: CronJobView | null | undefined) {
+  if (!job) return
+  if (await removeCron(job.id)) drawerVisible.value = false
 }
 
-// --- 格式化 ---
 function formatDuration(ms: number) {
   if (!ms) return '-'
-  if (ms < 1000) return `${ms}ms`
-  const s = Math.round(ms / 1000)
-  return s < 60 ? `${s}s` : `${Math.floor(s / 60)}m${s % 60}s`
+  if (ms < 1000) return ms + 'ms'
+  const seconds = Math.round(ms / 1000)
+  return seconds < 60
+    ? seconds + 's'
+    : Math.floor(seconds / 60) + 'm' + (seconds % 60) + 's'
 }
 
-function formatTime(t: string) {
-  if (!t) return '-'
-  const d = new Date(t)
-  return d.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
-}
-
-// --- 生命周期 ---
-async function refreshAll() {
-  await Promise.all([fetchSnapshot(), fetchHistory(), fetchScheduledTasks()])
+function formatTime(value?: string) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 onMounted(() => {
-  refreshAll()
-  pollTimer = setInterval(refreshAll, 3000)
+  refreshQueue()
+  queuePollTimer = setInterval(refreshQueue, 3000)
 })
 
 onUnmounted(() => {
-  if (pollTimer) clearInterval(pollTimer)
+  if (queuePollTimer) clearInterval(queuePollTimer)
 })
 </script>
 
 <style scoped>
 .dashboard-container {
   min-height: 100vh;
-  background: var(--color-bg-base, #f8f9fa);
-  color: var(--color-text-primary, #1a1a2e);
+  background: var(--color-bg-base);
+  color: var(--color-text-primary);
 }
+
 .dashboard-content {
-  max-width: 900px;
+  width: min(960px, calc(100% - 32px));
   margin: 0 auto;
-  padding: 80px 20px 40px;
+  padding: 84px 0 48px;
 }
-.dashboard-title {
-  font-size: 1.5rem;
-  font-weight: 700;
+
+.page-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
   margin-bottom: 24px;
 }
 
-/* 统计卡片 */
+.page-path {
+  margin: 0 0 6px;
+  color: var(--color-syntax-comment);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.dashboard-title {
+  margin: 0;
+  color: var(--color-foreground);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xl);
+  font-weight: var(--font-weight-bold);
+}
+
+.view-tabs {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(112px, 1fr));
+  padding: 3px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: var(--color-muted);
+}
+
+.tab-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.tab-button.active {
+  background: var(--color-card);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+.view-panel {
+  min-height: 420px;
+}
+
 .stats-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 32px;
-}
-.stat-card {
-  background: var(--color-bg-card, #fff);
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 12px;
-  padding: 16px;
-  text-align: center;
-}
-.stat-value {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: var(--color-primary, #8b5cf6);
-}
-.stat-label {
-  font-size: 0.8rem;
-  color: var(--color-text-secondary, #64748b);
-  margin-top: 4px;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 26px;
 }
 
-/* 任务区块 */
-.task-section { margin-bottom: 28px; }
-.task-section h2 {
-  font-size: 1.1rem;
-  font-weight: 600;
-  margin-bottom: 12px;
+.stat-card {
+  min-width: 0;
+  padding: 14px 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  background: var(--color-card);
+  text-align: center;
 }
-.section-header {
+
+.stat-value {
+  color: var(--color-syntax-function);
+  font-family: var(--font-mono);
+  font-size: 24px;
+  font-weight: var(--font-weight-bold);
+}
+
+.stat-label {
+  margin-top: 4px;
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.task-section {
+  margin-bottom: 26px;
+}
+
+.task-section h2 {
+  margin: 0 0 10px;
+  color: var(--color-foreground);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.task-list,
+.cron-job-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.task-card {
+  padding: 14px 16px;
+  border: 1px solid var(--color-border);
+  border-left-width: 3px;
+  border-radius: 8px;
+  background: var(--color-card);
+}
+
+.task-card.running { border-left-color: var(--color-syntax-function); }
+.task-card.queued { border-left-color: var(--color-warning); }
+.task-card.completed { border-left-color: var(--color-success); }
+.task-card.failed { border-left-color: var(--color-error); }
+.task-card.cancelled { border-left-color: var(--color-text-tertiary); }
+
+.task-header,
+.task-footer,
+.cron-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 12px;
+  gap: 12px;
 }
-.section-header h2 { margin-bottom: 0; }
-.task-list { display: flex; flex-direction: column; gap: 10px; }
-
-/* 任务卡片 */
-.task-card {
-  background: var(--color-bg-card, #fff);
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 10px;
-  padding: 14px 16px;
-  transition: border-color 0.2s;
-}
-.task-card:hover { border-color: var(--color-primary, #8b5cf6); }
-.task-card.running { border-left: 3px solid #3b82f6; }
-.task-card.queued { border-left: 3px solid #f59e0b; }
-.task-card.completed { border-left: 3px solid #10b981; }
-.task-card.failed { border-left: 3px solid #ef4444; }
-.task-card.cancelled { border-left: 3px solid #94a3b8; }
-.task-card.scheduled { border-left: 3px solid #8b5cf6; }
 
 .task-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
   margin-bottom: 8px;
 }
-.task-name { font-weight: 600; font-size: 0.95rem; }
-.task-stage { font-size: 0.8rem; color: #3b82f6; }
-.task-badge {
-  font-size: 0.7rem;
-  padding: 2px 8px;
-  border-radius: 9999px;
-  font-weight: 500;
-}
-.queued-badge { background: #fef3c7; color: #92400e; }
-.success-badge { background: #d1fae5; color: #065f46; }
-.fail-badge { background: #fee2e2; color: #991b1b; }
-.active-badge { background: #ede9fe; color: #5b21b6; }
-.paused-badge { background: #f1f5f9; color: #64748b; }
-.cancelled-badge { background: #f1f5f9; color: #64748b; }
 
-/* 进度条 */
+.task-name {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--color-foreground);
+  font-weight: var(--font-weight-semibold);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-stage,
+.task-footer,
+.task-time {
+  color: var(--color-text-secondary);
+  font-size: var(--font-size-xs);
+}
+
+.task-detail {
+  min-width: 0;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-progress-text {
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+}
+
+.task-badge {
+  flex: 0 0 auto;
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.queued-badge { background: var(--color-warning-light); color: var(--color-warning); }
+.success-badge { background: var(--color-success-light); color: var(--color-success); }
+.fail-badge { background: var(--color-error-light); color: var(--color-error); }
+.cancelled-badge { background: var(--color-muted); color: var(--color-text-secondary); }
+
 .progress-bar {
   height: 6px;
-  background: var(--color-border, #e2e8f0);
-  border-radius: 3px;
+  margin-bottom: 9px;
   overflow: hidden;
-  margin-bottom: 8px;
+  border-radius: 3px;
+  background: var(--color-muted);
 }
+
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #8b5cf6);
-  border-radius: 3px;
-  transition: width 0.3s ease;
+  border-radius: inherit;
+  background: var(--color-syntax-function);
 }
 
-.task-footer {
+.cron-toolbar {
+  margin-bottom: 18px;
+}
+
+.cron-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 18px;
+  color: var(--color-text-secondary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
+
+.cron-stats strong {
+  color: var(--color-success);
+  font-size: var(--font-size-lg);
+}
+
+.cron-stats .error-count strong {
+  color: var(--color-error);
+}
+
+.primary-button,
+.text-button,
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.primary-button {
+  gap: 7px;
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md, 8px);
+  background: transparent;
+  color: var(--color-primary);
+  font-family: var(--font-mono);
+}
+
+.primary-button:hover {
+  border-style: solid;
+  background: var(--color-primary-light);
+}
+
+.text-button {
+  min-height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: transparent;
+  color: var(--color-text-secondary);
+}
+
+.text-button.danger:hover {
+  border-color: var(--color-error);
+  color: var(--color-error);
+}
+
+.icon-button {
+  width: 30px;
+  height: 30px;
+  margin-left: auto;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: transparent;
+  color: inherit;
+}
+
+.loading-state,
+.empty-state,
+.error-state {
+  min-height: 240px;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  font-size: 0.8rem;
-  color: var(--color-text-secondary, #64748b);
+  justify-content: center;
 }
-.task-detail { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.task-progress-text { font-size: 0.75rem; font-weight: 600; color: var(--color-primary, #8b5cf6); margin: 0 8px; white-space: nowrap; }
-.task-time { font-size: 0.75rem; margin-left: 8px; }
-.task-actions { display: flex; gap: 6px; }
 
-/* 按钮 */
-.btn-cancel, .btn-sm {
-  padding: 4px 12px;
-  border-radius: 6px;
-  border: 1px solid var(--color-border, #e2e8f0);
-  background: var(--color-bg-card, #fff);
-  font-size: 0.75rem;
-  cursor: pointer;
-  transition: all 0.2s;
+.loading-state {
+  color: var(--color-text-tertiary);
 }
-.btn-cancel:hover, .btn-sm:hover {
-  border-color: var(--color-primary, #8b5cf6);
-  color: var(--color-primary, #8b5cf6);
-}
-.btn-danger { color: #ef4444; }
-.btn-danger:hover { border-color: #ef4444; background: #fef2f2; }
-.btn-add {
-  padding: 6px 16px;
-  border-radius: 8px;
-  border: 1px dashed var(--color-border, #e2e8f0);
-  background: transparent;
-  font-size: 0.85rem;
-  cursor: pointer;
-  color: var(--color-primary, #8b5cf6);
-  transition: all 0.2s;
-}
-.btn-add:hover { background: var(--color-bg-card, #fff); border-style: solid; }
 
-/* 表单 */
-.schedule-form {
-  background: var(--color-bg-card, #fff);
-  border: 1px solid var(--color-border, #e2e8f0);
-  border-radius: 10px;
+.empty-state {
+  flex-direction: column;
+  gap: 12px;
+  color: var(--color-text-tertiary);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+}
+
+.error-state {
+  min-height: 80px;
+  gap: 10px;
   padding: 16px;
-  margin-bottom: 12px;
-}
-.form-row { display: flex; gap: 10px; margin-bottom: 10px; }
-.form-input {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid var(--color-border, #e2e8f0);
+  border: 1px solid var(--color-error);
   border-radius: 8px;
-  background: var(--color-bg-base, #f8f9fa);
-  color: inherit;
-  font-size: 0.85rem;
-  outline: none;
-  transition: border-color 0.2s;
-}
-.form-input:focus { border-color: var(--color-primary, #8b5cf6); }
-.form-input.flex-2 { flex: 2; }
-.btn-parse {
-  padding: 8px 16px;
-  border-radius: 8px;
-  border: none;
-  background: var(--color-primary, #8b5cf6);
-  color: #fff;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-.parsed-result {
-  font-size: 0.8rem;
-  color: #10b981;
-  margin-bottom: 10px;
-  padding: 6px 10px;
-  background: #ecfdf5;
-  border-radius: 6px;
-}
-.error-text { color: #ef4444; }
-.btn-create {
-  width: 100%;
-  padding: 10px;
-  border-radius: 8px;
-  border: none;
-  background: var(--color-primary, #8b5cf6);
-  color: #fff;
-  font-size: 0.9rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity 0.2s;
-}
-.btn-create:disabled { opacity: 0.5; cursor: not-allowed; }
-.empty-hint {
-  text-align: center;
-  color: var(--color-text-secondary, #64748b);
-  font-size: 0.85rem;
-  padding: 20px;
+  background: var(--color-error-light);
+  color: var(--color-error);
 }
 
-/* 暗黑模式 */
-.dark-mode .stat-card,
-.dark-mode .task-card,
-.dark-mode .schedule-form { background: #1e1e2e; border-color: #2d2d3f; }
-.dark-mode .form-input { background: #16161e; border-color: #2d2d3f; }
-.dark-mode .queued-badge { background: #422006; color: #fbbf24; }
-.dark-mode .success-badge { background: #064e3b; color: #34d399; }
-.dark-mode .fail-badge { background: #450a0a; color: #f87171; }
-.dark-mode .active-badge { background: #2e1065; color: #a78bfa; }
-.dark-mode .paused-badge { background: #1e293b; color: #94a3b8; }
-.dark-mode .parsed-result { background: #064e3b; color: #34d399; }
-.dark-mode .btn-danger:hover { background: #450a0a; }
+.status-message {
+  margin-bottom: 14px;
+  padding: 9px 12px;
+  border: 1px solid var(--color-success);
+  border-radius: 8px;
+  background: var(--color-success-light);
+  color: var(--color-success);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+}
 
-/* 响应式 */
-@media (max-width: 640px) {
-  .stats-grid { grid-template-columns: repeat(2, 1fr); }
-  .form-row { flex-direction: column; }
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (max-width: 720px) {
+  .dashboard-content {
+    width: min(100% - 24px, 960px);
+    padding-top: 72px;
+  }
+
+  .page-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-tabs {
+    width: 100%;
+  }
+
+  .stats-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .cron-toolbar,
+  .task-footer {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
 }
 </style>

@@ -22,6 +22,8 @@ export interface CronJobView {
 export function useCronJobs(pollInterval = 5000) {
   const jobs = ref<CronJobView[]>([])
   const loading = ref(true)
+  const error = ref('')
+  const feedback = ref('')
 
   const activeCount = computed(() =>
     jobs.value.filter(j => j.enabled && j.last_status !== 'error').length
@@ -36,45 +38,97 @@ export function useCronJobs(pollInterval = 5000) {
   let timer: ReturnType<typeof setInterval> | null = null
 
   async function refresh() {
+    error.value = ''
     try {
       const res = await fetch('/api/scheduler/tasks')
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       jobs.value = Array.isArray(data) ? data : []
+      return true
     } catch {
-      // silent
+      error.value = '加载定时任务失败，请重试'
+      return false
     } finally {
       loading.value = false
     }
   }
 
-  async function create(payload: Record<string, any>) {
-    await fetch('/api/scheduler/tasks', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    })
-    await refresh()
+  async function runAction(
+    url: string,
+    options: RequestInit,
+    successMessage: string,
+    errorMessage: string,
+  ) {
+    error.value = ''
+    feedback.value = ''
+    try {
+      const res = await fetch(url, options)
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      const refreshed = await refresh()
+      if (!refreshed) {
+        error.value = successMessage + '，但列表刷新失败，请重试'
+        return true
+      }
+      feedback.value = successMessage
+      return true
+    } catch {
+      error.value = errorMessage
+      return false
+    }
   }
 
-  async function remove(id: string) {
-    await fetch(`/api/scheduler/tasks/${id}`, { method: 'DELETE' })
-    await refresh()
+  function create(payload: Record<string, any>) {
+    return runAction(
+      '/api/scheduler/tasks',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      },
+      '定时任务已创建',
+      '创建定时任务失败，请重试',
+    )
   }
 
-  async function toggle(job: CronJobView) {
+  function remove(id: string) {
+    return runAction(
+      `/api/scheduler/tasks/${id}`,
+      { method: 'DELETE' },
+      '定时任务已删除',
+      '删除定时任务失败，请重试',
+    )
+  }
+
+  function toggle(job: CronJobView) {
     const action = job.enabled ? 'pause' : 'resume'
-    await fetch(`/api/scheduler/tasks/${job.id}/${action}`, { method: 'POST' })
-    await refresh()
+    return runAction(
+      `/api/scheduler/tasks/${job.id}/${action}`,
+      { method: 'POST' },
+      job.enabled ? '定时任务已暂停' : '定时任务已恢复',
+      '更新定时任务失败，请重试',
+    )
   }
 
-  async function retry(id: string) {
-    await fetch(`/api/scheduler/tasks/${id}/retry`, { method: 'POST' })
-    await refresh()
+  function retry(id: string) {
+    return runAction(
+      `/api/scheduler/tasks/${id}/retry`,
+      { method: 'POST' },
+      '重试请求已提交',
+      '重试定时任务失败，请重试',
+    )
   }
 
-  async function run(id: string) {
-    await fetch(`/api/scheduler/tasks/${id}/run`, { method: 'POST' })
-    await refresh()
+  function run(id: string) {
+    return runAction(
+      `/api/scheduler/tasks/${id}/run`,
+      { method: 'POST' },
+      '执行请求已提交',
+      '执行定时任务失败，请重试',
+    )
+  }
+
+  function clearFeedback() {
+    feedback.value = ''
   }
 
   function startPolling() {
@@ -111,6 +165,8 @@ export function useCronJobs(pollInterval = 5000) {
   return {
     jobs,
     loading,
+    error,
+    feedback,
     activeCount,
     pausedCount,
     errorCount,
@@ -120,5 +176,6 @@ export function useCronJobs(pollInterval = 5000) {
     toggle,
     retry,
     run,
+    clearFeedback,
   }
 }

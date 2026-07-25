@@ -20,7 +20,7 @@ describe('CronJobCard actions', () => {
   it('keeps supported actions without rendering execution history', () => {
     const wrapper = mount(CronJobCard, { props: { job: errorJob } })
 
-    expect(wrapper.find('button[title="编辑"]').exists()).toBe(true)
+    expect(wrapper.find('button[title="编辑"]').exists()).toBe(false)
     expect(wrapper.find('button[title="暂停"]').exists()).toBe(true)
     expect(wrapper.find('button[title="执行"]').exists()).toBe(true)
     expect(wrapper.find('button[title="重试"]').exists()).toBe(true)
