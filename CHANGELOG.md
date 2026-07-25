@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+- ♻️ **Reviewer 客户端 API 清理** — 删除无生产消费者的旧评估任务、流、列表和详情客户端，仅保留当前 tutorial 工作流。
 - ♻️ **孤立 Blog Store 清理** — 删除无生产消费者的旧 Pinia Blog Store、专用测试及失效的博客列表客户端调用。
 - 🔧 **前端构建产物治理** — 将 `/frontend/dist/` 明确设为仓库级忽略目录，并停止跟踪历史构建文件。
 - ♻️ **低风险僵尸代码清理** — 删除无生产入口、路由、构建或测试引用的 `ResultCard.vue` 顶层组件，并忽略 `/docs/` 目录

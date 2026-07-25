@@ -22,9 +22,6 @@ import {
   cancelXhsTask,
   publishToXhs,
   generateExplanationVideo,
-  createReviewTask,
-  getReviewList,
-  getReviewDetail,
 } from '@/services/api'
 
 // Mock API responses
@@ -130,10 +127,6 @@ const server = setupServer(
   http.post('/api/xhs/publish', () => HttpResponse.json({ success: true, url: 'https://xiaohongshu.com/123' })),
   http.post('/api/xhs/explanation-video', () => HttpResponse.json({ success: true, video_url: 'https://example.com/video.mp4' })),
 
-  // Reviewer API
-  http.post('/api/reviewer/evaluate', () => HttpResponse.json(mockTaskResponse)),
-  http.get('/api/reviewer/list', () => HttpResponse.json({ success: true, reviews: [] })),
-  http.get('/api/reviewer/:reviewId', () => HttpResponse.json({ success: true, review: {} })),
 )
 
 beforeAll(() => server.listen())
@@ -327,29 +320,6 @@ describe('api.ts', () => {
       })
       expect(result.success).toBe(true)
       expect(result.video_url).toBe('https://example.com/video.mp4')
-    })
-  })
-
-  describe('Reviewer API', () => {
-    it('should create review task', async () => {
-      const result = await createReviewTask({
-        git_url: 'https://github.com/user/repo',
-        enable_search: true,
-      })
-      expect(result.success).toBe(true)
-      expect(result.task_id).toBe('task-123')
-    })
-
-    it('should get review list', async () => {
-      const result = await getReviewList()
-      expect(result.success).toBe(true)
-      expect(result.reviews).toBeDefined()
-    })
-
-    it('should get review detail', async () => {
-      const result = await getReviewDetail('review-123')
-      expect(result.success).toBe(true)
-      expect(result.review).toBeDefined()
     })
   })
 

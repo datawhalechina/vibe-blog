@@ -354,37 +354,3 @@ export async function generateExplanationVideo(params: {
   })
   return response.json()
 }
-
-// ========== 教程评估 API ==========
-
-export interface ReviewerParams {
-  git_url: string
-  enable_search?: boolean
-}
-
-// 创建评估任务
-export async function createReviewTask(params: ReviewerParams): Promise<{ success: boolean; task_id?: string; error?: string }> {
-  const response = await fetch(`${API_BASE}/api/reviewer/evaluate`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params)
-  })
-  return response.json()
-}
-
-// 创建评估 SSE 连接
-export function createReviewStream(taskId: string): EventSource {
-  return new EventSource(`${API_BASE}/api/reviewer/stream/${taskId}`)
-}
-
-// 获取评估列表
-export async function getReviewList(): Promise<{ success: boolean; reviews?: any[] }> {
-  const response = await fetch(`${API_BASE}/api/reviewer/list`)
-  return response.json()
-}
-
-// 获取评估详情
-export async function getReviewDetail(reviewId: string): Promise<{ success: boolean; review?: any }> {
-  const response = await fetch(`${API_BASE}/api/reviewer/${reviewId}`)
-  return response.json()
-}
