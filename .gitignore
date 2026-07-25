@@ -98,7 +98,7 @@ yarn-error.log
 .eslintcache
 
 # 前端构建产物
-frontend/dist/
+/frontend/dist/
 
 # 操作系统
 .DS_Store
