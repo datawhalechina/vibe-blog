@@ -2,7 +2,7 @@
 LLM 调用完整日志 — 记录每次 LLM 调用的 prompt/response 到 JSONL 文件
 
 来源：v2 方案 10
-日志路径：logs/blog_tasks/{task_id}/llm_calls.jsonl
+日志路径：var/logs/blog_tasks/{task_id}/llm_calls.jsonl
 
 环境变量：
   LLM_CALL_LOG_ENABLED=true  (默认 true，设为 false 关闭)
@@ -13,6 +13,8 @@ import os
 import time
 from pathlib import Path
 from typing import Optional
+
+from infrastructure.paths import RuntimePaths
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +36,7 @@ class LLMCallLogger:
             base = os.environ["BLOG_LOGS_DIR"]
         else:
             project_root = Path(__file__).resolve().parent.parent.parent
-            base = str(project_root / "logs" / "blog_tasks")
+            base = str(RuntimePaths.from_env(project_root=project_root).logs / "blog_tasks")
 
         task_dir = Path(base) / task_id
         task_dir.mkdir(parents=True, exist_ok=True)

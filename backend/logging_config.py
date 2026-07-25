@@ -8,7 +8,10 @@ import logging
 import os
 from contextvars import ContextVar
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
 from typing import Iterable
+
+from infrastructure.paths import RuntimePaths
 
 # 任务 ID 上下文变量（供异步任务链路注入）
 task_id_context: ContextVar[str] = ContextVar("task_id", default="")
@@ -136,10 +139,12 @@ def setup_logging(log_level: str | int = "INFO", log_dir: str | None = None, ena
     if not enable_file:
         return
 
-    base_dir = os.path.dirname(os.path.realpath(__file__))
-    # 统一日志目录到 vibe-blog/logs/（与启动脚本一致）
-    project_root = os.path.dirname(base_dir)
-    resolved_log_dir = log_dir or os.path.join(project_root, "logs")
+    project_root = Path(__file__).resolve().parent.parent
+    resolved_log_dir = (
+        log_dir
+        or os.environ.get("LOG_DIR")
+        or str(RuntimePaths.from_env(project_root=project_root).logs)
+    )
     os.makedirs(resolved_log_dir, exist_ok=True)
 
     log_file = os.path.join(resolved_log_dir, "app.log")
@@ -176,12 +181,15 @@ class TaskIdMatchFilter(logging.Filter):
 def create_task_logger(task_id: str, log_dir: str | None = None) -> logging.Handler:
     """为指定任务创建独立的文件日志 handler。
 
-    日志写入 ``logs/blog_tasks/{task_id}/task.log``。
+    日志写入 ``var/logs/blog_tasks/{task_id}/task.log``。
     返回 handler 实例，调用方需在任务结束后调用 ``remove_task_logger`` 清理。
     """
-    base_dir = os.path.dirname(os.path.realpath(__file__))
-    project_root = os.path.dirname(base_dir)
-    resolved_log_dir = log_dir or os.path.join(project_root, "logs", "blog_tasks")
+    project_root = Path(__file__).resolve().parent.parent
+    resolved_log_dir = (
+        log_dir
+        or os.environ.get("BLOG_LOGS_DIR")
+        or str(RuntimePaths.from_env(project_root=project_root).logs / "blog_tasks")
+    )
     task_dir = os.path.join(resolved_log_dir, task_id)
     os.makedirs(task_dir, exist_ok=True)
 

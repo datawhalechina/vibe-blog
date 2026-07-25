@@ -218,17 +218,17 @@ docker compose -f docker/docker-compose.yml logs --tail=0 -f backend
 |------|------|--------|
 | `FLASK_ENV` | Flask 环境 | `production` |
 | `LOG_LEVEL` | 日志级别 | `INFO` |
-| `LOG_DIR` | 日志目录 | `/app/logs` |
-| `OUTPUT_FOLDER` | 输出目录 | `/app/outputs` |
-| `UPLOAD_FOLDER` | 上传目录 | `/app/uploads` |
+| `VIBE_RUNTIME_DIR` | 统一运行目录 | `/app/var` |
+| `BLOG_LOGS_DIR` | 可选的任务日志目录覆盖 | `/app/var/logs/blog_tasks` |
+| `OUTPUT_FOLDER` | 可选的输出目录覆盖 | `/app/var/outputs` |
+| `UPLOAD_FOLDER` | 可选的上传目录覆盖 | `/app/var/uploads` |
 
 ## 数据持久化
 
 Docker Compose 配置了以下数据卷：
 
-- `./outputs` - 生成的博客文件
-- `./backend/logs` - 应用日志
-- `./backend/uploads` - 用户上传的文件
+- `./var` - 日志、生成输出、上传、缓存和截图
+- `./backend/data` - 博客、任务和写作会话数据库
 
 这些目录会自动创建，数据在容器重启后保留。
 

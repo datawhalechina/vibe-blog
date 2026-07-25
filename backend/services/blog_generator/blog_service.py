@@ -6,11 +6,13 @@ import logging
 import threading
 import os
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any, Optional, Callable
 from queue import Queue
 from contextvars import copy_context
 
 from logging_config import task_id_context
+from infrastructure.paths import RuntimePaths
 
 from .queue_bridge import update_queue_status, update_queue_progress
 from .generator import BlogGenerator
@@ -20,7 +22,10 @@ from .post_processors.markdown_formatter import MarkdownFormatter
 from ..image_service import get_image_service, AspectRatio, ImageSize
 
 # 输出目录
-OUTPUTS_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'outputs')
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
+OUTPUTS_DIR = os.environ.get(
+    "OUTPUT_FOLDER", str(RuntimePaths.from_env(project_root=PROJECT_ROOT).outputs)
+)
 
 logger = logging.getLogger(__name__)
 

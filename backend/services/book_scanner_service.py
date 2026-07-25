@@ -5,8 +5,10 @@ import json
 import uuid
 import logging
 import os
+from pathlib import Path
 from typing import Dict, Any, List, Optional
 
+from infrastructure.paths import RuntimePaths
 from services.database_service import DatabaseService
 from services.blog_generator.prompts import get_prompt_manager
 
@@ -1037,7 +1039,14 @@ class BookScannerService:
                 api_key=api_key,
                 api_base=api_base,
                 model=model,
-                output_folder="outputs/covers"
+                output_folder=str(
+                    Path(
+                        os.environ.get("OUTPUT_FOLDER")
+                        or RuntimePaths.from_env(
+                            project_root=Path(__file__).resolve().parent.parent.parent
+                        ).outputs
+                    ) / "covers"
+                )
             )
             
             # 构建封面生成 Prompt - kawaii 风格

@@ -5,6 +5,7 @@ Markdown 后处理器：修复分割线前后的换行符问题
 确保 Markdown 格式规范且渲染正确。
 """
 
+import os
 import re
 from pathlib import Path
 from typing import Optional
@@ -221,7 +222,13 @@ if __name__ == "__main__":
             print(f"[ERROR] 无效的路径: {target_path}")
     else:
         # 默认处理当前目录的 outputs 文件夹
-        outputs_dir = Path(__file__).parent.parent.parent.parent.parent / "outputs"
+        from infrastructure.paths import RuntimePaths
+
+        project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+        outputs_dir = Path(
+            os.environ.get("OUTPUT_FOLDER")
+            or RuntimePaths.from_env(project_root=project_root).outputs
+        )
         if outputs_dir.exists():
             print(f"[INFO] 处理输出目录: {outputs_dir}")
             formatter.process_directory(str(outputs_dir))

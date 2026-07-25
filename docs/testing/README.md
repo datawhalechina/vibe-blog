@@ -111,7 +111,7 @@ RUN_E2E_TESTS=1 E2E_SLOW_MO=100 uv run --project backend pytest tests/e2e/ -v
 RUN_E2E_TESTS=1 uv run --project backend pytest tests/e2e/test_tc01_home_load.py -v
 ```
 
-E2E screenshots are written to `backend/outputs/e2e_screenshots/` and must not be committed.
+E2E screenshots are written to `var/screenshots/` and must not be committed.
 
 Analyze the latest E2E and application logs independently:
 
