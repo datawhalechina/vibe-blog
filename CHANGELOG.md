@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+- 🔧 **前端构建产物治理** — 将 `/frontend/dist/` 明确设为仓库级忽略目录，并停止跟踪历史构建文件。
 - ♻️ **低风险僵尸代码清理** — 删除无生产入口、路由、构建或测试引用的 `ResultCard.vue` 顶层组件，并忽略 `/docs/` 目录
 - 🔧 **后端依赖精简** — 移除生产代码和测试均未使用的 Pillow 直接依赖，减少安装下载量、环境体积和依赖维护面。
 - ♻️ **测试导入与兼容清理** — 通过 pytest `pythonpath` 配置取代后端测试中的 53 处 `sys.path` 修补，增加 AST 防回归规则，并记录仍有调用的兼容入口暂缓删除。
@@ -23,6 +24,9 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Tests
 - 🧪 **Vue 组件可达性回归测试** — 新增 import 图架构测试，防止 `src/components/` 根目录引入未经审计的孤立 Vue 组件
+
+### Fixed
+- 🐛 **前端构建 CI** — 移除构建后提交已忽略 `dist` 的步骤，使工作流只验证依赖安装和生产构建。
 
 
 ## 2026-07-22
