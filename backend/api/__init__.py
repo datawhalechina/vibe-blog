@@ -97,8 +97,7 @@ def init_services(app):
     # 7. File Parser
     mineru_token = app.config.get('MINERU_TOKEN', '')
     if mineru_token:
-        # Uploads relative to backend root
-        upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
+        upload_folder = app.config['UPLOAD_FOLDER']
         os.makedirs(upload_folder, exist_ok=True)
         
         init_file_parser(

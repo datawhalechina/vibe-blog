@@ -15,6 +15,8 @@ from pathlib import Path
 from typing import Any, Optional
 import logging
 
+from infrastructure.paths import RuntimePaths
+
 logger = logging.getLogger(__name__)
 
 
@@ -26,16 +28,17 @@ class CacheManager:
         初始化缓存管理器
 
         Args:
-            cache_dir: 缓存目录路径，默认为 backend/cache
+            cache_dir: 缓存目录路径，默认使用 var/cache
             ttl_hours: 缓存过期时间（小时），默认 24 小时
         """
         try:
             import diskcache
 
             if cache_dir is None:
-                # 默认缓存目录：backend/cache
-                backend_dir = Path(__file__).parent.parent.parent.parent
-                cache_dir = backend_dir / "cache"
+                project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+                cache_dir = os.environ.get("CACHE_DIR") or RuntimePaths.from_env(
+                    project_root=project_root
+                ).cache
 
             self.cache_dir = Path(cache_dir)
             self.ttl_seconds = ttl_hours * 3600

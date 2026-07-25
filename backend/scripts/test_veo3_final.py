@@ -168,7 +168,16 @@ def main():
             logger.info(f"🔑 任务 ID: {result['task_id']}")
         
         # 5. 保存结果
-        output_file = Path("outputs") / f"veo3_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        from infrastructure.paths import RuntimePaths
+
+        project_root = Path(__file__).resolve().parent.parent.parent
+        output_dir = Path(
+            os.environ.get("OUTPUT_FOLDER")
+            or RuntimePaths.from_env(project_root=project_root).outputs
+        )
+        output_file = output_dir / (
+            f"veo3_result_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        )
         output_file.parent.mkdir(parents=True, exist_ok=True)
         
         with open(output_file, 'w', encoding='utf-8') as f:
