@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+- ♻️ **后端包边界基线** — 建立 repositories、models、shared 与 infrastructure 子包骨架，并用 AST 架构测试约束底层包不得反向依赖 API、services 或 Flask。
 - 🔧 **运行产物统一迁移** — 将日志、生成输出、上传、缓存和 E2E 截图的新写入统一迁入 `var/`，保留旧输出与日志读取兼容及原有 `/outputs/*` URL。
 - 🔧 **运行路径基础计划** — 明确以无副作用配置对象建立 `var/` 运行目录边界，并通过完整回归和浏览器 E2E 验证原有逻辑。
 - 🔧 **运行路径配置边界** — 新增统一的 `RuntimePaths` 解析对象与空配置安全回退，不改变现有日志、输出、上传和缓存调用路径。
