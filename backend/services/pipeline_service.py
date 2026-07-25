@@ -137,7 +137,7 @@ class PipelineService:
                         )
                         
                         try:
-                            from services.image_service import AspectRatio, ImageSize, STORYBOOK_STYLE_PREFIX
+                            from services.media import AspectRatio, ImageSize, STORYBOOK_STYLE_PREFIX
                             # 第一页使用前端选择的宽高比，其他页保持 16:9
                             if page_idx == 0:
                                 selected_aspect_ratio = AspectRatio.PORTRAIT_9_16 if aspect_ratio == "9:16" else AspectRatio.LANDSCAPE_16_9

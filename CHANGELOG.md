@@ -8,6 +8,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Changed
 - ♻️ **低风险僵尸代码清理** — 删除无生产入口、路由、构建或测试引用的 `ResultCard.vue` 顶层组件，并忽略 `/docs/` 目录
+- ♻️ **媒体服务能力边界** — 将图片、图片风格、视频、视频序列和 Sora 实现归入 `services/media/`，修正资源与 OSS 依赖路径，并以模块别名保留旧入口兼容。
 - ♻️ **调度与任务存储边界** — 将队列、cron 和调度编排迁入 `services/scheduling/`，任务模型及 SQLite 持久化分别归入 `models/` 与 `repositories/tasks/`，并保留旧导入兼容。
 - ♻️ **LLM 服务能力边界** — 将 LLM 生命周期与多提供商工厂迁入 `services/llm/`，通过模块别名保留旧导入、私有 helper、mock patch 和单例状态兼容。
 - ♻️ **后端包边界基线** — 建立 repositories、models、shared 与 infrastructure 子包骨架，并用 AST 架构测试约束底层包不得反向依赖 API、services 或 Flask。

@@ -585,7 +585,7 @@ class BlogService:
             "services.blog_generator.agents.assembler",
             "services.blog_generator.agents.search_coordinator",
             "services.blog_generator.services.search_service",
-            "services.image_service",
+            "services.media.image_service",
         ]
         if task_manager:
             sse_handler = SSELogHandler(task_manager, task_id)
@@ -1858,7 +1858,7 @@ class BlogService:
             # 构建封面图 Prompt
             if image_style:
                 # 使用风格管理器渲染 Prompt
-                from services.image_styles import get_style_manager
+                from services.media.image_styles import get_style_manager
                 style_manager = get_style_manager()
                 cover_prompt = style_manager.render_prompt(image_style, article_summary)
                 logger.info(f"开始生成【封面图】({image_style}): {title}")
@@ -1947,7 +1947,7 @@ Duration: 6-8 seconds. Professional educational style."""
             视频访问 URL 或 None
         """
         try:
-            from services.video_service import get_video_service, VideoAspectRatio
+            from services.media import get_video_service, VideoAspectRatio
             from services.oss_service import get_oss_service
             import os
             
@@ -2065,7 +2065,7 @@ Duration: 6-8 seconds. Professional educational style."""
         Returns:
             合并后的视频 URL 或 None
         """
-        from services.video_service import get_video_service, VideoAspectRatio
+        from services.media import get_video_service, VideoAspectRatio
         from concurrent.futures import ThreadPoolExecutor, as_completed
         
         video_service = get_video_service()

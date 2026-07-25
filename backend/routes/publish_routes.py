@@ -11,7 +11,7 @@ from flask import Blueprint, Response, jsonify, request
 
 from services import get_llm_service, get_image_service
 from services.database_service import get_db_service
-from services.video_service import get_video_service
+from services.media import get_video_service
 from services.publishers import Publisher
 
 logger = logging.getLogger(__name__)
