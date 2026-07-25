@@ -3,8 +3,10 @@ TC-13: Dashboard 任务中心（P1）
 
 验证：
 - /dashboard 路由可访问
-- 统计卡片渲染（4 个 stat-card）
-- 定时任务区块存在
+- Queue/Cron 分段视图可切换
+- 统计卡片渲染（5 个 stat-card）
+- Cron 创建抽屉可打开
+- /cron 兼容路由重定向并保留查询参数
 - 暗黑模式切换
 - API 请求发出（queue/tasks, scheduler/tasks）
 """
@@ -20,7 +22,7 @@ def test_dashboard_loads(page, base_url, take_screenshot):
     # 标题
     title = page.locator(".dashboard-title")
     assert title.is_visible()
-    assert "任务中心" in title.text_content()
+    assert "$ task-center" in title.text_content()
 
     # 5 个统计卡片（处理中、等待中、今日完成、失败、已取消）
     stat_cards = page.locator(".stat-card")
@@ -47,49 +49,33 @@ def test_dashboard_stats_display_numbers(page, base_url):
         assert text.isdigit(), f"stat-value[{i}] should be a number, got: {text}"
 
 
-def test_dashboard_scheduled_section(page, base_url):
-    """定时任务区块存在，有新建按钮"""
+def test_dashboard_switches_to_cron_view(page, base_url):
+    """Cron 标签切换视图并同步 URL。"""
     page.goto(f"{base_url}/dashboard", wait_until="networkidle")
 
-    # 定时任务标题
-    section_headers = page.locator(".task-section h2, .section-header h2")
-    found = False
-    for i in range(section_headers.count()):
-        if "定时任务" in section_headers.nth(i).text_content():
-            found = True
-            break
-    assert found, "应该有'定时任务'区块"
-
-    # 新建按钮
-    add_btn = page.locator(".btn-add")
-    assert add_btn.is_visible()
-    assert "+ 新建" in add_btn.text_content()
+    assert page.locator('[data-view="queue"]').is_visible()
+    page.locator('[data-tab="cron"]').click()
+    page.wait_for_url("**/dashboard?tab=cron")
+    assert page.locator('[data-view="cron"]').is_visible()
+    assert page.locator('[data-tab="cron"]').get_attribute("aria-selected") == "true"
 
 
-def test_dashboard_schedule_form_toggle(page, base_url, take_screenshot):
-    """点击新建按钮展开/收起定时任务表单"""
-    page.goto(f"{base_url}/dashboard", wait_until="networkidle")
+def test_dashboard_opens_cron_drawer(page, base_url, take_screenshot, console_logs):
+    """Cron 视图的新建按钮打开任务抽屉。"""
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+    page.goto(f"{base_url}/dashboard?tab=cron", wait_until="networkidle")
 
-    add_btn = page.locator(".btn-add")
-    # 表单初始不可见
-    assert page.locator(".schedule-form").count() == 0
+    page.locator(".cron-toolbar .primary-button").click()
+    drawer = page.locator(".drawer-panel")
+    drawer.wait_for(state="visible", timeout=3000)
+    assert drawer.locator(".drawer-title").text_content() == "$ new-task"
+    assert drawer.locator(".form-input").count() >= 2
 
-    # 点击展开
-    add_btn.click()
-    form = page.locator(".schedule-form")
-    form.wait_for(state="visible", timeout=3000)
-    assert form.is_visible()
-
-    # 表单内有输入框
-    inputs = form.locator(".form-input")
-    assert inputs.count() >= 2
-
-    take_screenshot("schedule_form_open")
-
-    # 点击收起
-    add_btn.click()
-    page.wait_for_timeout(500)
-    assert page.locator(".schedule-form").count() == 0
+    page.wait_for_timeout(400)
+    take_screenshot("dashboard_cron_drawer")
+    assert page_errors == []
+    assert [log for log in console_logs if log["type"] == "error"] == []
 
 
 def test_dashboard_dark_mode(page, base_url, take_screenshot):
@@ -157,8 +143,36 @@ def test_dashboard_navigate_from_home(page, base_url):
         assert '/dashboard' in page.url
 
 
-def test_cron_manager_keeps_supported_actions_without_history(page, base_url):
-    """独立 Cron 页面保留任务操作，但不显示无后端支持的历史入口。"""
+def test_dashboard_mobile_cron_drawer_fits_viewport(browser, base_url):
+    """移动端可切换 Cron，且创建抽屉保持在视口内。"""
+    context = browser.new_context(viewport={"width": 375, "height": 812}, locale="zh-CN")
+    page = context.new_page()
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+
+    page.goto(f"{base_url}/dashboard", wait_until="networkidle")
+    assert page.locator('[data-tab="queue"]').is_visible()
+    assert page.locator('[data-tab="cron"]').is_visible()
+    page.locator('[data-tab="cron"]').click()
+    page.locator(".cron-toolbar .primary-button").click()
+    drawer = page.locator(".drawer-panel")
+    drawer.wait_for(state="visible", timeout=3000)
+    page.wait_for_timeout(400)
+
+    box = drawer.bounding_box()
+    assert box is not None
+    assert box["x"] >= 0
+    assert box["x"] + box["width"] <= 375
+    assert page_errors == []
+
+    page.close()
+    context.close()
+
+
+def test_cron_manager_keeps_supported_actions_without_history(page, base_url, console_logs):
+    """旧 Cron URL 重定向后保留查询参数和所有后端支持的任务操作。"""
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
     job = {
         "id": "cron-e2e-1",
         "name": "E2E cron",
@@ -179,8 +193,14 @@ def test_cron_manager_keeps_supported_actions_without_history(page, base_url):
             body=json.dumps([job]),
         ),
     )
-    page.goto(f"{base_url}/cron", wait_until="networkidle")
+    page.goto(f"{base_url}/cron?source=e2e", wait_until="networkidle")
 
-    for title in ("编辑", "暂停", "执行", "重试", "删除"):
+    assert re.search(r"/dashboard\?(?:source=e2e&tab=cron|tab=cron&source=e2e)$", page.url)
+    assert page.locator('[data-view="cron"]').is_visible()
+
+    assert page.locator('button[title="编辑"]').count() == 0
+    for title in ("暂停", "执行", "重试", "删除"):
         assert page.locator(f'button[title="{title}"]').is_visible()
     assert page.locator('button[title="历史"]').count() == 0
+    assert page_errors == []
+    assert [log for log in console_logs if log["type"] == "error"] == []

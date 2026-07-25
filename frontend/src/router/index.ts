@@ -48,8 +48,10 @@ const routes = [
   },
   {
     path: '/cron',
-    name: 'CronManager',
-    component: () => import('../views/CronManager.vue')
+    redirect: (to) => ({
+      path: '/dashboard',
+      query: { ...to.query, tab: 'cron' }
+    })
   }
 ]
 

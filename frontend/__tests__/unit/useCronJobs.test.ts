@@ -214,4 +214,50 @@ describe('useCronJobs', () => {
       expect.objectContaining({ method: 'POST' })
     )
   })
+
+  it('should expose a retryable error when refresh fails', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 503 })
+    const { error, refresh } = useCronJobs(5000)
+
+    await refresh()
+
+    expect(error.value).toBe('加载定时任务失败，请重试')
+  })
+
+  it('should expose feedback after a successful action', async () => {
+    const { create, feedback } = useCronJobs(5000)
+
+    const success = await create({ name: 'Daily summary' })
+
+    expect(success).toBe(true)
+    expect(feedback.value).toBe('定时任务已创建')
+  })
+
+  it('should keep the drawer open when an action fails', async () => {
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    const { create, error } = useCronJobs(5000)
+
+    const success = await create({ name: 'Daily summary' })
+
+    expect(success).toBe(false)
+    expect(error.value).toBe('创建定时任务失败，请重试')
+  })
+
+  it('should distinguish a successful action from a failed list refresh', async () => {
+    const existingJobs = makeMockJobs()
+    const { create, refresh, jobs, error, feedback } = useCronJobs(5000)
+    await refresh()
+    jobs.value = existingJobs
+    mockFetch.mockReset()
+    mockFetch
+      .mockResolvedValueOnce({ ok: true })
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+
+    const success = await create({ name: 'Daily summary' })
+
+    expect(success).toBe(true)
+    expect(jobs.value).toEqual(existingJobs)
+    expect(feedback.value).toBe('')
+    expect(error.value).toBe('定时任务已创建，但列表刷新失败，请重试')
+  })
 })

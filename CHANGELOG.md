@@ -8,9 +8,11 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Changed
 - ♻️ **弃用 vibe-reviewer 清理** — 删除独立教程评估后端、API、配置、专用 Prompt 与依赖、Vue 页面和失效文档资源，保留博客生成内部 Reviewer Agent 及质量检查链路。
+- ♻️ **Dashboard 与 Cron 收口** — 将队列和定时任务合并为 Dashboard 分段视图，复用统一 Cron 组件与状态管理，并将旧 `/cron` 地址兼容重定向到 Cron 标签。
 
 ### Tests
 - ✨ **vibe-reviewer 退休契约** — 增加仓库、配置、路由和导航回归检查，并验证旧 `/reviewer` 地址跳转首页。
+- ✨ **Dashboard/Cron 回归契约** — 覆盖 Cron 加载与操作反馈、重复页面删除、兼容路由查询参数及 Dashboard 抽屉交互。
 
 ## 2026-07-25
 
