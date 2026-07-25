@@ -19,6 +19,8 @@ from typing import Optional, List, Tuple, Callable, Dict, Any
 import requests
 from jinja2 import Environment, FileSystemLoader
 
+from infrastructure.paths import RuntimePaths
+
 logger = logging.getLogger(__name__)
 
 # 初始化 Jinja2 模板环境
@@ -50,7 +52,10 @@ class FileParserService:
         self.upload_url_api = f"{mineru_api_base}/api/v4/file-urls/batch"
         self.result_api_template = f"{mineru_api_base}/api/v4/extract-results/batch/{{}}"
         
-        self.upload_folder = upload_folder or str(Path(__file__).parent.parent / 'uploads')
+        project_root = Path(__file__).resolve().parent.parent.parent
+        self.upload_folder = upload_folder or os.environ.get('UPLOAD_FOLDER') or str(
+            RuntimePaths.from_env(project_root=project_root).uploads
+        )
         self.pdf_max_pages = pdf_max_pages
         
         logger.info(f"FileParserService 初始化完成, upload_folder={self.upload_folder}, pdf_max_pages={self.pdf_max_pages}")

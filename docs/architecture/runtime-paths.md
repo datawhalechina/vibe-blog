@@ -27,9 +27,30 @@ back to the repository `var/` directory.
 ## Compatibility Contract
 
 - Resolving paths does not create directories.
-- Existing runtime consumers keep their current paths in the foundation PR.
+- New runtime writes use the repository-level `var/` layout.
 - Existing logs, outputs, uploads, caches, and screenshots are not moved or
   deleted automatically.
-- Each consumer will migrate in a focused follow-up PR with an old-path read
-  fallback where persisted data must remain accessible.
+- `/outputs/*` URLs are unchanged and read from `var/outputs` first, then the
+  legacy `backend/outputs` directory.
+- Existing Markdown files stored under `backend/outputs` remain editable.
+- E2E log analysis reads the new locations first and falls back to legacy logs
+  and screenshots.
+- Cache data is disposable and is recreated under `var/cache`; no cache files
+  are copied during migration.
 - The repository-level `var/` directory is ignored by Git.
+
+## Explicit Overrides
+
+`VIBE_RUNTIME_DIR` changes the complete runtime root. Existing deployment
+variables remain supported for deployments that mount separate directories:
+
+| Variable | Target |
+| --- | --- |
+| `OUTPUT_FOLDER` | Generated Markdown, images, covers, and videos |
+| `UPLOAD_FOLDER` | Uploaded source documents |
+| `CACHE_DIR` | Disk-backed cache |
+| `SCREENSHOT_DIR` | Browser and E2E screenshots |
+| `LOG_DIR` | Application log directory |
+| `BLOG_LOGS_DIR` | Structured per-task logs |
+
+Docker Compose mounts the complete repository `var/` directory at `/app/var`.

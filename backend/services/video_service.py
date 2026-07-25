@@ -12,6 +12,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from infrastructure.paths import RuntimePaths
+
 logger = logging.getLogger(__name__)
 
 
@@ -57,7 +59,7 @@ class Veo3Service:
         api_key: str,
         api_base: str = "https://grsai.dakka.com.cn",
         model: str = "veo3.1-fast",
-        output_folder: str = "outputs/videos"
+        output_folder: Optional[str] = None
     ):
         """
         初始化视频生成服务
@@ -71,7 +73,14 @@ class Veo3Service:
         self.api_key = api_key
         self.api_base = api_base.rstrip('/')
         self.model = model
-        self.output_folder = output_folder
+        project_root = Path(__file__).resolve().parent.parent.parent
+        configured_outputs = os.environ.get("OUTPUT_FOLDER")
+        default_output = (
+            Path(configured_outputs) / "videos"
+            if configured_outputs
+            else RuntimePaths.from_env(project_root=project_root).outputs / "videos"
+        )
+        self.output_folder = output_folder or str(default_output)
         
         self.session = requests.Session()
         self.session.headers.update({
@@ -80,7 +89,7 @@ class Veo3Service:
         })
         
         # 确保输出目录存在
-        Path(output_folder).mkdir(parents=True, exist_ok=True)
+        Path(self.output_folder).mkdir(parents=True, exist_ok=True)
 
     def is_available(self) -> bool:
         """检查服务是否可用"""
@@ -474,8 +483,8 @@ def init_video_service(config: dict) -> Optional[UnifiedVideoService]:
     # 视频输出目录
     output_folder = config.get('VIDEO_OUTPUT_FOLDER', '')
     if not output_folder:
-        base_output = config.get('OUTPUT_FOLDER', 'outputs')
-        output_folder = os.path.join(base_output, 'videos')
+        base_output = config.get('OUTPUT_FOLDER')
+        output_folder = os.path.join(base_output, 'videos') if base_output else None
     
     # 初始化 Veo3 服务
     _veo3_service = Veo3Service(

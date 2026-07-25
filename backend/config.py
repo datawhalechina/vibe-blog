@@ -4,11 +4,15 @@ vibe-blog 后端配置文件
 """
 import os
 from datetime import timedelta
+from pathlib import Path
+
+from infrastructure.paths import RuntimePaths
 
 # 基础路径配置
 _current_file = os.path.realpath(__file__)
 BASE_DIR = os.path.dirname(_current_file)
 PROJECT_ROOT = os.path.dirname(BASE_DIR)
+RUNTIME_PATHS = RuntimePaths.from_env(project_root=Path(PROJECT_ROOT))
 
 
 class Config:
@@ -17,8 +21,11 @@ class Config:
     SECRET_KEY = os.getenv('SECRET_KEY', 'banana-blog-secret-key')
     
     # 文件存储配置
-    UPLOAD_FOLDER = os.path.join(BASE_DIR, 'uploads')
-    OUTPUT_FOLDER = os.path.join(BASE_DIR, 'outputs')
+    UPLOAD_FOLDER = os.getenv('UPLOAD_FOLDER', str(RUNTIME_PATHS.uploads))
+    OUTPUT_FOLDER = os.getenv('OUTPUT_FOLDER', str(RUNTIME_PATHS.outputs))
+    LEGACY_OUTPUT_FOLDER = os.path.join(BASE_DIR, 'outputs')
+    CACHE_FOLDER = os.getenv('CACHE_DIR', str(RUNTIME_PATHS.cache))
+    SCREENSHOT_FOLDER = os.getenv('SCREENSHOT_DIR', str(RUNTIME_PATHS.screenshots))
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
     
     # AI 配置（从 .env 读取）
@@ -97,7 +104,7 @@ class Config:
 
     # 结构化任务日志
     BLOG_TASK_LOG_ENABLED = os.getenv('BLOG_TASK_LOG_ENABLED', 'true').lower() == 'true'
-    BLOG_LOGS_DIR = os.getenv('BLOG_LOGS_DIR', 'logs/blog_tasks')
+    BLOG_LOGS_DIR = os.getenv('BLOG_LOGS_DIR', str(RUNTIME_PATHS.logs / 'blog_tasks'))
 
     # SSE 流式事件增量优化（37.34）
     SSE_LLM_EVENTS_ENABLED = os.getenv('SSE_LLM_EVENTS_ENABLED', 'true').lower() == 'true'

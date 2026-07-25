@@ -23,7 +23,7 @@ pip install diskcache
 无需任何配置，缓存已自动启用：
 
 ```bash
-# 缓存目录：backend/cache/
+# 缓存目录：var/cache/
 # 默认 TTL：24 小时
 ```
 
@@ -150,7 +150,7 @@ API 成本：仅首次调用产生费用
 ## 注意事项
 
 1. **缓存目录**：
-   - 缓存文件存储在 `backend/cache/` 目录
+   - 缓存文件存储在 `var/cache/` 目录
    - diskcache 会自动管理缓存文件
    - 定期清理过期缓存以节省磁盘空间
 
@@ -228,5 +228,5 @@ print(f"缓存目录: {stats['cache_dir']}")
 缓存后端: diskcache
 缓存数量: 15
 缓存大小: 2.5 MB
-缓存目录: /Users/xxx/vibe-blog/backend/cache
+缓存目录: /Users/xxx/vibe-blog/var/cache
 ```

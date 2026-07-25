@@ -118,7 +118,13 @@ def test_mini_blog(topic: str):
     # 保存文章到文件
     markdown_content = result.get('markdown', '')
     if markdown_content:
-        output_dir = Path(__file__).parent.parent / 'outputs'
+        from infrastructure.paths import RuntimePaths
+
+        project_root = Path(__file__).resolve().parent.parent.parent
+        output_dir = Path(
+            os.environ.get("OUTPUT_FOLDER")
+            or RuntimePaths.from_env(project_root=project_root).outputs
+        )
         output_dir.mkdir(parents=True, exist_ok=True)
         
         # 生成文件名

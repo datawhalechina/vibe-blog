@@ -10,18 +10,14 @@ services:
     ports:
       - "5000:5000"
     volumes:
-      - ../backend/outputs:/app/outputs
-      - ../backend/logs:/app/logs
-      - ../backend/uploads:/app/uploads
+      - ../var:/app/var
       - ../backend/data:/app/data
     env_file:
       - ../backend/.env
     environment:
       - FLASK_ENV=production
       - PYTHONUNBUFFERED=1
-      - LOG_DIR=/app/logs
-      - OUTPUT_FOLDER=/app/outputs
-      - UPLOAD_FOLDER=/app/uploads
+      - VIBE_RUNTIME_DIR=/app/var
       # 飞书机器人（对话式写作入口）
       - FEISHU_APP_ID=${FEISHU_APP_ID:-}
       - FEISHU_APP_SECRET=${FEISHU_APP_SECRET:-}

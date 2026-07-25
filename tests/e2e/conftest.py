@@ -54,9 +54,11 @@ def browser():
 @pytest.fixture(scope="session")
 def screenshot_dir():
     """截图输出目录"""
-    d = os.path.join(
-        os.path.dirname(__file__), '..', '..', 'backend', 'outputs', 'e2e_screenshots'
-    )
+    project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
+    runtime_root = os.environ.get('VIBE_RUNTIME_DIR', os.path.join(project_root, 'var'))
+    if not os.path.isabs(runtime_root):
+        runtime_root = os.path.join(project_root, runtime_root)
+    d = os.environ.get('SCREENSHOT_DIR', os.path.join(runtime_root, 'screenshots'))
     os.makedirs(d, exist_ok=True)
     return d
 

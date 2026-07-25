@@ -13,14 +13,19 @@ E2E 验证脚本 — 验证本次 PR 的所有改动
 import asyncio
 import os
 import time
+from pathlib import Path
 
 import httpx
 from playwright.async_api import async_playwright
+from infrastructure.paths import RuntimePaths
 
 FRONTEND_URL = "http://localhost:5173"
 BACKEND_URL = "http://localhost:5001"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+RUNTIME_PATHS = RuntimePaths.from_env(project_root=PROJECT_ROOT)
 SCREENSHOT_DIR = os.path.join(
-    os.path.dirname(__file__), "outputs", "e2e_pr_verify"
+    os.environ.get("SCREENSHOT_DIR", str(RUNTIME_PATHS.screenshots)),
+    "e2e_pr_verify",
 )
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
@@ -500,7 +505,7 @@ async def test_7_check_logs():
     """检查后端日志验证 QueueBridge 和 Humanizer 改动"""
     print("\n[Test 7] 后端日志验证")
     log_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)), "logs", "app.log"
+        os.environ.get("LOG_DIR", str(RUNTIME_PATHS.logs)), "app.log"
     )
     if not os.path.exists(log_path):
         record("日志文件存在", False, f"未找到 {log_path}")

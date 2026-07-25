@@ -134,7 +134,16 @@ async def main():
             await page.goto(url, wait_until="networkidle", timeout=30000)
             await page.wait_for_timeout(3000)
             # Screenshot
-            screenshot_path = f"/Users/coyote-ll/Documents/git/AiSlide/vibe-blog/backend/outputs/e2e_mini_blog.png"
+            from infrastructure.paths import RuntimePaths
+            from pathlib import Path
+
+            project_root = Path(__file__).resolve().parent.parent.parent
+            screenshot_dir = Path(
+                os.environ.get("SCREENSHOT_DIR")
+                or RuntimePaths.from_env(project_root=project_root).screenshots
+            )
+            screenshot_dir.mkdir(parents=True, exist_ok=True)
+            screenshot_path = str(screenshot_dir / "e2e_mini_blog.png")
             await page.screenshot(path=screenshot_path, full_page=True)
             print(f"  Screenshot saved: {screenshot_path}")
             await browser.close()

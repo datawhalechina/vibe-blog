@@ -3,10 +3,10 @@
 E2E 日志分析器 — vibe-blog-browser-test 日志监控子代理的核心脚本
 
 数据源：
-  1. logs/blog_tasks/{task_id}.json  — 结构化任务日志（agent 步骤、token、耗时）
-  2. logs/app.log                    — 后端应用日志（最近 N 行）
-  3. backend/outputs/e2e_screenshots/ — 浏览器控制台日志 JSON + 截图清单
-  4. logs/e2e_result_*.log           — pytest 输出
+  1. var/logs/blog_tasks/{task_id}.json — 结构化任务日志（agent 步骤、token、耗时）
+  2. var/logs/app.log                  — 后端应用日志（最近 N 行）
+  3. var/screenshots/                  — 浏览器控制台日志 JSON + 截图清单
+  4. var/logs/e2e_result_*.log         — pytest 输出
 
 输出：
   stdout JSON 格式的分析报告，供主代理解析。
@@ -26,10 +26,26 @@ from pathlib import Path
 
 PROJECT_ROOT = Path(__file__).resolve().parents[3]
 BACKEND_DIR = PROJECT_ROOT / "backend"
-LOGS_DIR = PROJECT_ROOT / "logs"
+RUNTIME_ROOT = Path(os.environ.get("VIBE_RUNTIME_DIR", PROJECT_ROOT / "var"))
+if not RUNTIME_ROOT.is_absolute():
+    RUNTIME_ROOT = PROJECT_ROOT / RUNTIME_ROOT
+LOGS_DIR = next(
+    (path for path in (RUNTIME_ROOT / "logs", PROJECT_ROOT / "logs") if path.exists()),
+    RUNTIME_ROOT / "logs",
+)
 TASK_LOGS_DIR = LOGS_DIR / "blog_tasks"
 APP_LOG = LOGS_DIR / "app.log"
-SCREENSHOT_DIR = BACKEND_DIR / "outputs" / "e2e_screenshots"
+SCREENSHOT_DIR = next(
+    (
+        path
+        for path in (
+            RUNTIME_ROOT / "screenshots",
+            BACKEND_DIR / "outputs" / "e2e_screenshots",
+        )
+        if path.exists()
+    ),
+    RUNTIME_ROOT / "screenshots",
+)
 
 
 def parse_args():
