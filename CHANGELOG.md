@@ -7,7 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
-- ♻️ **低风险僵尸代码清理** — 删除无生产入口、路由、构建或测试引用的 `ResultCard.vue` 顶层组件
+- ♻️ **低风险僵尸代码清理** — 删除无生产入口、路由、构建或测试引用的 `ResultCard.vue` 顶层组件，并忽略 `/docs/` 目录
 
 ### Tests
 - 🧪 **Vue 组件可达性回归测试** — 新增 import 图架构测试，防止 `src/components/` 根目录引入未经审计的孤立 Vue 组件
