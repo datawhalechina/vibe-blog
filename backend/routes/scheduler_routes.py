@@ -16,7 +16,7 @@ import logging
 
 from flask import Blueprint, jsonify, request
 
-from services.task_queue.cron_parser import parse_schedule
+from services.scheduling.cron_parser import parse_schedule
 
 logger = logging.getLogger(__name__)
 

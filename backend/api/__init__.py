@@ -113,8 +113,8 @@ def init_services(app):
     # 8. TaskQueue + CronScheduler (Optional)
     try:
         import asyncio
-        from services.task_queue import TaskQueueManager
-        from services.task_queue.cron_scheduler import CronScheduler
+        from services.scheduling import TaskQueueManager
+        from services.scheduling.cron_scheduler import CronScheduler
         from routes.queue_routes import init_queue_routes
         from routes.scheduler_routes import init_scheduler_routes
 
