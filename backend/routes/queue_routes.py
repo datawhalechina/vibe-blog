@@ -41,7 +41,7 @@ def submit_task():
     if not data or not data.get('topic'):
         return jsonify({'error': '缺少 topic 参数'}), 400
 
-    from services.task_queue.models import (
+    from models.scheduling import (
         BlogTask, BlogGenerationConfig, PublishConfig,
         TriggerConfig, TaskPriority,
     )
