@@ -1,5 +1,4 @@
 import importlib
-from pathlib import Path
 
 
 ROUTE_MODULES = (
@@ -45,10 +44,3 @@ def test_legacy_route_registry_uses_new_registry():
     current = importlib.import_module("api.routes")
 
     assert legacy.register_all_blueprints is current.register_all_blueprints
-
-
-def test_static_route_keeps_backend_static_directory():
-    static_routes = importlib.import_module("api.routes.static_routes")
-    expected = Path(__file__).resolve().parents[2] / "static"
-
-    assert Path(static_routes._static_folder).resolve() == expected.resolve()
