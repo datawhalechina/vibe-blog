@@ -12,7 +12,7 @@ from flask import Blueprint, Response, jsonify, request
 from services import get_llm_service, get_image_service
 from services.database_service import get_db_service
 from services.media import get_video_service
-from services.publishers import Publisher
+from services.publishing import Publisher
 
 logger = logging.getLogger(__name__)
 
@@ -211,7 +211,7 @@ def convert_blog_to_xhs(history_id):
         if blog_record.get('content_type') == 'xhs':
             return jsonify({'success': False, 'error': '该记录已经是小红书类型'}), 400
 
-        from services.xhs_service import get_xhs_service
+        from services.publishing import get_xhs_service
         xhs_service = get_xhs_service()
 
         if not xhs_service:
@@ -298,7 +298,7 @@ def sync_publish():
             'xhs': None
         }
 
-        from services.publishers.publisher import Publisher
+        from services.publishing import Publisher
         publisher = Publisher()
 
         for platform in blog_platforms:
@@ -335,7 +335,7 @@ def sync_publish():
         if xhs_enabled:
             xhs_cookies = cookies.get('xiaohongshu', [])
 
-            from services.xhs_service import get_xhs_service
+            from services.publishing import get_xhs_service
             xhs_service = get_xhs_service()
 
             if xhs_service:
