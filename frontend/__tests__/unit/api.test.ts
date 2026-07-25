@@ -65,7 +65,6 @@ const mockConfigResponse = {
   success: true,
   config: {
     features: {
-      reviewer: true,
       xhs_tab: true,
       cover_video: true,
     },
@@ -238,7 +237,8 @@ describe('api.ts', () => {
     it('should get frontend config', async () => {
       const result = await getFrontendConfig()
       expect(result.success).toBe(true)
-      expect(result.config?.features.reviewer).toBe(true)
+      expect(result.config?.features.xhs_tab).toBe(true)
+      expect(result.config?.features).not.toHaveProperty('reviewer')
     })
 
     it('should get image styles', async () => {

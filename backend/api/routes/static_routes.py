@@ -106,12 +106,10 @@ def get_frontend_config():
         'success': True,
         'config': {
             'features': {
-                'reviewer': os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true',
                 'book_scan': os.environ.get('BOOK_SCAN_ENABLED', 'false').lower() == 'true',
                 'cover_video': os.environ.get('COVER_VIDEO_ENABLED', 'true').lower() == 'true',
                 'xhs_tab': os.environ.get('XHS_TAB_ENABLED', 'false').lower() == 'true',
             },
-            'reviewer_enabled': os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true',
             'book_scan_enabled': os.environ.get('BOOK_SCAN_ENABLED', 'false').lower() == 'true'
         }
     })

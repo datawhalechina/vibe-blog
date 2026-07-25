@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-26
+
+### Changed
+- ♻️ **弃用 vibe-reviewer 清理** — 删除独立教程评估后端、API、配置、专用 Prompt 与依赖、Vue 页面和失效文档资源，保留博客生成内部 Reviewer Agent 及质量检查链路。
+
+### Tests
+- ✨ **vibe-reviewer 退休契约** — 增加仓库、配置、路由和导航回归检查，并验证旧 `/reviewer` 地址跳转首页。
+
 ## 2026-07-25
 
 ### Changed

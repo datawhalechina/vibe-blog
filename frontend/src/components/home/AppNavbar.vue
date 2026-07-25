@@ -18,14 +18,6 @@
         <BookOpen :size="14" />
         <span>小红书创作</span>
       </router-link>
-      <router-link
-        v-if="appConfig.features?.reviewer"
-        to="/reviewer"
-        class="nav-link"
-      >
-        <Search :size="14" />
-        <span>教程评估</span>
-      </router-link>
       <a
         href="https://github.com/datawhalechina/vibe-blog"
         target="_blank"
@@ -52,7 +44,7 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { Sun, Moon, BookOpen, Search } from 'lucide-vue-next'
+import { Sun, Moon, BookOpen } from 'lucide-vue-next'
 import { useThemeStore } from '../../stores/theme'
 
 interface Props {

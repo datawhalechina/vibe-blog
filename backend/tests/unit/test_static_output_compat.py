@@ -2,6 +2,7 @@ import pytest
 from flask import Flask
 
 from routes.static_routes import static_bp
+from routes.settings_routes import SETTINGS_SCHEMA
 
 
 def _app(current_output, legacy_output):
@@ -86,3 +87,19 @@ def test_supported_static_api_routes_remain_available(tmp_path):
 
     assert client.get("/api/config").status_code == 200
     assert client.get("/api-docs").status_code == 200
+
+
+def test_frontend_config_does_not_expose_retired_reviewer(tmp_path, monkeypatch):
+    monkeypatch.setenv("REVIEWER_ENABLED", "true")
+
+    response = _app(tmp_path / "outputs", tmp_path / "legacy").test_client().get(
+        "/api/config"
+    )
+
+    config = response.get_json()["config"]
+    assert "reviewer" not in config["features"]
+    assert "reviewer_enabled" not in config
+
+
+def test_settings_schema_does_not_expose_retired_reviewer():
+    assert "REVIEWER_ENABLED" not in SETTINGS_SCHEMA
