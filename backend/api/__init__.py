@@ -55,7 +55,7 @@ def init_services(app):
         get_llm_service,
     )
     from services.oss_service import init_oss_service, get_oss_service
-    from services.video_service import init_video_service, get_video_service
+    from services.media import init_video_service, get_video_service
     from services.database_service import init_db_service
     from services.file_parser_service import init_file_parser
     from services.knowledge_service import init_knowledge_service

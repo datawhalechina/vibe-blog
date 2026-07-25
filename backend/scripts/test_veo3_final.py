@@ -76,7 +76,7 @@ def upload_to_oss(image_path: str) -> str:
 
 def generate_video(image_url: str) -> dict:
     """调用 Veo3 API 生成视频"""
-    from services.video_service import Veo3Service, VideoAspectRatio
+    from services.media import Veo3Service, VideoAspectRatio
     
     # VEO3_API_KEY 复用 NANO_BANANA_API_KEY
     api_key = os.getenv('VEO3_API_KEY') or os.getenv('NANO_BANANA_API_KEY')

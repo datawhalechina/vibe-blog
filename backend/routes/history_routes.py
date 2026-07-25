@@ -13,7 +13,7 @@ from flask import Blueprint, Response, jsonify, request
 from urllib.parse import urlparse
 
 from services.database_service import get_db_service
-from services.video_service import get_video_service
+from services.media import get_video_service
 from services.oss_service import get_oss_service
 
 logger = logging.getLogger(__name__)

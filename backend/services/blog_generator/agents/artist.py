@@ -544,7 +544,7 @@ class ArtistAgent:
             # 构建完整的 Prompt
             if image_style:
                 # 使用风格管理器渲染 Prompt（支持 Type × Style 二维渲染）
-                from services.image_styles import get_style_manager
+                from services.media.image_styles import get_style_manager
                 style_manager = get_style_manager()
                 content = f"{prompt}\n\n图片说明：{caption}"
                 full_prompt = style_manager.render_prompt(image_style, content, illustration_type=illustration_type)
@@ -745,7 +745,7 @@ class ArtistAgent:
             # Type × Style: 优先使用大纲指定的 illustration_type，否则自动推荐
             illustration_type = section_outline.get('illustration_type', '')
             if not illustration_type and section_content:
-                from services.image_styles import get_style_manager
+                from services.media.image_styles import get_style_manager
                 illustration_type = get_style_manager().auto_recommend_type(section_content)
                 logger.debug(f"章节 {i} 自动推荐 illustration_type: {illustration_type}")
             
@@ -781,7 +781,7 @@ class ArtistAgent:
                     surrounding_context = content[:2000]
                 
                 # Type × Style: 根据占位符上下文自动推荐
-                from services.image_styles import get_style_manager
+                from services.media.image_styles import get_style_manager
                 ph_illustration_type = get_style_manager().auto_recommend_type(surrounding_context)
                 
                 tasks.append({
@@ -804,7 +804,7 @@ class ArtistAgent:
             section_title = sections[section_idx].get('title', '') if section_idx < len(sections) else ''
             
             # Type × Style: 根据缺失图表上下文自动推荐
-            from services.image_styles import get_style_manager
+            from services.media.image_styles import get_style_manager
             md_illustration_type = get_style_manager().auto_recommend_type(task['context'])
             
             tasks.append({
@@ -1135,7 +1135,7 @@ class ArtistAgent:
             try:
                 # 生成图片 Prompt
                 if image_style:
-                    from ...image_styles import get_style_manager
+                    from services.media.image_styles import get_style_manager
                     style_manager = get_style_manager()
                     # Type × Style: Mini 模式也自动推荐 illustration_type
                     mini_illustration_type = style_manager.auto_recommend_type(section_summary)
