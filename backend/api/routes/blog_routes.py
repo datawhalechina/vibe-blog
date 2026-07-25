@@ -65,7 +65,7 @@ def init_blog_services(app_config):
 
         # 75.02 Serper Google 搜索
         try:
-            from services.blog_generator.services.serper_search_service import init_serper_service
+            from services.blog_generation import init_serper_service
             serper = init_serper_service(app_config)
             if serper and serper.is_available():
                 logger.info("Serper Google 搜索服务已初始化")
@@ -74,7 +74,7 @@ def init_blog_services(app_config):
 
         # 75.07 搜狗搜索（腾讯云 SearchPro）
         try:
-            from services.blog_generator.services.sogou_search_service import init_sogou_service
+            from services.blog_generation import init_sogou_service
             sogou = init_sogou_service(app_config)
             if sogou:
                 logger.info("搜狗搜索服务已初始化")
