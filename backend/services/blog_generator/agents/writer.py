@@ -233,7 +233,7 @@ class WriterAgent:
                 section_title = section_outline.get('title', '')
                 accumulated = ""
                 import time as _time
-                from services.llm_service import _strip_thinking
+                from services.llm.service import _strip_thinking
                 _last_send = [0.0]  # 节流：最少间隔 100ms
 
                 def on_writing_chunk(delta, acc):

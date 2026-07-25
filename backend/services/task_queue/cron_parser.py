@@ -77,7 +77,7 @@ def _parse_by_llm(text: str) -> dict | None:
     调用大模型，输出结构化 JSON。
     """
     try:
-        from services.llm_service import get_llm_service
+        from services.llm import get_llm_service
         llm = get_llm_service()
         if not llm or not llm.is_available():
             logger.warning("[cron_parser] LLM 服务不可用，跳过 LLM 解析")
