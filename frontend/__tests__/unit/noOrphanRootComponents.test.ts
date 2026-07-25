@@ -13,7 +13,6 @@ describe('top-level component reachability', () => {
     const frontendRoot = process.cwd()
     const sourceRoot = resolve(frontendRoot, 'src')
     const componentRoot = resolve(sourceRoot, 'components')
-    const orphanCandidatesAwaitingAudit = new Set(['ProgressPanel.vue'])
     const productionFiles = walkFiles(sourceRoot).filter((path) =>
       ['.ts', '.vue'].includes(extname(path)),
     )
@@ -36,9 +35,7 @@ describe('top-level component reachability', () => {
     }
 
     const orphanComponents = rootComponents.filter(
-      (filename) =>
-        !orphanCandidatesAwaitingAudit.has(filename) &&
-        !importedComponents.has(resolve(componentRoot, filename)),
+      (filename) => !importedComponents.has(resolve(componentRoot, filename)),
     )
 
     expect(orphanComponents).toEqual([])
