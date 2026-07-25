@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+- ♻️ **调度与任务存储边界** — 将队列、cron 和调度编排迁入 `services/scheduling/`，任务模型及 SQLite 持久化分别归入 `models/` 与 `repositories/tasks/`，并保留旧导入兼容。
 - ♻️ **LLM 服务能力边界** — 将 LLM 生命周期与多提供商工厂迁入 `services/llm/`，通过模块别名保留旧导入、私有 helper、mock patch 和单例状态兼容。
 - ♻️ **后端包边界基线** — 建立 repositories、models、shared 与 infrastructure 子包骨架，并用 AST 架构测试约束底层包不得反向依赖 API、services 或 Flask。
 - 🔧 **运行产物统一迁移** — 将日志、生成输出、上传、缓存和 E2E 截图的新写入统一迁入 `var/`，保留旧输出与日志读取兼容及原有 `/outputs/*` URL。

@@ -34,7 +34,7 @@ def _record_task_to_queue(task_id: str, topic: str, article_type: str,
         if not queue_manager:
             return
         import asyncio
-        from services.task_queue.models import (
+        from models.scheduling import (
             BlogTask, BlogGenerationConfig, QueueStatus,
         )
         task = BlogTask(
