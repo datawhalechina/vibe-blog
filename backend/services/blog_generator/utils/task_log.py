@@ -15,6 +15,8 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List
 
+from infrastructure.paths import RuntimePaths
+
 logger = logging.getLogger(__name__)
 
 
@@ -132,16 +134,16 @@ class BlogTaskLog:
         self.log_step("system", "task_failed", error, level="error")
 
     def save(self, logs_dir: str = None) -> str:
-        """保存为 JSON 文件到 logs/blog_tasks/{task_id}/task.json"""
+        """保存为 JSON 文件到 var/logs/blog_tasks/{task_id}/task.json"""
         if logs_dir:
             base_logs_dir = logs_dir
         elif os.environ.get("BLOG_LOGS_DIR"):
             base_logs_dir = os.environ["BLOG_LOGS_DIR"]
         else:
-            # 统一使用 vibe-blog/logs/blog_tasks 目录（与 logging_config.py / 启动脚本一致）
-            # task_log.py → utils/ → blog_generator/ → services/ → backend/ → vibe-blog/
             project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
-            base_logs_dir = str(project_root / "logs" / "blog_tasks")
+            base_logs_dir = str(
+                RuntimePaths.from_env(project_root=project_root).logs / "blog_tasks"
+            )
         task_dir = Path(base_logs_dir) / self.task_id
         task_dir.mkdir(parents=True, exist_ok=True)
 

@@ -28,7 +28,13 @@ BACKEND_DIR="$PROJECT_ROOT/backend"
 FRONTEND_DIR="$PROJECT_ROOT/frontend"
 WHATSAPP_DIR="$PROJECT_ROOT/integrations/whatsapp-gateway"
 LEGACY_WHATSAPP_DIR="$PROJECT_ROOT/whatsapp-gateway"
-LOG_DIR="$PROJECT_ROOT/logs"
+RUNTIME_DIR="${VIBE_RUNTIME_DIR:-var}"
+case "$RUNTIME_DIR" in
+    /*) ;;
+    *) RUNTIME_DIR="$PROJECT_ROOT/$RUNTIME_DIR" ;;
+esac
+export VIBE_RUNTIME_DIR="$RUNTIME_DIR"
+LOG_DIR="$RUNTIME_DIR/logs"
 
 # 时间戳（精确到秒）
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")

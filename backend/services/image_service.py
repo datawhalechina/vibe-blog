@@ -11,6 +11,8 @@ from dataclasses import dataclass
 from enum import Enum
 from pathlib import Path
 
+from infrastructure.paths import RuntimePaths
+
 logger = logging.getLogger(__name__)
 
 
@@ -69,7 +71,7 @@ class NanoBananaService:
         api_key: str,
         api_base: str = "https://grsai.dakka.com.cn",
         model: str = "nano-banana-pro",
-        output_folder: str = "outputs/images"
+        output_folder: Optional[str] = None
     ):
         """
         初始化图片生成服务
@@ -83,7 +85,14 @@ class NanoBananaService:
         self.api_key = api_key
         self.api_base = api_base.rstrip('/')
         self.model = model
-        self.output_folder = output_folder
+        project_root = Path(__file__).resolve().parent.parent.parent
+        configured_outputs = os.environ.get("OUTPUT_FOLDER")
+        default_output = (
+            Path(configured_outputs) / "images"
+            if configured_outputs
+            else RuntimePaths.from_env(project_root=project_root).outputs / "images"
+        )
+        self.output_folder = output_folder or str(default_output)
         
         self.session = requests.Session()
         self.session.headers.update({
@@ -92,7 +101,7 @@ class NanoBananaService:
         })
         
         # 确保输出目录存在
-        Path(output_folder).mkdir(parents=True, exist_ok=True)
+        Path(self.output_folder).mkdir(parents=True, exist_ok=True)
 
     def is_available(self) -> bool:
         """检查服务是否可用"""
@@ -362,7 +371,7 @@ def init_image_service(config: dict) -> Optional[NanoBananaService]:
         api_key=api_key,
         api_base=config.get('NANO_BANANA_API_BASE', 'https://grsai.dakka.com.cn'),
         model=config.get('NANO_BANANA_MODEL', 'nano-banana-pro'),
-        output_folder=config.get('IMAGE_OUTPUT_FOLDER', 'outputs/images')
+        output_folder=config.get('IMAGE_OUTPUT_FOLDER')
     )
     
     logger.info(f"图片生成服务已初始化: model={_image_service.model}")

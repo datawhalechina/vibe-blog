@@ -17,7 +17,14 @@ import json
 
 FRONTEND = "http://localhost:5173"
 BACKEND = "http://localhost:5001"
-SCREENSHOT_DIR = os.path.join(os.path.dirname(__file__), "..", "backend", "outputs", "e2e_screenshots", "full_e2e")
+PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+RUNTIME_ROOT = os.environ.get("VIBE_RUNTIME_DIR", os.path.join(PROJECT_ROOT, "var"))
+if not os.path.isabs(RUNTIME_ROOT):
+    RUNTIME_ROOT = os.path.join(PROJECT_ROOT, RUNTIME_ROOT)
+SCREENSHOT_DIR = os.path.join(
+    os.environ.get("SCREENSHOT_DIR", os.path.join(RUNTIME_ROOT, "screenshots")),
+    "full_e2e",
+)
 os.makedirs(SCREENSHOT_DIR, exist_ok=True)
 
 results = []

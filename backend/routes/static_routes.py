@@ -6,7 +6,7 @@ import os
 import re
 import logging
 
-from flask import Blueprint, Response, jsonify, request, send_from_directory
+from flask import Blueprint, Response, current_app, jsonify, request, send_from_directory
 
 from services.database_service import get_db_service
 
@@ -16,7 +16,18 @@ static_bp = Blueprint('static', __name__)
 
 # 静态文件目录
 _static_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'static')
-_outputs_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'outputs')
+
+
+def _serve_output(directory, filename):
+    folders = [current_app.config['OUTPUT_FOLDER']]
+    legacy = current_app.config.get('LEGACY_OUTPUT_FOLDER')
+    if legacy and legacy not in folders:
+        folders.append(legacy)
+    for folder in folders:
+        candidate = os.path.join(folder, directory, filename)
+        if os.path.isfile(candidate):
+            return send_from_directory(os.path.join(folder, directory), filename)
+    return send_from_directory(os.path.join(folders[0], directory), filename)
 
 
 @static_bp.route('/')
@@ -95,20 +106,17 @@ def book_reader_chapter(chapter_path):
 @static_bp.route('/outputs/images/<path:filename>')
 @static_bp.route('/static/chapter/outputs/images/<path:filename>')
 def serve_output_image(filename):
-    images_folder = os.path.join(_outputs_folder, 'images')
-    return send_from_directory(images_folder, filename)
+    return _serve_output('images', filename)
 
 
 @static_bp.route('/outputs/covers/<path:filename>')
 def serve_output_cover(filename):
-    covers_folder = os.path.join(_outputs_folder, 'covers')
-    return send_from_directory(covers_folder, filename)
+    return _serve_output('covers', filename)
 
 
 @static_bp.route('/outputs/videos/<path:filename>')
 def serve_output_video(filename):
-    videos_folder = os.path.join(_outputs_folder, 'videos')
-    return send_from_directory(videos_folder, filename)
+    return _serve_output('videos', filename)
 
 
 @static_bp.route('/api-docs')

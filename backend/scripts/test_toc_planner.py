@@ -87,7 +87,13 @@ def test_full_pipeline():
     # 保存文件
     from pathlib import Path
     from datetime import datetime
-    output_dir = Path(__file__).parent.parent / 'outputs'
+    from infrastructure.paths import RuntimePaths
+
+    project_root = Path(__file__).resolve().parent.parent.parent
+    output_dir = Path(
+        os.environ.get("OUTPUT_FOLDER")
+        or RuntimePaths.from_env(project_root=project_root).outputs
+    )
     output_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     filepath = output_dir / f"TOC_TEST_Redis快速入门_{timestamp}.md"

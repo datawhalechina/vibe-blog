@@ -109,7 +109,7 @@ def upload_document():
 
         doc_id = f"doc_{uuid.uuid4().hex[:12]}"
 
-        upload_folder = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'uploads')
+        upload_folder = current_app.config['UPLOAD_FOLDER']
         os.makedirs(upload_folder, exist_ok=True)
         file_path = os.path.join(upload_folder, f"{doc_id}_{filename}")
         file.save(file_path)
@@ -599,11 +599,16 @@ def update_blog_content(blog_id):
         file_updated = False
         if isinstance(saved_path, str) and saved_path.strip():
             requested_path = Path(saved_path).resolve()
-            outputs_dir = Path(os.path.dirname(os.path.dirname(__file__))) / 'outputs'
-            outputs_dir = outputs_dir.resolve()
+            output_roots = [Path(current_app.config['OUTPUT_FOLDER']).resolve()]
+            legacy_output = current_app.config.get('LEGACY_OUTPUT_FOLDER')
+            if legacy_output:
+                output_roots.append(Path(legacy_output).resolve())
 
             try:
-                if os.path.commonpath([str(requested_path), str(outputs_dir)]) != str(outputs_dir):
+                if not any(
+                    os.path.commonpath([str(requested_path), str(root)]) == str(root)
+                    for root in output_roots
+                ):
                     return jsonify({'success': False, 'error': '保存路径不合法'}), 400
             except ValueError:
                 return jsonify({'success': False, 'error': '保存路径不合法'}), 400

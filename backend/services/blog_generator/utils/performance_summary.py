@@ -10,10 +10,13 @@
 """
 import json
 import logging
+import os
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, Optional
+
+from infrastructure.paths import RuntimePaths
 
 logger = logging.getLogger(__name__)
 
@@ -165,7 +168,13 @@ class BlogPerformanceSummary:
 
     def save(self, output_path: str = None) -> None:
         """保存摘要到 JSON 文件"""
-        output_path = output_path or "logs/blog_tasks/performance_summary.json"
+        if output_path is None:
+            project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            task_logs = Path(
+                os.environ.get("BLOG_LOGS_DIR")
+                or RuntimePaths.from_env(project_root=project_root).logs / "blog_tasks"
+            )
+            output_path = str(task_logs / "performance_summary.json")
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
 
         data = {
@@ -180,8 +189,14 @@ class BlogPerformanceSummary:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
     @classmethod
-    def from_log_dir(cls, log_dir: str = "logs/blog_tasks") -> "BlogPerformanceSummary":
+    def from_log_dir(cls, log_dir: str = None) -> "BlogPerformanceSummary":
         """从日志目录读取所有任务日志并聚合"""
+        if log_dir is None:
+            project_root = Path(__file__).resolve().parent.parent.parent.parent.parent
+            log_dir = str(
+                os.environ.get("BLOG_LOGS_DIR")
+                or RuntimePaths.from_env(project_root=project_root).logs / "blog_tasks"
+            )
         summary = cls()
         log_path = Path(log_dir)
         if not log_path.exists():
