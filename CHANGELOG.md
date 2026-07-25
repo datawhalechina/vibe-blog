@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+- 🔧 **后端运行产物治理** — 停止跟踪 `backend/outputs/` 下的 64 个历史文章、图片和视频，并增加仓库级回归检查。
 - ♻️ **孤立进度组件清理** — 删除无生产消费者的旧 `ProgressPanel.vue`，并取消可达性测试中的临时豁免。
 - ♻️ **旧静态页面清理** — 删除未被生产代码引用的旧 HTML/CSS 前端，并收缩 Flask 静态兼容路由，仅保留 XHS 地址跳转及有效输出、配置接口。
 - ♻️ **Cron 历史 UI 清理** — 删除没有后端接口支持的执行历史抽屉和入口，保留创建、暂停、恢复、执行、重试与删除操作。
