@@ -135,7 +135,7 @@ class ImageEnhancementPipeline:
         try:
             # 如果有风格 ID，走 style_manager 渲染
             if image_style:
-                from services.image_styles import get_style_manager
+                from services.media.image_styles import get_style_manager
                 full_prompt = get_style_manager().render_prompt(
                     image_style, image_prompt, illustration_type="infographic"
                 )

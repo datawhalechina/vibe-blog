@@ -433,7 +433,7 @@ class XHSService:
         if not self.image_service or not page:
             return None
         
-        from services.image_service import AspectRatio
+        from services.media import AspectRatio
         
         logger.info(f"生成图片: {page.page_type} (index={page.index})")
         
@@ -495,7 +495,7 @@ class XHSService:
         if not self.image_service or not page:
             return None
         
-        from services.image_service import AspectRatio
+        from services.media import AspectRatio
         
         logger.info(f"生成图片: {page.page_type} (index={page.index}, layout={layout}, shape={shape})")
         
@@ -1080,7 +1080,7 @@ class XHSService:
         Returns:
             最终视频 URL 或 None
         """
-        from services.video_sequence_service import VideoSequenceOrchestrator
+        from services.media.video_sequence_service import VideoSequenceOrchestrator
         
         logger.info(f"开始生成讲解视频: {len(images)} 张图片, 风格={style}, 目标时长={target_duration}s, 模型={video_model}")
         

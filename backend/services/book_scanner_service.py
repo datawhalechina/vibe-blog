@@ -1024,7 +1024,7 @@ class BookScannerService:
         
         try:
             # 导入图片服务
-            from services.image_service import NanoBananaService, AspectRatio, ImageSize
+            from services.media import NanoBananaService, AspectRatio, ImageSize
             
             # 获取配置
             api_key = os.getenv('NANO_BANANA_API_KEY')

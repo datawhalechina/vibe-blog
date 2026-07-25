@@ -10,7 +10,7 @@ from services import (
     get_llm_service, create_transform_service,
     get_image_service, AspectRatio, ImageSize, STORYBOOK_STYLE_PREFIX,
 )
-from services.image_styles import get_style_manager
+from services.media.image_styles import get_style_manager
 
 logger = logging.getLogger(__name__)
 
