@@ -7,6 +7,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+- 🔧 **后端依赖精简** — 移除生产代码和测试均未使用的 Pillow 直接依赖，减少安装下载量、环境体积和依赖维护面。
 - ♻️ **测试导入与兼容清理** — 通过 pytest `pythonpath` 配置取代后端测试中的 53 处 `sys.path` 修补，增加 AST 防回归规则，并记录仍有调用的兼容入口暂缓删除。
 - ♻️ **博客生成与审核公共边界** — 新增 `services/blog_generation` 与 `services/review` 稳定门面，迁移外部调用方并保持核心 LangGraph 实现、Agent 身份和单例状态不变。
 - ♻️ **HTTP API 能力边界** — 将 Flask 应用工厂与 13 个 Blueprint 路由归入 `api/`，建立 schemas/errors 边界，修正静态资源路径并保留旧 `routes.*` patch 与导入兼容。
