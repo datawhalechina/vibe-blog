@@ -72,7 +72,7 @@ def update_queue_status(
         if not qm:
             return
 
-        from services.task_queue.models import QueueStatus
+        from models.scheduling import QueueStatus
 
         async def _update():
             task = await qm.db.get_task(task_id)

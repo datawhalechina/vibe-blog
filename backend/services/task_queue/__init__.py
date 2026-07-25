@@ -1,23 +1,4 @@
-"""
-任务排队系统 & 定时自动化发布
+"""Compatibility exports for :mod:`services.scheduling`."""
 
-零外部依赖：SQLite + asyncio，不引入 Redis
-"""
-from .models import (
-    BlogTask, BlogGenerationConfig, PublishConfig, TriggerConfig,
-    TriggerType, QueueStatus, TaskPriority, ExecutionRecord,
-    SchedulerConfig,
-    CronJob, CronJobState, CronJobStatus, CronSchedule, CronScheduleKind,
-)
-from .manager import TaskQueueManager
-from .cron_parser import parse_schedule
-from .db import TaskDB
-from .pipeline import PublishPipeline
-
-__all__ = [
-    'TaskQueueManager', 'TaskDB', 'parse_schedule', 'PublishPipeline',
-    'BlogTask', 'BlogGenerationConfig', 'PublishConfig', 'TriggerConfig',
-    'TriggerType', 'QueueStatus', 'TaskPriority', 'ExecutionRecord',
-    'SchedulerConfig',
-    'CronJob', 'CronJobState', 'CronJobStatus', 'CronSchedule', 'CronScheduleKind',
-]
+from services.scheduling import *  # noqa: F401,F403
+from services.scheduling import __all__
