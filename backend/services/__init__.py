@@ -8,9 +8,9 @@ vibe-blog 服务模块。
 from importlib import import_module
 
 _EXPORTS = {
-    "LLMService": ("services.llm_service", "LLMService"),
-    "get_llm_service": ("services.llm_service", "get_llm_service"),
-    "init_llm_service": ("services.llm_service", "init_llm_service"),
+    "LLMService": ("services.llm", "LLMService"),
+    "get_llm_service": ("services.llm", "get_llm_service"),
+    "init_llm_service": ("services.llm", "init_llm_service"),
     "TransformService": ("services.transform_service", "TransformService"),
     "create_transform_service": ("services.transform_service", "create_transform_service"),
     "NanoBananaService": ("services.image_service", "NanoBananaService"),

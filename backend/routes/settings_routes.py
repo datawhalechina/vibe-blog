@@ -231,7 +231,8 @@ def update_settings():
     # TEXT_MODEL 变更时，自动重新推断 provider_format 并热更新 LLMService
     if 'TEXT_MODEL' in updated:
         try:
-            from services.llm_service import get_llm_service, _infer_provider_format
+            from services.llm import get_llm_service
+            from services.llm.service import _infer_provider_format
             new_model = os.environ.get('TEXT_MODEL', '')
             inferred = _infer_provider_format({
                 'TEXT_MODEL': new_model,
