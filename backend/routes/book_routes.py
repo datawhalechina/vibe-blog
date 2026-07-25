@@ -93,7 +93,7 @@ def get_book_chapter(book_id, chapter_id):
 def regenerate_books():
     """重新生成所有书籍（清空旧数据，重新聚合）"""
     try:
-        from services.book_scanner_service import BookScannerService
+        from services.documents import BookScannerService
 
         db_service = get_db_service()
         llm_service = get_llm_service()
@@ -114,7 +114,7 @@ def regenerate_books():
 def rescan_book(book_id):
     """重新扫描单本书籍"""
     try:
-        from services.book_scanner_service import BookScannerService
+        from services.documents import BookScannerService
 
         db_service = get_db_service()
         llm_service = get_llm_service()
@@ -135,7 +135,7 @@ def rescan_book(book_id):
 def generate_book_intro(book_id):
     """生成书籍简介"""
     try:
-        from services.book_scanner_service import BookScannerService
+        from services.documents import BookScannerService
 
         db_service = get_db_service()
         llm_service = get_llm_service()
@@ -159,7 +159,7 @@ def generate_book_intro(book_id):
 def generate_book_cover(book_id):
     """生成书籍封面"""
     try:
-        from services.book_scanner_service import BookScannerService
+        from services.documents import BookScannerService
 
         db_service = get_db_service()
 
@@ -182,7 +182,7 @@ def generate_book_cover(book_id):
 def generate_all_book_covers():
     """为所有书籍生成封面"""
     try:
-        from services.book_scanner_service import BookScannerService
+        from services.documents import BookScannerService
 
         db_service = get_db_service()
 

@@ -460,7 +460,7 @@ class Sora2Service:
 
     def _upload_to_oss(self, video_url: str) -> dict:
         """上传视频到 OSS"""
-        from services.oss_service import get_oss_service
+        from services.publishing import get_oss_service
         oss_service = get_oss_service()
 
         if oss_service and oss_service.is_available:

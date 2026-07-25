@@ -1948,7 +1948,7 @@ Duration: 6-8 seconds. Professional educational style."""
         """
         try:
             from services.media import get_video_service, VideoAspectRatio
-            from services.oss_service import get_oss_service
+            from services.publishing import get_oss_service
             import os
             
             # 发送进度事件

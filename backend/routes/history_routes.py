@@ -14,7 +14,7 @@ from urllib.parse import urlparse
 
 from services.database_service import get_db_service
 from services.media import get_video_service
-from services.oss_service import get_oss_service
+from services.publishing import get_oss_service
 
 logger = logging.getLogger(__name__)
 

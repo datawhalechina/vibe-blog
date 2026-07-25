@@ -325,7 +325,7 @@ class NanoBananaService:
         Returns:
             {'oss_url': str or None}
         """
-        from services.oss_service import get_oss_service
+        from services.publishing import get_oss_service
         oss_service = get_oss_service()
 
         if oss_service and oss_service.is_available:

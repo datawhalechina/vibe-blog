@@ -16,8 +16,7 @@ from services import (
     init_search_service, get_search_service,
 )
 from services.database_service import get_db_service
-from services.file_parser_service import get_file_parser
-from services.knowledge_service import get_knowledge_service
+from services.documents import get_file_parser, get_knowledge_service
 from utils.atomic_write import atomic_write
 
 logger = logging.getLogger(__name__)
