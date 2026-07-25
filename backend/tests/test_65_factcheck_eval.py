@@ -203,7 +203,6 @@ CHECK_NAMES = {
 
 def get_llm_client():
     """获取 LLM 客户端"""
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     from services.llm_service import get_llm_service, init_llm_service
 
     llm = get_llm_service()
@@ -354,7 +353,6 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent.parent / ".env")
     main()

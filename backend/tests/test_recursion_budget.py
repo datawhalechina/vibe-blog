@@ -5,7 +5,6 @@ import pytest
 from unittest.mock import MagicMock, patch
 
 import sys, os
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from services.blog_generator.style_profile import StyleProfile
 
