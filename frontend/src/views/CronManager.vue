@@ -46,7 +46,6 @@
           @delete="handleDelete"
           @retry="(j) => retry(j.id)"
           @run="(j) => run(j.id)"
-          @view-history="openHistory"
         />
       </div>
       <!-- Empty state -->
@@ -68,12 +67,6 @@
         @delete="handleDelete"
       />
 
-      <CronExecutionHistory
-        :visible="historyVisible"
-        :job-id="historyJobId"
-        :job-name="historyJobName"
-        @close="historyVisible = false"
-      />
     </div>
   </div>
 </template>
@@ -84,7 +77,6 @@ import { Plus, Loader, CalendarOff } from 'lucide-vue-next'
 import AppNavbar from '../components/home/AppNavbar.vue'
 import CronJobCard from '../components/cron/CronJobCard.vue'
 import CronJobDrawer from '../components/cron/CronJobDrawer.vue'
-import CronExecutionHistory from '../components/cron/CronExecutionHistory.vue'
 import { useCronJobs } from '../composables/useCronJobs'
 import type { CronJobView } from '../composables/useCronJobs'
 
@@ -113,16 +105,6 @@ async function handleDelete(job: CronJobView | null | undefined) {
   drawerVisible.value = false
 }
 
-// History state
-const historyVisible = ref(false)
-const historyJobId = ref<string | null>(null)
-const historyJobName = ref('')
-
-function openHistory(job: CronJobView) {
-  historyJobId.value = job.id
-  historyJobName.value = job.name
-  historyVisible.value = true
-}
 </script>
 
 <style scoped>

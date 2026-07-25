@@ -9,6 +9,7 @@ TC-13: Dashboard 任务中心（P1）
 - API 请求发出（queue/tasks, scheduler/tasks）
 """
 import re
+import json
 
 
 def test_dashboard_loads(page, base_url, take_screenshot):
@@ -154,3 +155,32 @@ def test_dashboard_navigate_from_home(page, base_url):
         # 导航栏可能还没加入 Dashboard 链接，直接访问
         page.goto(f"{base_url}/dashboard", wait_until="networkidle")
         assert '/dashboard' in page.url
+
+
+def test_cron_manager_keeps_supported_actions_without_history(page, base_url):
+    """独立 Cron 页面保留任务操作，但不显示无后端支持的历史入口。"""
+    job = {
+        "id": "cron-e2e-1",
+        "name": "E2E cron",
+        "enabled": True,
+        "schedule": {"kind": "cron", "expr": "0 9 * * *"},
+        "last_status": "error",
+        "last_error": "timeout",
+        "consecutive_errors": 1,
+        "generation": {"topic": "E2E"},
+        "tags": [],
+    }
+
+    page.route(
+        "**/api/scheduler/tasks",
+        lambda route: route.fulfill(
+            status=200,
+            content_type="application/json",
+            body=json.dumps([job]),
+        ),
+    )
+    page.goto(f"{base_url}/cron", wait_until="networkidle")
+
+    for title in ("编辑", "暂停", "执行", "重试", "删除"):
+        assert page.locator(f'button[title="{title}"]').is_visible()
+    assert page.locator('button[title="历史"]').count() == 0

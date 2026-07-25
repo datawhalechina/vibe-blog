@@ -47,9 +47,6 @@
         <button v-if="job.last_status === 'error'" class="action-btn" title="重试" @click="$emit('retry', job)">
           <RotateCcw :size="14" />
         </button>
-        <button class="action-btn" title="历史" @click="$emit('view-history', job)">
-          <History :size="14" />
-        </button>
         <button class="action-btn action-danger" title="删除" @click="$emit('delete', job)">
           <Trash2 :size="14" />
         </button>
@@ -61,7 +58,7 @@
 <script setup lang="ts">
 import {
   Clock, CalendarClock, AlertTriangle, Pencil,
-  Pause, Play, Zap, RotateCcw, History, Trash2
+  Pause, Play, Zap, RotateCcw, Trash2
 } from 'lucide-vue-next'
 import CronStatusBadge from './CronStatusBadge.vue'
 import type { CronJobView } from '@/composables/useCronJobs'
@@ -73,7 +70,6 @@ defineEmits<{
   delete: [job: CronJobView]
   retry: [job: CronJobView]
   run: [job: CronJobView]
-  'view-history': [job: CronJobView]
 }>()
 
 function formatTime(t?: string) {
