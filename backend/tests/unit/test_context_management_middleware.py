@@ -13,7 +13,6 @@ from unittest.mock import MagicMock, patch
 
 # 将 backend 加入 sys.path
 import sys
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..', '..'))
 
 from services.blog_generator.context_management_middleware import (
     ContextManagementMiddleware,

@@ -188,7 +188,6 @@ PASS_THRESHOLD = 5  # 8 项中至少 5 项通过
 
 
 def get_llm_client():
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     from services.llm_service import get_llm_service, init_llm_service
     llm = get_llm_service()
     if llm is None:
@@ -429,7 +428,6 @@ def main():
 
 
 if __name__ == "__main__":
-    sys.path.insert(0, str(Path(__file__).parent.parent))
     from dotenv import load_dotenv
     load_dotenv(Path(__file__).parent.parent / ".env")
     main()

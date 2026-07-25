@@ -28,16 +28,13 @@
 """
 
 import sys
-import os
 import json
 import time
 import argparse
 import logging
 import requests
 
-# 添加当前目录到 Python 路径，以便导入 e2e_utils
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from e2e_utils import (
+from tests.e2e_utils import (
     SSE_HOOK_JS, run_playwright_generation, cancel_task,
     BACKEND_URL, FRONTEND_URL
 )

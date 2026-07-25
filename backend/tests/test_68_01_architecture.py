@@ -6,7 +6,6 @@ import pytest
 import sys
 import os
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from services.blog_generator.style_profile import StyleProfile
 from services.blog_generator.workflow_registry import WorkflowRegistry
