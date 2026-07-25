@@ -7,10 +7,15 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ## 2026-07-25
 
 ### Changed
+
 - ♻️ **低风险僵尸代码清理** — 删除无生产入口、路由、构建或测试引用的 `ResultCard.vue` 顶层组件，并忽略 `/docs/` 目录
 
 ### Tests
 - 🧪 **Vue 组件可达性回归测试** — 新增 import 图架构测试，防止 `src/components/` 根目录引入未经审计的孤立 Vue 组件
+
+- 🔧 **运行路径基础计划** — 明确以无副作用配置对象建立 `var/` 运行目录边界，并通过完整回归和浏览器 E2E 验证原有逻辑。
+- 🔧 **运行路径配置边界** — 新增统一的 `RuntimePaths` 解析对象与空配置安全回退，不改变现有日志、输出、上传和缓存调用路径。
+
 
 ## 2026-07-22
 

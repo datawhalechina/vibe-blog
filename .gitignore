@@ -23,6 +23,9 @@ backend/coverage.lcov
 # 缓存数据库（可能含敏感信息）
 backend/cache/
 
+# 统一运行时数据
+/var/
+
 # WhatsApp 网关旧路径（迁移期间保护本地认证数据）
 whatsapp-gateway/store/
 
@@ -42,7 +45,6 @@ eggs/
 /lib64/
 parts/
 sdist/
-var/
 wheels/
 pip-wheel-metadata/
 share/python-wheels/
