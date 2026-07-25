@@ -17,7 +17,6 @@ dependencies = [
     "requests>=2.31.0",
     "python-dotenv>=1.0.1",
     "pydantic>=2.0.0",
-    "pillow>=10.0.0",
     "python-docx>=1.1.0",
     "oss2>=2.18.0",
     "jieba>=0.42.1",
