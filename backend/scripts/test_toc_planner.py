@@ -16,7 +16,7 @@ load_dotenv()
 
 
 def test_full_pipeline():
-    from services.llm_service import init_llm_service
+    from services.llm import init_llm_service
     from services.blog_generator.blog_service import init_blog_service, get_blog_service
     from services.blog_generator.services.search_service import init_search_service
     from services.image_service import init_image_service
