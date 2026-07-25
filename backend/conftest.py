@@ -24,7 +24,6 @@ def app(monkeypatch):
     monkeypatch.setattr('routes.blog_routes.get_file_parser', lambda: mock_file_parser)
     monkeypatch.setattr('routes.history_routes.get_db_service', lambda: mock_db_svc)
     monkeypatch.setattr('routes.task_routes.get_task_manager', lambda: mock_task_mgr)
-    monkeypatch.setattr('routes.static_routes.get_db_service', lambda: mock_db_svc)
     monkeypatch.setattr('routes.book_routes.get_db_service', lambda: mock_db_svc)
 
     from app import create_app
@@ -267,7 +266,6 @@ def chat_app(monkeypatch, mock_dispatcher, chat_session_mgr):
     monkeypatch.setattr('routes.blog_routes.get_file_parser', lambda: MagicMock())
     monkeypatch.setattr('routes.history_routes.get_db_service', lambda: MagicMock())
     monkeypatch.setattr('routes.task_routes.get_task_manager', lambda: MagicMock())
-    monkeypatch.setattr('routes.static_routes.get_db_service', lambda: MagicMock())
     monkeypatch.setattr('routes.book_routes.get_db_service', lambda: MagicMock())
 
     from app import create_app
