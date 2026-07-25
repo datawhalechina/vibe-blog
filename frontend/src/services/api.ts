@@ -234,7 +234,6 @@ export async function getDocumentStatus(docId: string): Promise<DocumentStatus> 
 
 export interface FrontendConfig {
   features: {
-    reviewer?: boolean
     xhs_tab?: boolean
     cover_video?: boolean
   }

@@ -29,8 +29,7 @@ const routes = [
   },
   {
     path: '/reviewer',
-    name: 'Reviewer',
-    component: () => import('../views/Reviewer.vue')
+    redirect: '/'
   },
   {
     path: '/blog/:id',

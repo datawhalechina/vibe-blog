@@ -21,11 +21,17 @@ def test_navigate_to_xhs(page, base_url):
         assert '/xhs' in page.url
 
 
-def test_navigate_to_reviewer(page, base_url):
-    """通过导航栏跳转到教程评估页"""
+def test_retired_reviewer_redirects_home(page, base_url, console_logs):
+    """教程评估入口已移除，旧地址兼容跳转首页"""
+    page_errors = []
+    page.on("pageerror", lambda error: page_errors.append(str(error)))
+
     page.goto(base_url, wait_until="networkidle")
     link = page.locator("a:has-text('教程评估')")
-    if link.count() > 0 and link.first.is_visible(timeout=3000):
-        link.first.click()
-        page.wait_for_url("**/reviewer", timeout=10000)
-        assert '/reviewer' in page.url
+    assert link.count() == 0
+
+    page.goto(f"{base_url}/reviewer", wait_until="networkidle")
+    page.wait_for_url(f"{base_url}/", timeout=10000)
+    assert page.url == f"{base_url}/"
+    assert [log for log in console_logs if log["type"] == "error"] == []
+    assert page_errors == []

@@ -152,35 +152,9 @@ def init_services(app):
     except Exception as e:
         logger.warning(f"对话式写作服务初始化失败 (可选模块): {e}")
 
-    # 10. Reviewer (Optional)
-    if os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true':
-        try:
-            from vibe_reviewer import init_reviewer_service
-
-            reviewer_search_service = None
-            try:
-                reviewer_search_service = get_search_service()
-            except Exception:
-                pass
-
-            init_reviewer_service(
-                llm_service=get_llm_service(),
-                search_service=reviewer_search_service,
-            )
-            logger.info("vibe-reviewer 模块已初始化")
-        except Exception as e:
-            logger.warning(f"vibe-reviewer 模块初始化失败: {e}")
 
 def register_blueprints(app):
     """注册路由蓝图"""
     from api.routes import register_all_blueprints
 
     register_all_blueprints(app)
-
-    # Reviewer Routes (External module)
-    if os.environ.get('REVIEWER_ENABLED', 'false').lower() == 'true':
-        try:
-            from vibe_reviewer.api import register_reviewer_routes
-            register_reviewer_routes(app)
-        except ImportError:
-            pass

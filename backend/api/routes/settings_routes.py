@@ -129,10 +129,6 @@ SETTINGS_SCHEMA = {
         'tab': 'feature', 'type': 'bool', 'label': '小红书 Tab',
         'default': False,
     },
-    'REVIEWER_ENABLED': {
-        'tab': 'feature', 'type': 'bool', 'label': 'Reviewer 页面',
-        'default': False,
-    },
     'BOOK_SCAN_ENABLED': {
         'tab': 'feature', 'type': 'bool', 'label': '书籍扫描',
         'default': False,
