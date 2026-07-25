@@ -1,0 +1,4 @@
+interface:
+  display_name: "VibeBlog E2E Verification"
+  short_description: "Verify VibeBlog PRs with API and browser E2E checks"
+  default_prompt: "Use $vibe-blog-e2e-verification to validate this VibeBlog change end to end."

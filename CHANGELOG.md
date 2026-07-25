@@ -23,6 +23,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - 🔧 **运行路径配置边界** — 新增统一的 `RuntimePaths` 解析对象与空配置安全回退，不改变现有日志、输出、上传和缓存调用路径。
 
 ### Tests
+- ✨ **项目级 E2E 验证 Skill** — 新增 VibeBlog 专用验证流程，统一 uv、Vitest、生产构建、Playwright、浏览器错误和运行产物检查门槛。
 - 🧪 **Vue 组件可达性回归测试** — 新增 import 图架构测试，防止 `src/components/` 根目录引入未经审计的孤立 Vue 组件
 
 ### Fixed
