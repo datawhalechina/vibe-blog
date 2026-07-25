@@ -10,7 +10,7 @@ from typing import Dict, Any, List, Optional
 
 from infrastructure.paths import RuntimePaths
 from services.database_service import DatabaseService
-from services.blog_generator.prompts import get_prompt_manager
+from services.blog_generation import get_prompt_manager
 
 logger = logging.getLogger(__name__)
 
@@ -352,7 +352,7 @@ class BookScannerService:
         if not self.llm:
             return 0
 
-        from services.blog_generator.blog_service import extract_article_summary
+        from services.blog_generation import extract_article_summary
 
         count = 0
         for blog in blogs:

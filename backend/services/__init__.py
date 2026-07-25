@@ -23,13 +23,13 @@ _EXPORTS = {
     "get_task_manager": ("services.task_service", "get_task_manager"),
     "PipelineService": ("services.pipeline_service", "PipelineService"),
     "create_pipeline_service": ("services.pipeline_service", "create_pipeline_service"),
-    "BlogGenerator": ("services.blog_generator", "BlogGenerator"),
-    "SearchService": ("services.blog_generator", "SearchService"),
-    "init_search_service": ("services.blog_generator", "init_search_service"),
-    "get_search_service": ("services.blog_generator", "get_search_service"),
-    "BlogService": ("services.blog_generator.blog_service", "BlogService"),
-    "init_blog_service": ("services.blog_generator.blog_service", "init_blog_service"),
-    "get_blog_service": ("services.blog_generator.blog_service", "get_blog_service"),
+    "BlogGenerator": ("services.blog_generation", "BlogGenerator"),
+    "SearchService": ("services.blog_generation", "SearchService"),
+    "init_search_service": ("services.blog_generation", "init_search_service"),
+    "get_search_service": ("services.blog_generation", "get_search_service"),
+    "BlogService": ("services.blog_generation", "BlogService"),
+    "init_blog_service": ("services.blog_generation", "init_blog_service"),
+    "get_blog_service": ("services.blog_generation", "get_blog_service"),
 }
 
 __all__ = list(_EXPORTS)
