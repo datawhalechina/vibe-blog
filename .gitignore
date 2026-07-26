@@ -26,9 +26,6 @@ backend/cache/
 # 统一运行时数据
 /var/
 
-# WhatsApp 网关旧路径（迁移期间保护本地认证数据）
-whatsapp-gateway/store/
-
 # Python
 __pycache__/
 *.py[cod]

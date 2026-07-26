@@ -40,6 +40,38 @@ class TestChatRoutes:
         assert resp.status_code == 200
         assert resp.get_json()["topic"] == "测试"
 
+    def test_rt3b_x_user_id_isolates_sessions(self, chat_client):
+        """RT3b: X-User-Id 隔离不同渠道用户的写作会话。"""
+        created = chat_client.post(
+            '/api/chat/session',
+            headers={'X-User-Id': 'user-a'},
+            json={'topic': '用户 A 的主题'},
+        )
+        assert created.status_code == 201
+        session_id = created.get_json()['session_id']
+
+        own_session = chat_client.get(
+            f'/api/chat/session/{session_id}',
+            headers={'X-User-Id': 'user-a'},
+        )
+        assert own_session.status_code == 200
+
+        other_session = chat_client.get(
+            f'/api/chat/session/{session_id}',
+            headers={'X-User-Id': 'user-b'},
+        )
+        assert other_session.status_code == 404
+
+        other_sessions = chat_client.get(
+            '/api/chat/sessions',
+            headers={'X-User-Id': 'user-b'},
+        )
+        assert other_sessions.status_code == 200
+        assert all(
+            session['session_id'] != session_id
+            for session in other_sessions.get_json()
+        )
+
     def test_rt4_get_session_404(self, chat_client):
         """RT4: GET /session/<bad_id> — 404"""
         resp = chat_client.get('/api/chat/session/ws_nonexistent')
