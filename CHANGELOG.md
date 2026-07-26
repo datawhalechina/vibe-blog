@@ -15,7 +15,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ### Tests
 - ✨ **vibe-reviewer 退休契约** — 增加仓库、配置、路由和导航回归检查，并验证旧 `/reviewer` 地址跳转首页。
 - ✨ **Dashboard/Cron 回归契约** — 覆盖 Cron 加载与操作反馈、重复页面删除、兼容路由查询参数及 Dashboard 抽屉交互。
-- ✨ **WhatsApp 退休契约** — 增加网关目录、启动接线和认证路径防回流检查，并约束通用 Chat API 继续保留。
+- ✨ **WhatsApp 退休契约** — 增加网关目录、启动接线和认证路径防回流检查，并通过真实请求验证 Chat API 与 `X-User-Id` 会话隔离继续保留。
 
 ## 2026-07-25
 
