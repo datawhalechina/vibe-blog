@@ -8,6 +8,7 @@ PROJECT_ROOT = BACKEND_ROOT.parent
 def test_feishu_production_modules_are_removed():
     assert not (BACKEND_ROOT / "api/routes/feishu_routes.py").exists()
     assert not (BACKEND_ROOT / "routes/feishu_routes.py").exists()
+    assert not (PROJECT_ROOT / "docs/feishu-deploy.md").exists()
 
 
 def test_route_registry_does_not_register_feishu():
@@ -15,6 +16,20 @@ def test_route_registry_does_not_register_feishu():
 
     assert "feishu_bp" not in registry
     assert "feishu_routes" not in registry
+
+
+def test_retired_feishu_webhook_returns_404_while_chat_routes_remain():
+    from flask import Flask
+
+    from api.routes import register_all_blueprints
+
+    app = Flask(__name__)
+    register_all_blueprints(app)
+
+    rules = {rule.rule for rule in app.url_map.iter_rules()}
+    assert "/api/feishu/webhook" not in rules
+    assert any(rule.startswith("/api/chat/") for rule in rules)
+    assert app.test_client().post("/api/feishu/webhook").status_code == 404
 
 
 def test_deployment_configuration_does_not_expose_feishu():
