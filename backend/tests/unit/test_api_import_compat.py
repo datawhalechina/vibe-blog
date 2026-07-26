@@ -5,7 +5,6 @@ ROUTE_MODULES = (
     "blog_routes",
     "book_routes",
     "chat_routes",
-    "feishu_routes",
     "history_routes",
     "publish_routes",
     "queue_routes",

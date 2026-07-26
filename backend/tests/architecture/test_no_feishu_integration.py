@@ -18,10 +18,15 @@ def test_route_registry_does_not_register_feishu():
 
 
 def test_deployment_configuration_does_not_expose_feishu():
-    compose = (PROJECT_ROOT / "docker/docker-compose.yml").read_text(encoding="utf-8")
+    deployment_files = [
+        PROJECT_ROOT / "docker/docker-compose.yml",
+        BACKEND_ROOT / ".env.example",
+    ]
 
-    assert "FEISHU_" not in compose
-    assert "飞书" not in compose
+    for deployment_file in deployment_files:
+        contents = deployment_file.read_text(encoding="utf-8")
+        assert "FEISHU_" not in contents
+        assert "飞书" not in contents
 
 
 def test_chat_and_whatsapp_boundaries_remain_available():
