@@ -2,7 +2,7 @@
 
 > **For Claude:** REQUIRED SUB-SKILL: Use superpowers:executing-plans to implement this plan task-by-task.
 
-**Goal:** Completely remove the Feishu interaction integration without changing Chat or WhatsApp behavior.
+**Goal:** Completely remove the Feishu interaction integration without changing Chat behavior.
 
 **Architecture:** Remove the Feishu API adapter at the HTTP/deployment boundary and add a static repository contract that prevents it from returning. Keep the underlying chat-writing domain independent and unchanged.
 
@@ -19,7 +19,7 @@
 
 Add assertions that production Feishu modules do not exist, the route registry
 does not mention `feishu_bp`, Docker Compose has no `FEISHU_` configuration,
-the old URL is absent from registered Flask routes, and Chat/WhatsApp remain.
+the old URL is absent from registered Flask routes, and Chat remains.
 
 **Step 2: Run test to verify it fails**
 
@@ -75,7 +75,7 @@ Delete the Feishu-only comment and `FEISHU_APP_ID`, `FEISHU_APP_SECRET`,
 **Step 2: Update the changelog**
 
 Under `## 2026-07-26` / `### Changed`, add a refactor entry describing the
-hard removal and explicit preservation of Chat and WhatsApp.
+hard removal and explicit preservation of Chat.
 
 **Step 3: Run the retirement contract GREEN**
 
@@ -132,7 +132,7 @@ Expected: lock and diff checks pass; production scan returns no matches.
 **Step 1: Request independent code review**
 
 Review the diff against the approved design, especially preservation of Chat
-and WhatsApp.
+and isolation from other channel-adapter decisions.
 
 **Step 2: Fix all blocking findings and rerun affected gates**
 

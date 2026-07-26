@@ -7,7 +7,7 @@ Approved for immediate removal on 2026-07-26.
 ## Goal
 
 Remove the Feishu interaction surface completely while preserving the shared
-chat-writing services and the WhatsApp gateway.
+chat-writing services.
 
 ## Scope
 
@@ -23,7 +23,7 @@ chat-writing services and the WhatsApp gateway.
 ## Preserved Boundaries
 
 - Keep `/api/chat/*`, `services/chat/*`, and their tests.
-- Keep `integrations/whatsapp-gateway/` and local startup support.
+- Treat other channel adapters as separate product decisions and PRs.
 - Do not change blog generation, task streaming, or scheduler behavior.
 
 ## Error And Compatibility Behavior

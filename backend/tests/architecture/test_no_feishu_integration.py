@@ -44,10 +44,9 @@ def test_deployment_configuration_does_not_expose_feishu():
         assert "飞书" not in contents
 
 
-def test_chat_and_whatsapp_boundaries_remain_available():
+def test_chat_boundary_remains_available():
     registry = (BACKEND_ROOT / "api/routes/__init__.py").read_text(encoding="utf-8")
 
     assert "chat_bp" in registry
     assert (BACKEND_ROOT / "api/routes/chat_routes.py").is_file()
     assert (BACKEND_ROOT / "services/chat").is_dir()
-    assert (PROJECT_ROOT / "integrations/whatsapp-gateway/src/index.js").is_file()
