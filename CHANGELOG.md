@@ -10,10 +10,12 @@ All notable changes to the Vibe Blog project will be documented in this file.
 - ♻️ **弃用 vibe-reviewer 清理** — 删除独立教程评估后端、API、配置、专用 Prompt 与依赖、Vue 页面和失效文档资源，保留博客生成内部 Reviewer Agent 及质量检查链路。
 - ♻️ **Dashboard 与 Cron 收口** — 将队列和定时任务合并为 Dashboard 分段视图，复用统一 Cron 组件与状态管理，并将旧 `/cron` 地址兼容重定向到 Cron 标签。
 - 🔧 **WhatsApp 网关下线设计与计划** — 明确删除未接入的 WhatsApp 渠道适配器及执行步骤，同时保留通用 `/api/chat/*` 与核心博客生成链路。
+- ♻️ **WhatsApp 网关下线** — 删除未接入的 Baileys 网关、扫码认证、会话映射、独立依赖和本地启动接线，保留通用 Chat API 与用户隔离行为。
 
 ### Tests
 - ✨ **vibe-reviewer 退休契约** — 增加仓库、配置、路由和导航回归检查，并验证旧 `/reviewer` 地址跳转首页。
 - ✨ **Dashboard/Cron 回归契约** — 覆盖 Cron 加载与操作反馈、重复页面删除、兼容路由查询参数及 Dashboard 抽屉交互。
+- ✨ **WhatsApp 退休契约** — 增加网关目录、启动接线和认证路径防回流检查，并约束通用 Chat API 继续保留。
 
 ## 2026-07-25
 

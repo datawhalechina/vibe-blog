@@ -21,7 +21,7 @@ def init_chat_service(session_mgr, dispatcher):
 
 def _get_user_id():
     """从请求中提取 user_id（优先 header，其次 JSON body）。
-    WhatsApp 场景下 NanoClaw Bridge 会在 header 中传 X-User-Id（即 WhatsApp JID）。
+    外部渠道适配器可通过 X-User-Id header 传入稳定的用户标识。
     """
     uid = request.headers.get('X-User-Id', '').strip()
     if not uid:
