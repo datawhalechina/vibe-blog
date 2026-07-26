@@ -19,7 +19,6 @@ def register_all_blueprints(app):
     from api.routes.queue_routes import queue_bp
     from api.routes.scheduler_routes import scheduler_bp
     from api.routes.chat_routes import chat_bp
-    from api.routes.feishu_routes import feishu_bp
     from api.routes.settings_routes import settings_bp
 
     app.register_blueprint(static_bp)
@@ -33,5 +32,4 @@ def register_all_blueprints(app):
     app.register_blueprint(queue_bp)
     app.register_blueprint(scheduler_bp)
     app.register_blueprint(chat_bp)
-    app.register_blueprint(feishu_bp)
     app.register_blueprint(settings_bp)
