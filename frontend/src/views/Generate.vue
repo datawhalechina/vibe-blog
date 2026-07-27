@@ -66,7 +66,7 @@
                 </Tooltip>
                 <Tooltip v-if="completedBlogId">
                   <TooltipTrigger as-child>
-                    <Button variant="ghost" size="icon" class="h-8 w-8" :disabled="evaluateLoading" @click="handleEvaluate">
+                    <Button variant="ghost" size="icon" class="h-8 w-8" aria-label="质量评估" :disabled="evaluateLoading" @click="handleEvaluate">
                       <GraduationCap :size="16" />
                     </Button>
                   </TooltipTrigger>

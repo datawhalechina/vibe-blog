@@ -18,6 +18,7 @@
 # ============================================================
 
 set -e
+set -o pipefail
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -42,6 +43,10 @@ UV_RUN=(uv run --project "$BACKEND_DIR")
 
 BACKEND_PORT=5001
 FRONTEND_PORT=5173
+STARTED_BACKEND=false
+STARTED_FRONTEND=false
+BACKEND_PID=""
+FRONTEND_PID=""
 
 # 解析参数
 RESTART=false
@@ -92,6 +97,29 @@ kill_port() {
     fi
 }
 
+cleanup_services() {
+    local exit_code=$?
+
+    if [ "$STARTED_BACKEND" = true ] || [ "$STARTED_FRONTEND" = true ]; then
+        echo ""
+        echo -e "${YELLOW}清理脚本启动的服务...${NC}"
+        if [ "$STARTED_BACKEND" = true ] && [ -n "$BACKEND_PID" ]; then
+            kill "$BACKEND_PID" 2>/dev/null || true
+            echo "  后端已停止"
+        fi
+        if [ "$STARTED_FRONTEND" = true ] && [ -n "$FRONTEND_PID" ]; then
+            kill "$FRONTEND_PID" 2>/dev/null || true
+            echo "  前端已停止"
+        fi
+    fi
+
+    return "$exit_code"
+}
+
+trap cleanup_services EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
 # ============================================================
 # 主流程
 # ============================================================
@@ -117,9 +145,6 @@ if [ "$TEST_ONLY" = false ]; then
 
     NEED_BACKEND=false
     NEED_FRONTEND=false
-    STARTED_BACKEND=false
-    STARTED_FRONTEND=false
-
     if ! check_port $BACKEND_PORT; then
         NEED_BACKEND=true
         echo -e "${YELLOW}后端未运行，启动中...${NC}"
@@ -166,6 +191,7 @@ echo ""
 echo -e "${BLUE}[Step 2] 准备测试环境${NC}"
 
 # 清理旧截图
+mkdir -p "$SCREENSHOT_DIR" "$LOG_DIR"
 if [ -d "$SCREENSHOT_DIR" ]; then
     OLD_COUNT=$(ls -1 "$SCREENSHOT_DIR" 2>/dev/null | wc -l)
     if [ "$OLD_COUNT" -gt 0 ]; then
@@ -173,7 +199,6 @@ if [ -d "$SCREENSHOT_DIR" ]; then
         rm -f "$SCREENSHOT_DIR"/*.png "$SCREENSHOT_DIR"/*.json
     fi
 fi
-mkdir -p "$SCREENSHOT_DIR"
 
 # 设置环境变量
 export RUN_E2E_TESTS=1
@@ -191,6 +216,7 @@ echo -e "${BLUE}[Step 3] 运行 E2E 测试${NC}"
 
 cd "$PROJECT_ROOT"
 
+set +e
 if [ "$SMOKE" = true ]; then
     echo -e "  运行 smoke 测试 (TC-01 + TC-02)..."
     "${UV_RUN[@]}" pytest tests/e2e/test_tc01_home_load.py tests/e2e/test_tc02_blog_gen.py \
@@ -207,6 +233,7 @@ else
         -v --tb=short $EXTRA_PYTEST_ARGS 2>&1 | tee "$LOG_DIR/e2e_result_$(date +%H%M%S).log"
     TEST_EXIT=$?
 fi
+set -e
 
 echo ""
 
@@ -214,8 +241,8 @@ echo ""
 
 echo -e "${BLUE}[Step 4] 测试结果${NC}"
 
-SCREENSHOT_COUNT=$(ls -1 "$SCREENSHOT_DIR"/*.png 2>/dev/null | wc -l)
-LOG_COUNT=$(ls -1 "$SCREENSHOT_DIR"/*.json 2>/dev/null | wc -l)
+SCREENSHOT_COUNT=$(find "$SCREENSHOT_DIR" -maxdepth 1 -type f -name '*.png' -print | wc -l)
+LOG_COUNT=$(find "$SCREENSHOT_DIR" -maxdepth 1 -type f -name '*.json' -print | wc -l)
 
 echo -e "  截图: ${SCREENSHOT_COUNT} 张 → $SCREENSHOT_DIR"
 echo -e "  日志: ${LOG_COUNT} 个 → $SCREENSHOT_DIR"
@@ -250,15 +277,6 @@ else
     echo -e "${RED}============================================================${NC}"
     echo -e "  查看截图: open $SCREENSHOT_DIR"
     echo -e "  查看日志: ls $LOG_DIR/e2e_result_*.log"
-fi
-
-# ── 清理：如果是脚本启动的服务，停掉 ──
-
-if [ "$STARTED_BACKEND" = true ] || [ "$STARTED_FRONTEND" = true ]; then
-    echo ""
-    echo -e "${YELLOW}清理脚本启动的服务...${NC}"
-    [ "$STARTED_BACKEND" = true ] && [ -n "$BACKEND_PID" ] && kill $BACKEND_PID 2>/dev/null && echo "  后端已停止"
-    [ "$STARTED_FRONTEND" = true ] && [ -n "$FRONTEND_PID" ] && kill $FRONTEND_PID 2>/dev/null && echo "  前端已停止"
 fi
 
 exit $TEST_EXIT

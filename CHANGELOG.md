@@ -11,6 +11,7 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Tests
 - ✨ **E2E UI 修复计划** — 规划修复 TipTap 选择器、质量评估按钮定位、历史滚动动画和 runner 退出码误报。
+- 🐛 **E2E UI 契约修复** — 更新 TipTap 输入和质量评估按钮选择器，稳定历史滚动点击区域，并让 runner 正确透传 pytest 失败退出码。
 
 ## 2026-07-26
 

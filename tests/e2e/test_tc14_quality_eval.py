@@ -188,8 +188,7 @@ class TestQualityDialogUI:
 
     def _click_evaluate_button(self, page):
         """点击评估按钮（GraduationCap 图标按钮）"""
-        # 评估按钮在 .card-toolbar 中，包含 svg 图标，tooltip "质量评估"
-        eval_btn = page.locator('.card-toolbar button:has(svg)').last
+        eval_btn = page.get_by_role("button", name="质量评估")
         eval_btn.wait_for(state="visible", timeout=10000)
         eval_btn.click()
         page.wait_for_timeout(1000)
