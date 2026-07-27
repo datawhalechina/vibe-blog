@@ -3,6 +3,7 @@ TC-11: 响应式布局（P2）
 
 验证：移动端视口下关键元素可见性
 """
+from e2e_utils import find_element, INPUT_SELECTORS
 
 
 def test_mobile_layout(browser, base_url):
@@ -15,7 +16,9 @@ def test_mobile_layout(browser, base_url):
     p.goto(base_url, wait_until="networkidle")
 
     # 输入卡片应可见
-    assert p.locator("textarea.code-input-textarea").is_visible()
+    input_el, _ = find_element(p, INPUT_SELECTORS)
+    assert input_el is not None
+    assert input_el.is_visible()
 
     # 生成按钮应可见
     assert p.locator("button.code-generate-btn").is_visible()
@@ -33,7 +36,9 @@ def test_tablet_layout(browser, base_url):
     p = ctx.new_page()
     p.goto(base_url, wait_until="networkidle")
 
-    assert p.locator("textarea.code-input-textarea").is_visible()
+    input_el, _ = find_element(p, INPUT_SELECTORS)
+    assert input_el is not None
+    assert input_el.is_visible()
     assert p.locator("button.code-generate-btn").is_visible()
 
     p.close()

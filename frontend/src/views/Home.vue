@@ -1062,6 +1062,7 @@ onUnmounted(() => {
 /* 下滑提示 */
 .scroll-hint {
   position: absolute;
+  z-index: 2;
   bottom: 2rem;
   left: 50%;
   transform: translateX(-50%);
@@ -1073,12 +1074,12 @@ onUnmounted(() => {
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   opacity: 0.5;
-  animation: scroll-bounce 2s ease-in-out infinite;
   cursor: pointer;
 }
 
 .scroll-hint-arrow {
   opacity: 0.6;
+  animation: scroll-bounce 2s ease-in-out infinite;
 }
 
 @keyframes scroll-bounce {

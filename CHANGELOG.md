@@ -4,6 +4,15 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-27
+
+### Changed
+- 🔧 **E2E 失败治理设计** — 将 10 个浏览器失败拆分为 UI 测试契约与真实生成预算两个独立 PR，明确退出码、稳定选择器和外部抓取时限的验收标准。
+
+### Tests
+- ✨ **E2E UI 修复计划** — 规划修复 TipTap 选择器、质量评估按钮定位、历史滚动动画和 runner 退出码误报。
+- 🐛 **E2E UI 契约修复** — 更新 TipTap 输入和质量评估按钮选择器，稳定历史滚动点击区域，并让 runner 正确透传 pytest 失败退出码。
+
 ## 2026-07-26
 
 ### Changed
