@@ -43,7 +43,13 @@ class JinaReader:
             headers["Authorization"] = f"Bearer {self.api_key}"
         return headers
 
-    def scrape(self, url: str) -> Optional[str]:
+    def scrape(
+        self,
+        url: str,
+        timeout: Optional[float] = None,
+        max_retries: Optional[int] = None,
+        deadline: Optional[float] = None,
+    ) -> Optional[str]:
         """抓取 URL 全文，返回 Markdown 文本
 
         Args:
@@ -54,23 +60,38 @@ class JinaReader:
         """
         jina_url = self._build_url(url)
         headers = self._build_headers()
+        request_timeout = self.timeout if timeout is None else timeout
+        retry_limit = self.max_retries if max_retries is None else max(1, max_retries)
 
-        for attempt in range(self.max_retries):
+        for attempt in range(retry_limit):
+            remaining = deadline - time.monotonic() if deadline is not None else None
+            if remaining is not None and remaining <= 0:
+                break
+            attempt_timeout = (
+                min(request_timeout, max(0.01, remaining))
+                if remaining is not None
+                else request_timeout
+            )
             try:
                 resp = requests.get(
                     jina_url,
                     headers=headers,
-                    timeout=self.timeout,
+                    timeout=attempt_timeout,
                 )
                 if resp.status_code == 200 and resp.text.strip():
                     logger.info(f"Jina 抓取成功: {url} ({len(resp.text)} chars)")
                     return resp.text.strip()
                 logger.warning(f"Jina 抓取返回 {resp.status_code}: {url}")
             except Exception as e:
-                logger.warning(f"Jina 抓取失败 (attempt {attempt + 1}/{self.max_retries}): {e}")
+                logger.warning(f"Jina 抓取失败 (attempt {attempt + 1}/{retry_limit}): {e}")
 
-            if attempt < self.max_retries - 1:
+            if attempt < retry_limit - 1:
                 wait = self.base_wait * (2 ** attempt)
+                if deadline is not None:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    wait = min(wait, remaining)
                 time.sleep(wait)
 
         logger.error(f"Jina 抓取全部重试失败: {url}")

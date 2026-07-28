@@ -2,6 +2,7 @@
 75.03 Jina 深度抓取 — 单元测试
 """
 import pytest
+import time
 from unittest.mock import MagicMock, patch, AsyncMock
 
 from services.blog_generator.services.jina_reader import JinaReader
@@ -145,6 +146,7 @@ class TestDeepScraper:
             {"url": "https://example.com/b", "title": "B"},
         ]
         scraper = DeepScraper()
+        scraper._extractor = None
         enriched = scraper.scrape_top_n(results, topic="AI", n=2)
         assert len(enriched) == 2
         assert enriched[0]["extracted_info"] == "Extracted key info"
@@ -156,6 +158,95 @@ class TestDeepScraper:
         scraper = DeepScraper()
         enriched = scraper.scrape_top_n(results, topic="AI", n=1)
         assert len(enriched) == 0
+
+    def test_returns_after_enough_sources_without_starting_slow_peer(self):
+        def scrape(url, **_kwargs):
+            if url.endswith("/slow"):
+                raise AssertionError("slow source should not start")
+            return "# Fast source"
+
+        results = [
+            {"url": "https://example.com/fast", "title": "Fast"},
+            {"url": "https://example.com/slow", "title": "Slow"},
+        ]
+        scraper = DeepScraper(total_timeout=1, min_successful_sources=1)
+
+        with patch.object(scraper, "_scrape_single", side_effect=scrape):
+            started = time.monotonic()
+            enriched = scraper.scrape_top_n(results, topic="AI", n=2)
+            elapsed = time.monotonic() - started
+
+        assert len(enriched) == 1
+        assert enriched[0]["url"].endswith("/fast")
+        assert elapsed < 0.5
+
+    @patch("services.blog_generator.services.jina_reader.requests.get")
+    def test_total_budget_prevents_fallback_after_jina_uses_deadline(self, get):
+        def exhaust_timeout(*_args, **kwargs):
+            time.sleep(kwargs["timeout"])
+            raise TimeoutError("unavailable")
+
+        get.side_effect = exhaust_timeout
+        scraper = DeepScraper(
+            timeout=1,
+            max_retries=3,
+            total_timeout=0.05,
+            min_successful_sources=1,
+        )
+
+        started = time.monotonic()
+        enriched = scraper.scrape_top_n(
+            [{"url": "https://example.com/a", "title": "A"}],
+            topic="AI",
+            n=1,
+        )
+        elapsed = time.monotonic() - started
+
+        assert enriched == []
+        assert elapsed < 0.2
+        assert get.call_count == 1
+        assert get.call_args.args[0].startswith("https://r.jina.ai/")
+
+    def test_mini_preset_uses_smaller_request_and_total_budget(self):
+        results = [
+            {"url": "https://example.com/a", "title": "A"},
+            {"url": "https://example.com/b", "title": "B"},
+        ]
+        scraper = DeepScraper(
+            timeout=30,
+            total_timeout=90,
+            mini_timeout=8,
+            mini_total_timeout=20,
+            mini_top_n=1,
+        )
+
+        with patch.object(scraper, "_scrape_single", return_value="# Mini") as scrape:
+            enriched = scraper.scrape_top_n(results, topic="AI", n=2, preset="mini")
+
+        assert len(enriched) == 1
+        scrape.assert_called_once()
+        args, kwargs = scrape.call_args
+        assert args == ("https://example.com/a",)
+        assert kwargs["timeout"] == 8
+        assert kwargs["max_retries"] == scraper.max_retries
+        assert isinstance(kwargs["deadline"], float)
+
+    def test_fallback_scrapers_share_the_request_budget(self):
+        scraper = DeepScraper()
+        scraper.jina.scrape = MagicMock(return_value=None)
+        scraper.httpx.scrape = MagicMock(return_value="# fallback")
+
+        result = scraper._scrape_single(
+            "https://example.com/a", timeout=4, max_retries=1
+        )
+
+        assert result == "# fallback"
+        scraper.jina.scrape.assert_called_once_with(
+            "https://example.com/a", timeout=4, max_retries=1
+        )
+        scraper.httpx.scrape.assert_called_once_with(
+            "https://example.com/a", timeout=4, max_retries=1
+        )
 
 
 # ---------------------------------------------------------------------------

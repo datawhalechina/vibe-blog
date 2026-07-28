@@ -14,6 +14,7 @@ from e2e_utils import (
     INPUT_SELECTORS,
     GENERATE_BTN_SELECTORS,
     FRONTEND_URL,
+    wait_for_outline,
 )
 
 
@@ -33,6 +34,12 @@ class TestOutlineConfirm:
         assert input_el is not None, f"未找到主题输入框，尝试过: {INPUT_SELECTORS}"
         fill_input(page, input_el, topic)
         take_screenshot("tc15_01_topic_filled")
+
+        # 交互式确认与 mini 自动确认互斥，使用 short preset 验证人工确认。
+        page.locator("button.code-action-btn:has-text('高级选项')").click()
+        page.locator("select").nth(1).select_option("short")
+        page.get_by_label("背景调查").uncheck()
+        page.get_by_label("交互式生成").check()
 
         # ── Step 2: 点击生成，捕获 task_id ──
         def on_response(response):
@@ -55,21 +62,13 @@ class TestOutlineConfirm:
         assert captured_task_id, "未捕获到 task_id"
 
         try:
-            # ── Step 3: 轮询等待大纲到达 ──
-            max_wait = 180  # 3 分钟
-            poll_interval = 3
-            waited = 0
-            outline_data = None
-
-            while waited < max_wait:
-                outline_data = page.evaluate("() => window.__sse_outline_data")
-                if outline_data:
-                    break
-                page.wait_for_timeout(poll_interval * 1000)
-                waited += poll_interval
-
-            assert outline_data is not None, \
-                f"超时 {max_wait}s：未收到 outline_complete 事件"
+            # ── Step 3: 等待大纲到达，并在任务失败时立即报告 ──
+            outline_data = wait_for_outline(
+                page,
+                captured_task_id,
+                max_wait=180,
+                poll_interval=3,
+            )
             take_screenshot("tc15_03_outline_received")
 
             # ── Step 4: 等待大纲确认 Card 出现 ──

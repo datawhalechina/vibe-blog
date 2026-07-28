@@ -162,6 +162,7 @@ class SharedState(TypedDict):
     audience_adaptation: str  # 受众适配类型: default/high-school/children/professional
     target_length: Literal["mini", "short", "medium", "long", "custom"]
     source_material: Optional[str]
+    skip_researcher: bool  # background_investigation=false 时跳过素材收集节点
     image_style: str  # 图片风格 ID
     aspect_ratio: str  # 宽高比: 16:9 或 9:16（前端选择）
     

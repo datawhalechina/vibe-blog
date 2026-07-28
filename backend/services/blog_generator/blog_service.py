@@ -29,6 +29,18 @@ OUTPUTS_DIR = os.environ.get(
 
 logger = logging.getLogger(__name__)
 
+
+def _normalize_research_result(state: dict):
+    """Normalize optional research fields before building SSE result events."""
+    return (
+        state.get('background_knowledge') or '',
+        state.get('key_concepts') or [],
+        state.get('knowledge_source_stats') or {},
+        state.get('document_knowledge') or [],
+        state.get('search_results') or [],
+    )
+
+
 # 全局博客生成服务实例
 _blog_service: Optional['BlogService'] = None
 
@@ -69,6 +81,39 @@ class BlogService:
         except Exception:
             pass
         return None
+
+    def _send_completion_event(
+        self, *, task_manager, task_id: str, final_state: Dict,
+        markdown: str, saved_path: Optional[str],
+        cover_video_path: Optional[str], citations: list,
+    ) -> None:
+        """Publish completion once the persisted article is readable."""
+        if not task_manager:
+            return
+
+        complete_data = {
+            'success': True,
+            'id': task_id,
+            'markdown': markdown,
+            'outline': final_state.get('outline') or {},
+            'sections_count': len(final_state.get('sections', [])),
+            'images_count': len(final_state.get('images', [])),
+            'code_blocks_count': len(final_state.get('code_blocks', [])),
+            'review_score': final_state.get('review_score', 0),
+            'saved_path': saved_path,
+            'cover_video': cover_video_path,
+            'citations': citations,
+        }
+        token_usage = self._get_token_usage()
+        if token_usage:
+            complete_data['token_usage'] = token_usage
+        task_manager.send_event(task_id, 'complete', complete_data)
+        update_queue_status(
+            task_id,
+            "completed",
+            word_count=len(markdown),
+            image_count=len(final_state.get('images', [])),
+        )
 
     def enhance_topic(self, topic: str, timeout: float = 30.0) -> str:
         """
@@ -393,6 +438,7 @@ class BlogService:
         document_ids: list = None,
         document_knowledge: list = None,
         image_style: str = "",
+        generate_images: bool = True,
         generate_cover_video: bool = False,
         video_aspect_ratio: str = "16:9",
         custom_config: dict = None,
@@ -416,6 +462,7 @@ class BlogService:
             document_ids: 文档 ID 列表
             document_knowledge: 文档知识列表
             image_style: 图片风格 ID
+            generate_images: 是否生成章节图和封面图
             generate_cover_video: 是否生成封面动画
             custom_config: 自定义配置（仅当 target_length='custom' 时使用）
             deep_thinking: 是否启用深度思考模式
@@ -442,6 +489,7 @@ class BlogService:
                             document_ids=document_ids,
                             document_knowledge=document_knowledge,
                             image_style=image_style,
+                            generate_images=generate_images,
                             generate_cover_video=generate_cover_video,
                             video_aspect_ratio=video_aspect_ratio,
                             custom_config=custom_config,
@@ -462,6 +510,7 @@ class BlogService:
                         document_ids=document_ids,
                         document_knowledge=document_knowledge,
                         image_style=image_style,
+                        generate_images=generate_images,
                         generate_cover_video=generate_cover_video,
                         video_aspect_ratio=video_aspect_ratio,
                         custom_config=custom_config,
@@ -491,6 +540,7 @@ class BlogService:
         document_ids: list = None,
         document_knowledge: list = None,
         image_style: str = "",
+        generate_images: bool = True,
         generate_cover_video: bool = False,
         video_aspect_ratio: str = "16:9",
         custom_config: dict = None,
@@ -676,7 +726,9 @@ class BlogService:
             
             # 获取文章长度配置
             from config import get_article_config
-            article_config = get_article_config(target_length, custom_config)
+            article_config = get_article_config(target_length, custom_config).copy()
+            if not generate_images:
+                article_config['images_count'] = 0
             logger.info(f"文章配置: sections={article_config['sections_count']}, "
                         f"images={article_config['images_count']}, "
                         f"code_blocks={article_config['code_blocks_count']}, "
@@ -824,12 +876,15 @@ class BlogService:
                         # 发送详细中间结果
                         if node_name == 'researcher':
                             # 素材收集结果
-                            background = state.get('background_knowledge', '')
-                            key_concepts = state.get('key_concepts', [])
-                            knowledge_stats = state.get('knowledge_source_stats', {})
+                            (
+                                background,
+                                key_concepts,
+                                knowledge_stats,
+                                doc_knowledge,
+                                raw_results,
+                            ) = _normalize_research_result(state)
                             
                             # 准备文档知识预览（前500字）
-                            doc_knowledge = state.get('document_knowledge', [])
                             doc_previews = []
                             for doc in doc_knowledge[:3]:  # 最多展示3个文档
                                 content = doc.get('content', '')
@@ -841,7 +896,6 @@ class BlogService:
                                 })
                             
                             # 推送搜索结果卡片数据
-                            raw_results = state.get('search_results', [])
                             if raw_results:
                                 from urllib.parse import urlparse
                                 card_results = []
@@ -1102,6 +1156,7 @@ class BlogService:
                     'article_type': article_type,
                     'target_length': target_length,
                     'interactive': interactive,
+                    'generate_images': generate_images,
                     'generate_cover_video': generate_cover_video,
                     'video_aspect_ratio': video_aspect_ratio,
                     'article_config': article_config,
@@ -1122,15 +1177,19 @@ class BlogService:
             markdown_content = final_state.get('final_markdown', '')
             # 从 final_state 获取图片风格参数
             image_style = final_state.get('image_style', '')
-            cover_image_result = self._generate_cover_image(
-                title=outline.get('title', topic),
-                topic=topic,
-                full_content=markdown_content,
-                task_manager=task_manager,
-                task_id=task_id,
-                image_style=image_style,
-                video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
-            )
+            cover_image_result = None
+            if generate_images:
+                cover_image_result = self._generate_cover_image(
+                    title=outline.get('title', topic),
+                    topic=topic,
+                    full_content=markdown_content,
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    image_style=image_style,
+                    video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
+                )
+            else:
+                logger.info("图片生成已禁用，跳过封面图")
             # 解构返回值：(外网URL, 本地路径, 文章摘要)
             cover_image_url = cover_image_result[0] if cover_image_result else None
             cover_image_path = cover_image_result[1] if cover_image_result else None
@@ -1236,6 +1295,16 @@ class BlogService:
                 )
                 logger.info(f"历史记录已保存: {task_id}")
 
+                self._send_completion_event(
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    final_state=final_state,
+                    markdown=markdown_with_cover,
+                    saved_path=saved_path,
+                    cover_video_path=cover_video_path,
+                    citations=citations,
+                )
+
                 # 102.03: 记录用户行为到记忆存储
                 if self.generator._memory_storage:
                     try:
@@ -1272,6 +1341,7 @@ class BlogService:
                     
             except Exception as e:
                 logger.warning(f"保存历史记录失败: {e}")
+                raise RuntimeError(f"保存历史记录失败: {e}") from e
             
             # 完成 Token 追踪（37.31）
             token_summary = None
@@ -1297,34 +1367,7 @@ class BlogService:
                 except Exception as e:
                     logger.warning(f"任务日志保存失败: {e}")
 
-            # 发送完成事件（使用包含封面图的 markdown）
-            if task_manager:
-                complete_data = {
-                    'success': True,
-                    'id': task_id,
-                    'markdown': markdown_with_cover,
-                    'outline': final_state.get('outline') or {},
-                    'sections_count': len(final_state.get('sections', [])),
-                    'images_count': len(final_state.get('images', [])),
-                    'code_blocks_count': len(final_state.get('code_blocks', [])),
-                    'review_score': final_state.get('review_score', 0),
-                    'saved_path': saved_path,
-                    'cover_video': cover_video_path,
-                    'citations': citations
-                }
-                # 注入 token 用量摘要
-                token_usage = self._get_token_usage()
-                if token_usage:
-                    complete_data['token_usage'] = token_usage
-                task_manager.send_event(task_id, 'complete', complete_data)
-            
             logger.info(f"博客生成完成: {task_id}, 保存到: {saved_path}")
-
-            update_queue_status(
-                task_id, "completed",
-                word_count=len(final_state.get('final_markdown', '')),
-                image_count=len(final_state.get('images', [])),
-            )
 
         except Exception as e:
             logger.error(f"博客生成失败 [{task_id}]: {e}", exc_info=True)
@@ -1372,6 +1415,7 @@ class BlogService:
         article_type = task_info.get('article_type', 'tutorial')
         target_length = task_info.get('target_length', 'medium')
         interactive = task_info.get('interactive', False)
+        generate_images = task_info.get('generate_images', True)
         generate_cover_video = task_info.get('generate_cover_video', False)
         video_aspect_ratio = task_info.get('video_aspect_ratio', '16:9')
 
@@ -1582,15 +1626,19 @@ class BlogService:
             outline = final_state.get('outline') or {}
             markdown_content = final_state.get('final_markdown', '')
             image_style = final_state.get('image_style', '')
-            cover_image_result = self._generate_cover_image(
-                title=outline.get('title', topic),
-                topic=topic,
-                full_content=markdown_content,
-                task_manager=task_manager,
-                task_id=task_id,
-                image_style=image_style,
-                video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
-            )
+            cover_image_result = None
+            if generate_images:
+                cover_image_result = self._generate_cover_image(
+                    title=outline.get('title', topic),
+                    topic=topic,
+                    full_content=markdown_content,
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    image_style=image_style,
+                    video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
+                )
+            else:
+                logger.info("图片生成已禁用，跳过封面图")
             cover_image_url = cover_image_result[0] if cover_image_result else None
             cover_image_path = cover_image_result[1] if cover_image_result else None
             article_summary = cover_image_result[2] if cover_image_result and len(cover_image_result) > 2 else None
@@ -1687,6 +1735,16 @@ class BlogService:
                 )
                 logger.info(f"历史记录已保存: {task_id}")
 
+                self._send_completion_event(
+                    task_manager=task_manager,
+                    task_id=task_id,
+                    final_state=final_state,
+                    markdown=markdown_with_cover,
+                    saved_path=saved_path,
+                    cover_video_path=cover_video_path,
+                    citations=citations,
+                )
+
                 # 保存博客摘要
                 try:
                     summary_to_save = article_summary
@@ -1704,6 +1762,7 @@ class BlogService:
                     logger.warning(f"保存博客摘要失败: {e}")
             except Exception as e:
                 logger.warning(f"保存历史记录失败: {e}")
+                raise RuntimeError(f"保存历史记录失败: {e}") from e
 
             # Token 追踪
             token_summary = None
@@ -1750,33 +1809,7 @@ class BlogService:
                         'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
                     })
 
-            # 发送完成事件
-            if task_manager:
-                complete_data = {
-                    'success': True,
-                    'id': task_id,
-                    'markdown': markdown_with_cover,
-                    'outline': final_state.get('outline') or {},
-                    'sections_count': len(final_state.get('sections', [])),
-                    'images_count': len(final_state.get('images', [])),
-                    'code_blocks_count': len(final_state.get('code_blocks', [])),
-                    'review_score': final_state.get('review_score', 0),
-                    'saved_path': saved_path,
-                    'cover_video': cover_video_path,
-                    'citations': citations
-                }
-                token_usage = self._get_token_usage()
-                if token_usage:
-                    complete_data['token_usage'] = token_usage
-                task_manager.send_event(task_id, 'complete', complete_data)
-
             logger.info(f"博客生成完成（resume）: {task_id}, 保存到: {saved_path}")
-            update_queue_status(
-                task_id, "completed",
-                word_count=len(final_state.get('final_markdown', '')),
-                image_count=len(final_state.get('images', [])),
-            )
-
         except Exception as e:
             logger.error(f"博客生成失败（resume）[{task_id}]: {e}", exc_info=True)
             if task_log:

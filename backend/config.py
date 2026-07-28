@@ -151,6 +151,12 @@ class Config:
     DEEP_SCRAPE_ENABLED = os.getenv('DEEP_SCRAPE_ENABLED', 'true').lower() == 'true'
     DEEP_SCRAPE_TOP_N = int(os.getenv('DEEP_SCRAPE_TOP_N', '3'))
     DEEP_SCRAPE_TIMEOUT = int(os.getenv('DEEP_SCRAPE_TIMEOUT', '30'))
+    DEEP_SCRAPE_TOTAL_TIMEOUT = int(os.getenv('DEEP_SCRAPE_TOTAL_TIMEOUT', '60'))
+    DEEP_SCRAPE_MAX_RETRIES = int(os.getenv('DEEP_SCRAPE_MAX_RETRIES', '1'))
+    DEEP_SCRAPE_MIN_SUCCESS = int(os.getenv('DEEP_SCRAPE_MIN_SUCCESS', '1'))
+    DEEP_SCRAPE_MINI_TIMEOUT = int(os.getenv('DEEP_SCRAPE_MINI_TIMEOUT', '8'))
+    DEEP_SCRAPE_MINI_TOTAL_TIMEOUT = int(os.getenv('DEEP_SCRAPE_MINI_TOTAL_TIMEOUT', '20'))
+    DEEP_SCRAPE_MINI_TOP_N = int(os.getenv('DEEP_SCRAPE_MINI_TOP_N', '1'))
 
     # 知识空白检测与多轮搜索（75.04）
     MULTI_ROUND_SEARCH_ENABLED = os.getenv('MULTI_ROUND_SEARCH_ENABLED', 'true').lower() == 'true'

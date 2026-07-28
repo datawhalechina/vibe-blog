@@ -72,7 +72,14 @@ class ResearcherAgent:
                 self._deep_scraper = DeepScraper(
                     jina_api_key=os.environ.get('JINA_API_KEY'),
                     llm_service=llm_client,
+                    timeout=float(os.environ.get('DEEP_SCRAPE_TIMEOUT', '30')),
                     top_n=int(os.environ.get('DEEP_SCRAPE_TOP_N', '3')),
+                    max_retries=int(os.environ.get('DEEP_SCRAPE_MAX_RETRIES', '1')),
+                    total_timeout=float(os.environ.get('DEEP_SCRAPE_TOTAL_TIMEOUT', '60')),
+                    min_successful_sources=int(os.environ.get('DEEP_SCRAPE_MIN_SUCCESS', '1')),
+                    mini_timeout=float(os.environ.get('DEEP_SCRAPE_MINI_TIMEOUT', '8')),
+                    mini_total_timeout=float(os.environ.get('DEEP_SCRAPE_MINI_TOTAL_TIMEOUT', '20')),
+                    mini_top_n=int(os.environ.get('DEEP_SCRAPE_MINI_TOP_N', '1')),
                 )
                 logger.info("🔗 深度抓取已启用 (Jina + httpx)")
             except Exception as e:
@@ -823,7 +830,11 @@ class ResearcherAgent:
         if self._deep_scraper and search_results:
             try:
                 logger.info("🔗 开始深度抓取 Top N 搜索结果...")
-                deep_scraped = self._deep_scraper.scrape_top_n(search_results, topic)
+                deep_scraped = self._deep_scraper.scrape_top_n(
+                    search_results,
+                    topic,
+                    preset=state.get('target_length'),
+                )
                 if deep_scraped:
                     logger.info(f"🔗 深度抓取完成: {len(deep_scraped)} 篇高质量素材")
                     # 推送 crawl_completed 事件

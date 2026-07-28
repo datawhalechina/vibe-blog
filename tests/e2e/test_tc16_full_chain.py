@@ -18,9 +18,10 @@ from e2e_utils import (
     fill_input,
     INPUT_SELECTORS,
     GENERATE_BTN_SELECTORS,
-    get_blog_detail_api,
     get_task_status,
     run_feature_checks,
+    wait_for_generation_history,
+    configure_fast_live_generation,
 )
 
 
@@ -50,6 +51,7 @@ class TestFullChain:
         adv_btn.click()
         page.wait_for_timeout(500)
         page.locator("select").nth(1).select_option("mini")
+        configure_fast_live_generation(page)
 
         # ── A2: 点击生成，捕获 task_id ──
         def on_response(response):
@@ -68,32 +70,46 @@ class TestFullChain:
         assert captured_task_id, "未捕获到 task_id"
         take_screenshot("chain_02_generating")
 
-        # ── A3: SSE 监控 — 等待生成完成 ──
-        max_wait = 600
-        poll_interval = 5
-        waited = 0
-        while waited < max_wait:
-            done = page.evaluate("() => window.__sse_generation_done")
-            if done:
-                break
-            if '/blog/' in page.url and page.url != base_url:
-                break
-            page.wait_for_timeout(poll_interval * 1000)
-            waited += poll_interval
+        # ── A3: 等待生成完成且历史记录可读 ──
+        completion = wait_for_generation_history(
+            page,
+            captured_task_id,
+            max_wait=600,
+            poll_interval=5,
+        )
 
-        # ── A4: 生成完成，导航到详情页 ──
-        page.wait_for_timeout(5000)
-        # 生成完成后可能停留在 /generate/ 或跳转到 /blog/
-        if '/blog/' in page.url:
-            blog_id = page.url.rstrip('/').split('/')[-1]
-        else:
-            blog_id = captured_task_id
+        # ── A4: 在生成工作台执行质量评估（真实 LLM 调用）──
+        eval_btn = page.get_by_role("button", name="质量评估")
+        assert eval_btn.count() == 1, "生成工作台未找到质量评估按钮"
+        assert eval_btn.is_visible(timeout=5000), "质量评估按钮不可见"
+        eval_btn.click()
+        take_screenshot("chain_03_eval_clicked")
+
+        dialog = page.locator('[role="dialog"]')
+        dialog.wait_for(state="visible", timeout=10_000)
+        dialog.get_by_text("事实准确", exact=True).wait_for(
+            state="visible", timeout=180_000
+        )
+        take_screenshot("chain_04_eval_dialog")
+        dialog_text = dialog.inner_text()
+        grades = ["A+", "A-", "B+", "B-", "C+", "C-", "A", "B", "C", "D", "F"]
+        assert any(grade in dialog_text for grade in grades), \
+            f"评估对话框未显示等级: {dialog_text[:200]}"
+        dimension_labels = ["事实准确", "内容完整", "逻辑连贯",
+                            "主题相关", "引用质量", "写作质量"]
+        found_dims = [label for label in dimension_labels if label in dialog_text]
+        assert len(found_dims) >= 3, f"评分维度不足，仅找到: {found_dims}"
+        page.keyboard.press("Escape")
+        page.wait_for_timeout(500)
+
+        # ── A5: 生成完成，导航到详情页 ──
+        blog_id = completion["blog_id"]
 
         page.goto(f"{base_url}/blog/{blog_id}", wait_until="networkidle")
         page.wait_for_load_state("networkidle", timeout=15000)
         take_screenshot("chain_03_detail_page")
 
-        # ── A5: 详情页内容验证 ──
+        # ── A6: 详情页内容验证 ──
         blog_title = page.locator(".blog-title")
         blog_title.wait_for(state="visible", timeout=10000)
         detail_title = blog_title.text_content().strip()
@@ -118,10 +134,9 @@ class TestFullChain:
         take_screenshot("chain_05_back_home")
 
         # ── B2: 滚动到历史区域 ──
-        hint = page.locator(".scroll-hint")
-        if hint.count() > 0 and hint.first.is_visible(timeout=3000):
-            hint.first.click()
-            page.wait_for_timeout(1500)
+        history_section = page.locator(".history-section")
+        history_section.scroll_into_view_if_needed()
+        page.wait_for_timeout(500)
 
         # ── B3: 验证历史列表包含刚生成的博客 ──
         cards = page.locator(".code-blog-card")
@@ -133,7 +148,7 @@ class TestFullChain:
         found_card = None
         for i in range(min(card_count, 5)):  # 只查前 5 张
             card_text = cards.nth(i).text_content() or ""
-            if topic[:4] in card_text:  # 匹配主题前几个字
+            if topic in card_text:
                 found_card = cards.nth(i)
                 break
 
@@ -152,44 +167,6 @@ class TestFullChain:
         title_again.wait_for(state="visible", timeout=10000)
         assert title_again.text_content().strip() == detail_title, \
             "从历史进入的详情页标题与首次不一致"
-
-        # ════════════════════════════════════════════
-        # Phase C: 质量评估（真实 LLM 调用）
-        # ════════════════════════════════════════════
-
-        # ── C1: 点击评估按钮 ──
-        eval_btn = page.locator('.card-toolbar button:has(svg)').last
-        if eval_btn.count() > 0 and eval_btn.is_visible(timeout=5000):
-            eval_btn.click()
-            take_screenshot("chain_08_eval_clicked")
-
-            # ── C2: 等待评估对话框 ──
-            dialog = page.locator('[role="dialog"]')
-            dialog.wait_for(state="visible", timeout=180_000)  # 评估调 LLM，可能慢
-            take_screenshot("chain_09_eval_dialog")
-
-            dialog_text = dialog.inner_text()
-
-            # ── C3: 验证评分结构 ──
-            # 应有等级（A+/A/A-/B+/B/B-/C+/C/C-/D/F）
-            has_grade = any(
-                g in dialog_text
-                for g in ["A+", "A-", "B+", "B-", "C+", "C-", "A", "B", "C", "D", "F"]
-            )
-            assert has_grade, f"评估对话框未显示等级: {dialog_text[:200]}"
-
-            # 应有评分维度标签
-            dimension_labels = ["事实准确", "内容完整", "逻辑连贯",
-                                "主题相关", "引用质量", "写作质量"]
-            found_dims = [d for d in dimension_labels if d in dialog_text]
-            assert len(found_dims) >= 3, \
-                f"评分维度不足，仅找到: {found_dims}"
-
-            take_screenshot("chain_10_eval_verified")
-
-            # 关闭对话框
-            page.keyboard.press("Escape")
-            page.wait_for_timeout(500)
 
         # ════════════════════════════════════════════
         # Phase D: Dashboard 任务反映
@@ -216,7 +193,7 @@ class TestFullChain:
                 f"任务最终状态异常: {task_info.get('status')}"
 
         # 验证历史 API 包含此博客
-        blog_data = get_blog_detail_api(blog_id)
+        blog_data = completion["blog"]
         assert blog_data is not None, \
             f"后端 API 未找到博客 {blog_id}"
         assert blog_data.get("success", True), \

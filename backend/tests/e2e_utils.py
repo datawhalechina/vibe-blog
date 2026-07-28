@@ -9,6 +9,7 @@ E2E 测试共享工具模块
   - run_playwright_generation(): 通用的前端交互流程（输入主题 → 点击生成 → 等待 SSE 事件）
 """
 
+import json
 import logging
 import requests
 
@@ -47,6 +48,10 @@ SSE_HOOK_JS = """
                             window.__sse_generation_done = true;
                         }
                     }
+                    if (type === 'outline_ready') {
+                        const d = JSON.parse(evt.data);
+                        window.__sse_outline_data = d;
+                    }
                 } catch(e) {}
                 return fn.call(this, evt);
             };
@@ -80,6 +85,22 @@ GENERATE_BTN_SELECTORS = [
     'button:has-text("Generate")',
     'button[type="submit"]',
 ]
+
+
+def configure_fast_live_generation(page):
+    """让 live 生成 case 跳过独立配图链路，专注验证博客主流程。"""
+    def disable_images(route):
+        payload = route.request.post_data_json or {}
+        payload["generate_images"] = False
+        payload["background_investigation"] = False
+        headers = dict(route.request.headers)
+        headers.pop("content-length", None)
+        route.continue_(
+            headers=headers,
+            post_data=json.dumps(payload, ensure_ascii=False),
+        )
+
+    page.route("**/api/blog/generate/mini", disable_images)
 
 
 def find_element(page, selectors: list, timeout: int = 3000):
@@ -379,6 +400,92 @@ def get_blog_detail_api(blog_id: str) -> dict | None:
     except Exception as e:
         logger.warning(f"获取博客详情失败: {e}")
     return None
+
+
+TERMINAL_FAILURE_STATUSES = {"failed", "cancelled", "canceled"}
+
+
+def _sse_event_types(page) -> list[str]:
+    try:
+        return page.evaluate(
+            "() => (window.__sse_events || []).map(event => event.type)"
+        )
+    except Exception:
+        return []
+
+
+def _assert_task_is_active(task_id: str, task: dict | None, event_types: list[str]):
+    if not task or task.get("status") not in TERMINAL_FAILURE_STATUSES:
+        return
+
+    detail = task.get("error") or task.get("message") or "无错误详情"
+    raise AssertionError(
+        f"任务 {task_id} 已进入 {task.get('status')} 状态: {detail}; "
+        f"stage={task.get('current_stage') or 'unknown'}; SSE={event_types}"
+    )
+
+
+def wait_for_outline(
+    page,
+    task_id: str,
+    max_wait: int = 180,
+    poll_interval: int = 3,
+) -> dict:
+    """等待大纲 SSE；任务失败或取消时立即给出状态诊断。"""
+    waited = 0
+    last_task = None
+    while waited < max_wait:
+        outline = page.evaluate("() => window.__sse_outline_data")
+        if outline:
+            return outline
+
+        event_types = _sse_event_types(page)
+        last_task = get_task_status(task_id)
+        _assert_task_is_active(task_id, last_task, event_types)
+        page.wait_for_timeout(poll_interval * 1000)
+        waited += poll_interval
+
+    raise AssertionError(
+        f"超时 {max_wait}s：未收到 outline_complete; "
+        f"task={last_task}; SSE={_sse_event_types(page)}"
+    )
+
+
+def wait_for_generation_history(
+    page,
+    task_id: str,
+    max_wait: int = 600,
+    poll_interval: int = 5,
+    completed_history_grace: int = 10,
+) -> dict:
+    """等待生成结果落库，避免把仍在运行的 task_id 当作可读历史。"""
+    waited = 0
+    last_task = None
+    completed_at = None
+    while waited < max_wait:
+        blog = get_blog_detail_api(task_id)
+        event_types = _sse_event_types(page)
+        last_task = get_task_status(task_id)
+        _assert_task_is_active(task_id, last_task, event_types)
+        is_completed = last_task and last_task.get("status") == "completed"
+        if blog and is_completed:
+            return {"blog_id": task_id, "blog": blog, "task": last_task}
+
+        if is_completed:
+            if completed_at is None:
+                completed_at = waited
+            elif waited - completed_at >= completed_history_grace:
+                raise AssertionError(
+                    f"任务 {task_id} 已完成但历史仍不可读; "
+                    f"task={last_task}; SSE={event_types}"
+                )
+        page.wait_for_timeout(poll_interval * 1000)
+        waited += poll_interval
+
+    raise AssertionError(
+        f"超时 {max_wait}s：任务历史仍不可读; "
+        f"task={last_task}; SSE={_sse_event_types(page)}"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════
