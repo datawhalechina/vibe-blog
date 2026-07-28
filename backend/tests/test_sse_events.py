@@ -5,7 +5,7 @@ import time
 from queue import Queue
 from unittest.mock import patch, MagicMock
 
-from services.task_service import TaskManager
+from services.task_service import TaskManager, TaskProgress
 
 
 class TestSendEventEnrichment:
@@ -60,6 +60,68 @@ class TestSendEventEnrichment:
         assert msg["event"] == "complete"
         assert msg["data"]["success"] is True
         assert msg["data"]["id"] == "blog_123"
+
+    def test_complete_event_updates_queryable_task_status(self):
+        mgr = self._fresh_manager()
+        mgr.tasks["t1"] = TaskProgress(task_id="t1", status="running")
+        mgr.queues["t1"] = Queue()
+
+        mgr.send_event("t1", "complete", {"success": True, "id": "t1"})
+
+        task = mgr.get_task("t1")
+        assert task.status == "completed"
+        assert task.overall_progress == 100
+        assert task.outputs == {"success": True, "id": "t1"}
+
+    def test_non_recoverable_error_updates_queryable_task_status(self):
+        mgr = self._fresh_manager()
+        mgr.tasks["t1"] = TaskProgress(task_id="t1", status="running")
+        mgr.queues["t1"] = Queue()
+
+        mgr.send_event(
+            "t1",
+            "error",
+            {"message": "provider timeout", "recoverable": False},
+        )
+
+        task = mgr.get_task("t1")
+        assert task.status == "failed"
+        assert task.error == "provider timeout"
+
+    def test_recoverable_error_keeps_task_running(self):
+        mgr = self._fresh_manager()
+        mgr.tasks["t1"] = TaskProgress(task_id="t1", status="running")
+        mgr.queues["t1"] = Queue()
+
+        mgr.send_event(
+            "t1",
+            "error",
+            {"message": "image skipped", "recoverable": True},
+        )
+
+        assert mgr.get_task("t1").status == "running"
+
+    def test_terminal_task_status_cannot_be_overwritten(self):
+        for terminal_status in ("completed", "failed", "cancelled"):
+            mgr = self._fresh_manager()
+            mgr.tasks["t1"] = TaskProgress(
+                task_id="t1",
+                status=terminal_status,
+                error="original" if terminal_status == "failed" else None,
+            )
+            mgr.queues["t1"] = Queue()
+
+            mgr.send_event("t1", "complete", {"success": True})
+            mgr.send_event(
+                "t1",
+                "error",
+                {"message": "late error", "recoverable": False},
+            )
+
+            task = mgr.get_task("t1")
+            assert task.status == terminal_status
+            if terminal_status == "failed":
+                assert task.error == "original"
 
 
 class TestLLMEvents:

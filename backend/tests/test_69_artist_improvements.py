@@ -17,6 +17,7 @@
 
 import sys
 from pathlib import Path
+from unittest.mock import patch
 
 
 from services.blog_generator.agents.artist import (
@@ -45,6 +46,24 @@ class TestImageBudget:
     def test_budget_reasonable_values(self):
         assert IMAGE_BUDGET['mini'] >= 2
         assert IMAGE_BUDGET['long'] <= 15
+
+    def test_zero_target_images_skips_artist(self):
+        agent = ArtistAgent(MockLLM())
+        state = {
+            'target_length': 'mini',
+            'target_images_count': 0,
+            'sections': [{'title': 'One', 'content': 'Content'}],
+        }
+
+        with patch.object(
+            agent,
+            '_generate_mini_section_images',
+            side_effect=AssertionError('image generation should be skipped'),
+        ):
+            result = agent.run(state)
+
+        assert result['images'] == []
+        assert result['section_images'] == []
 
 
 class TestASCIIDetection:

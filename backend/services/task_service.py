@@ -84,6 +84,22 @@ class TaskManager:
     
     def send_event(self, task_id: str, event: str, data: Dict[str, Any]):
         """发送 SSE 事件（带唯一 ID 和时间戳）"""
+        task = self.tasks.get(task_id)
+        if event == "complete" and task and task.status in {"pending", "running"}:
+            task.status = "completed"
+            task.overall_progress = 100
+            task.outputs = data
+            task.updated_at = datetime.utcnow()
+        elif (
+            event == "error"
+            and task
+            and task.status in {"pending", "running"}
+            and not data.get("recoverable", False)
+        ):
+            task.status = "failed"
+            task.error = data.get("message") or "任务失败"
+            task.updated_at = datetime.utcnow()
+
         queue = self.queues.get(task_id)
         if queue:
             queue.put({

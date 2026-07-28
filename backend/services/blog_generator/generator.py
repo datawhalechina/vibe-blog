@@ -329,6 +329,26 @@ class BlogGenerator:
         """素材收集节点"""
         if state.get('skip_researcher'):
             logger.info("=== Step 1: 素材收集（已跳过） ===")
+            empty_defaults = {
+                'background_knowledge': '',
+                'key_concepts': [],
+                'search_results': [],
+                'reference_links': [],
+                'knowledge_source_stats': {},
+                'instructional_analysis': {},
+                'learning_objectives': [],
+                'verbatim_data': [],
+                'distilled_sources': [],
+                'material_by_type': {},
+                'common_themes': [],
+                'contradictions': [],
+                'content_gaps': [],
+                'unique_angles': [],
+                'writing_recommendations': {},
+            }
+            for key, default in empty_defaults.items():
+                if state.get(key) is None:
+                    state[key] = default
             return state
         logger.info("=== Step 1: 素材收集 ===")
         self._validate_layer("research", state)

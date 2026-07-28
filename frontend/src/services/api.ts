@@ -12,6 +12,7 @@ export interface BlogGenerateParams {
   audience_adaptation?: string
   document_ids?: string[]
   image_style?: string
+  generate_images?: boolean
   generate_cover_video?: boolean
   video_aspect_ratio?: string
   deep_thinking?: boolean

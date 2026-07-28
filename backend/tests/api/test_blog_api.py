@@ -102,6 +102,20 @@ class TestBlogGenerateAPI:
         call_kwargs = mock_blog_service.generate_sync.call_args[1]
         assert call_kwargs['source_material'] == 'Some reference material'
 
+    def test_mini_generation_can_disable_images(self, client, mock_blog_service):
+        response = client.post('/api/blog/generate/mini', json={
+            'topic': 'Fast live verification',
+            'generate_images': False,
+            'background_investigation': False,
+        })
+
+        assert response.status_code == 202
+        call_kwargs = mock_blog_service.generate_async.call_args.kwargs
+        assert call_kwargs['generate_images'] is False
+        assert call_kwargs['background_investigation'] is False
+        task = call_kwargs['task_manager'].get_task(response.get_json()['task_id'])
+        assert task.status == 'running'
+
 
 class TestHistoryAPI:
     """测试历史记录 API"""

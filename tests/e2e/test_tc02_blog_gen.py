@@ -13,9 +13,10 @@ from e2e_utils import (
     clear_input,
     INPUT_SELECTORS,
     GENERATE_BTN_SELECTORS,
-    get_blog_detail_api,
     get_task_status,
     run_feature_checks,
+    wait_for_generation_history,
+    configure_fast_live_generation,
 )
 
 
@@ -45,6 +46,7 @@ class TestBlogGeneration:
         page.wait_for_timeout(500)
         length_select = page.locator("select").nth(1)
         length_select.select_option("mini")
+        configure_fast_live_generation(page)
         take_screenshot("03_mini_selected")
 
         # ── Step 4: 点击生成，捕获 task_id ──
@@ -72,43 +74,20 @@ class TestBlogGeneration:
         page.locator(".progress-drawer").wait_for(state="visible", timeout=15000)
         take_screenshot("05_progress_drawer")
 
-        # ── Step 6: SSE 监控 — 等待生成完成 ──
-        max_wait = 600  # 10 分钟
-        poll_interval = 5
-        waited = 0
-        last_section_count = 0
-
-        while waited < max_wait:
-            done = page.evaluate("() => window.__sse_generation_done")
-            if done:
-                break
-
-            if '/blog/' in page.url and page.url != base_url:
-                break
-
-            # 记录进度：每收到新 section 截图一次
-            section_count = page.evaluate("() => (window.__sse_sections || []).length")
-            if section_count > last_section_count:
-                take_screenshot(f"06_section_{section_count}")
-                last_section_count = section_count
-
-            if waited % 60 == 0 and waited > 0:
-                take_screenshot(f"06_wait_{waited}s")
-
-            page.wait_for_timeout(poll_interval * 1000)
-            waited += poll_interval
+        # ── Step 6: 等待生成完成且历史记录可读 ──
+        completion = wait_for_generation_history(
+            page,
+            captured_task_id,
+            max_wait=600,
+            poll_interval=5,
+        )
 
         take_screenshot("07_generation_done")
 
         # ── Step 7: 验证生成完成 ──
-        page.wait_for_timeout(5000)
-        # 生成完成后可能停留在 /generate/ 或跳转到 /blog/
-        current_url = page.url
-        if '/blog/' in current_url:
-            blog_id = current_url.rstrip('/').split('/')[-1]
-        else:
-            # 停留在 /generate/task_xxx，用 task_id 作为 blog_id
-            blog_id = captured_task_id
+        blog_id = completion["blog_id"]
+        captured_outline = page.evaluate("() => window.__sse_outline_data")
+        captured_sections = page.evaluate("() => window.__sse_sections || []")
 
         # 导航到详情页验证内容
         page.goto(f"{base_url}/blog/{blog_id}", wait_until="networkidle")
@@ -136,13 +115,11 @@ class TestBlogGeneration:
         take_screenshot("09_content_verified")
 
         # ── Step 9: 验证 SSE 捕获的数据 ──
-        outline = page.evaluate("() => window.__sse_outline_data")
-        sections = page.evaluate("() => window.__sse_sections || []")
-        assert len(sections) >= 1 or outline is not None, \
+        assert len(captured_sections) >= 1 or captured_outline is not None, \
             "SSE hook 未捕获到 outline 或 sections"
 
         # ── Step 10: 后端数据校验 ──
-        blog_data = get_blog_detail_api(blog_id)
+        blog_data = completion["blog"]
         if blog_data:
             # 验证后端确实存储了生成结果
             assert blog_data.get("success", True), \

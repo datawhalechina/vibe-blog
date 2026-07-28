@@ -688,6 +688,12 @@ class ArtistAgent:
             logger.error("没有章节内容，跳过配图生成")
             state['images'] = []
             return state
+
+        if state.get('target_images_count') == 0:
+            logger.info("目标配图数为 0，跳过配图生成")
+            state['images'] = []
+            state['section_images'] = []
+            return state
         
         # ========== Mini 模式：使用专用的章节配图生成 ==========
         # 通过 StyleProfile.image_generation_mode 或 target_length 判断
