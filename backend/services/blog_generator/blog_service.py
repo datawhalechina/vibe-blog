@@ -82,6 +82,18 @@ class BlogService:
             pass
         return None
 
+    @staticmethod
+    def _validate_final_state(final_state: Dict) -> str:
+        """Return generated Markdown or raise before any success side effects."""
+        error = final_state.get('error')
+        if error and str(error).strip():
+            raise RuntimeError(str(error).strip())
+
+        markdown = final_state.get('final_markdown')
+        if not isinstance(markdown, str) or not markdown.strip():
+            raise RuntimeError("博客生成未产生有效内容")
+        return markdown
+
     def _send_completion_event(
         self, *, task_manager, task_id: str, final_state: Dict,
         markdown: str, saved_path: Optional[str],
@@ -1171,10 +1183,10 @@ class BlogService:
 
             # 获取最终状态
             final_state = snapshot.values
+            markdown_content = self._validate_final_state(final_state)
             
             # 生成封面架构图（基于全文内容）
             outline = final_state.get('outline') or {}
-            markdown_content = final_state.get('final_markdown', '')
             # 从 final_state 获取图片风格参数
             image_style = final_state.get('image_style', '')
             cover_image_result = None
@@ -1196,7 +1208,6 @@ class BlogService:
             article_summary = cover_image_result[2] if cover_image_result and len(cover_image_result) > 2 else None
             
             # 自动保存 Markdown 到文件（包含封面图）
-            markdown_content = final_state.get('final_markdown', '')
             saved_path = None
             
             # 如果有封面图，在 Markdown 中插入封面图
@@ -1621,10 +1632,10 @@ class BlogService:
 
             # 获取最终状态
             final_state = self.generator.app.get_state(config).values
+            markdown_content = self._validate_final_state(final_state)
 
             # 封面图 + 保存历史 + 完成事件（复用 _run_generation 逻辑）
             outline = final_state.get('outline') or {}
-            markdown_content = final_state.get('final_markdown', '')
             image_style = final_state.get('image_style', '')
             cover_image_result = None
             if generate_images:

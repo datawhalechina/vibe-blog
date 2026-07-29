@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-29
+
+### Fixed
+- 🐛 **生成失败状态传播** — 最终状态包含错误或正文为空时停止持久化，并向 SSE 与任务队列报告失败。
+
+### Tests
+- ✨ **空博客成功回归** — 覆盖首次生成与大纲确认恢复流程，确保失败状态不会保存空历史或发送完成事件。
+
 ## 2026-07-28
 
 ### Fixed
