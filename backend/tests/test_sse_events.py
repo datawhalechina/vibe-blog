@@ -2,6 +2,7 @@
 37.34 SSE 流式事件系统增量优化 — 单元测试
 """
 import time
+from datetime import datetime, timedelta
 from queue import Queue
 from unittest.mock import patch, MagicMock
 
@@ -122,6 +123,94 @@ class TestSendEventEnrichment:
             assert task.status == terminal_status
             if terminal_status == "failed":
                 assert task.error == "original"
+
+    def test_terminal_event_is_enqueued_while_task_lock_is_held(self):
+        mgr = self._fresh_manager()
+        mgr.tasks["t1"] = TaskProgress(task_id="t1", status="running")
+
+        class LockCheckingQueue(Queue):
+            def put(self, item, *args, **kwargs):
+                assert not mgr.task_lock.acquire(blocking=False)
+                assert mgr.tasks["t1"].status == "completed"
+                return super().put(item, *args, **kwargs)
+
+        mgr.queues["t1"] = LockCheckingQueue()
+
+        mgr.send_complete("t1", {"path": "blog.md"})
+
+        assert mgr.queues["t1"].get_nowait()["event"] == "complete"
+        assert mgr.tasks["t1"].outputs == {"path": "blog.md"}
+
+
+class TestTaskCleanup:
+    @staticmethod
+    def _manager(task):
+        mgr = object.__new__(TaskManager)
+        mgr._initialized = True
+        mgr.tasks = {task.task_id: task}
+        mgr.queues = {task.task_id: Queue()}
+        mgr._cleanup_tasks = set()
+        from threading import Lock
+        mgr.task_lock = Lock()
+        return mgr
+
+    def test_cleanup_waits_for_running_task_to_reach_terminal_state(self):
+        mgr = self._manager(TaskProgress(task_id="t1", status="running"))
+
+        def run_cleanup_target():
+            target = thread_cls.call_args.kwargs["target"]
+            target()
+
+        def advance_task_after_retry(_seconds):
+            if sleep.call_count == 2:
+                mgr.tasks["t1"].status = "completed"
+
+        with (
+            patch("services.task_service.Thread") as thread_cls,
+            patch(
+                "services.task_service.time.sleep",
+                side_effect=advance_task_after_retry,
+            ) as sleep,
+        ):
+            thread_cls.return_value.start.side_effect = run_cleanup_target
+            mgr.cleanup_task("t1", delay=300)
+
+        assert sleep.call_count == 2
+        assert "t1" not in mgr.tasks
+        assert "t1" not in mgr.queues
+        assert "t1" not in mgr._cleanup_tasks
+
+    def test_cleanup_is_scheduled_once_per_task(self):
+        mgr = self._manager(TaskProgress(task_id="t1", status="running"))
+
+        with patch("services.task_service.Thread") as thread_cls:
+            mgr.cleanup_task("t1")
+            mgr.cleanup_task("t1")
+
+        thread_cls.assert_called_once()
+        thread_cls.return_value.start.assert_called_once()
+
+    def test_cleanup_removes_stale_running_task(self):
+        task = TaskProgress(
+            task_id="t1",
+            status="running",
+            updated_at=datetime.utcnow() - timedelta(days=2),
+        )
+        mgr = self._manager(task)
+
+        def run_cleanup_target():
+            thread_cls.call_args.kwargs["target"]()
+
+        with (
+            patch("services.task_service.Thread") as thread_cls,
+            patch("services.task_service.time.sleep"),
+        ):
+            thread_cls.return_value.start.side_effect = run_cleanup_target
+            mgr.cleanup_task("t1", delay=300)
+
+        assert "t1" not in mgr.tasks
+        assert "t1" not in mgr.queues
+        assert "t1" not in mgr._cleanup_tasks
 
 
 class TestLLMEvents:

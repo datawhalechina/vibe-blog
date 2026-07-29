@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-29
+
+### Fixed
+- 🐛 **运行任务清理竞态** — SSE 断开后保留活跃任务并去重清理线程，原子写入终态事件，失联任务在 24 小时后回收。
+
+### Tests
+- ✨ **任务清理并发契约** — 覆盖慢生成保留、清理调度去重、失联回收与终态事件原子入队。
+
 ## 2026-07-28
 
 ### Fixed
