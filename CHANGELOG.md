@@ -4,6 +4,11 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-29
+
+### Changed
+- 🔧 **计划文档忽略范围** — 将 Git 忽略规则从整个 `docs/` 收窄为 `docs/plans/`，保留正式文档的跟踪能力。
+
 ## 2026-07-28
 
 ### Fixed
