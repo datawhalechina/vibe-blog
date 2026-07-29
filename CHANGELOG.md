@@ -4,6 +4,17 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-30
+
+### Added
+- ✨ **结构化输出契约** — 新增统一 Pydantic 解析入口、decode/validation 错误分类、严格/兼容模式及显式单次修复策略。
+
+### Changed
+- ♻️ **输出 Schema 边界** — 将稳定的 Agent 输出模型迁至独立 `schemas/outputs.py`，并保留原有导入身份兼容。
+
+### Tests
+- ✨ **结构化解析契约测试** — 覆盖 JSON/fence、Mapping/BaseModel、类型校验、截断输入、有限修复、多围栏拒绝及错误与日志脱敏。
+
 ## 2026-07-29
 
 ### Changed
