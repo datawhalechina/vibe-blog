@@ -9,6 +9,14 @@ from importlib import import_module
 
 _EXPORTS = {
     "BlogGenerator": ("services.blog_generator.generator", "BlogGenerator"),
+    "StructuredOutputError": (
+        "services.blog_generator.structured_output",
+        "StructuredOutputError",
+    ),
+    "parse_structured_output": (
+        "services.blog_generator.structured_output",
+        "parse_structured_output",
+    ),
     "SearchService": ("services.blog_generator.services.search_service", "SearchService"),
     "init_search_service": (
         "services.blog_generator.services.search_service",
