@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-29
+
+### Fixed
+- 🐛 **进度来源图标** — 搜索与抓取卡片改用本地 Globe 图标，移除 Google favicon 外部请求及其网络超时与来源域名泄露风险。
+
+### Tests
+- ✨ **本地来源图标契约** — 覆盖搜索与抓取卡片的本地图标渲染，并断言不再创建远程 favicon 图片。
+
 ## 2026-07-28
 
 ### Fixed
