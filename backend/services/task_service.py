@@ -14,6 +14,10 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+TERMINAL_TASK_STATUSES = {"completed", "failed", "cancelled", "canceled"}
+ACTIVE_CLEANUP_RETRY_SECONDS = 60
+MAX_TASK_INACTIVITY_SECONDS = 24 * 60 * 60
+
 
 @dataclass
 class TaskProgress:
@@ -51,6 +55,7 @@ class TaskManager:
         self._initialized = True
         self.tasks: Dict[str, TaskProgress] = {}
         self.queues: Dict[str, Queue] = {}
+        self._cleanup_tasks = set()
         self.task_lock = Lock()
         logger.info("TaskManager 初始化完成")
     
@@ -84,30 +89,36 @@ class TaskManager:
     
     def send_event(self, task_id: str, event: str, data: Dict[str, Any]):
         """发送 SSE 事件（带唯一 ID 和时间戳）"""
-        task = self.tasks.get(task_id)
-        if event == "complete" and task and task.status in {"pending", "running"}:
-            task.status = "completed"
-            task.overall_progress = 100
-            task.outputs = data
-            task.updated_at = datetime.utcnow()
-        elif (
-            event == "error"
-            and task
-            and task.status in {"pending", "running"}
-            and not data.get("recoverable", False)
-        ):
-            task.status = "failed"
-            task.error = data.get("message") or "任务失败"
-            task.updated_at = datetime.utcnow()
+        payload = {
+            'event': event,
+            'id': uuid.uuid4().hex[:12],
+            'timestamp': time.time(),
+            'data': data,
+        }
+        queue_found = False
+        with self.task_lock:
+            task = self.tasks.get(task_id)
+            if task and task.status in {"pending", "running"}:
+                if event == "complete":
+                    task.status = "completed"
+                    task.overall_progress = 100
+                    task.outputs = data.get("outputs", data)
+                    task.updated_at = datetime.utcnow()
+                elif event == "error":
+                    task.error = data.get("message") or "任务失败"
+                    if not data.get("recoverable", False):
+                        task.status = "failed"
+                    task.updated_at = datetime.utcnow()
+                elif event == "cancelled":
+                    task.status = "cancelled"
+                    task.updated_at = datetime.utcnow()
 
-        queue = self.queues.get(task_id)
-        if queue:
-            queue.put({
-                'event': event,
-                'id': uuid.uuid4().hex[:12],
-                'timestamp': time.time(),
-                'data': data,
-            })
+            queue = self.queues.get(task_id)
+            if queue:
+                queue.put(payload)
+                queue_found = True
+
+        if queue_found:
             if event not in ('writing_chunk', 'log', 'stream'):
                 logger.debug(f"SSE 事件已入队 [{task_id}]: {event}")
         else:
@@ -175,13 +186,6 @@ class TaskManager:
     
     def send_complete(self, task_id: str, outputs: Dict[str, Any]):
         """发送完成事件"""
-        task = self.tasks.get(task_id)
-        if task:
-            task.status = "completed"
-            task.overall_progress = 100
-            task.outputs = outputs
-            task.updated_at = datetime.utcnow()
-        
         self.send_event(task_id, 'complete', {
             'task_id': task_id,
             'status': 'completed',
@@ -190,13 +194,6 @@ class TaskManager:
     
     def send_error(self, task_id: str, stage: str, message: str, recoverable: bool = False, **extra):
         """发送错误事件"""
-        task = self.tasks.get(task_id)
-        if task:
-            if not recoverable:
-                task.status = "failed"
-            task.error = message
-            task.updated_at = datetime.utcnow()
-        
         self.send_event(task_id, 'error', {
             'stage': stage,
             'message': message,
@@ -215,11 +212,10 @@ class TaskManager:
         """取消任务"""
         task = self.tasks.get(task_id)
         if task and task.status in ("running", "pending"):
-            task.status = "cancelled"
-            task.updated_at = datetime.utcnow()
             self.send_event(task_id, 'cancelled', {'task_id': task_id, 'message': '任务已取消'})
-            logger.info(f"任务已取消: {task_id}")
-            return True
+            if task.status == "cancelled":
+                logger.info(f"任务已取消: {task_id}")
+                return True
         return False
     
     def is_cancelled(self, task_id: str) -> bool:
@@ -228,13 +224,51 @@ class TaskManager:
         return task is not None and task.status == "cancelled"
     
     def cleanup_task(self, task_id: str, delay: int = 300):
-        """延迟清理任务 (默认 5 分钟后)"""
+        """延迟清理任务；活跃任务保留，失联任务最终回收。"""
+        with self.task_lock:
+            if task_id in self._cleanup_tasks:
+                return
+            self._cleanup_tasks.add(task_id)
+
         def _cleanup():
-            time.sleep(delay)
-            with self.task_lock:
-                self.tasks.pop(task_id, None)
-                self.queues.pop(task_id, None)
-            logger.info(f"清理任务: {task_id}")
+            next_delay = max(delay, 0)
+            try:
+                while True:
+                    time.sleep(next_delay)
+                    removed_reason = None
+                    with self.task_lock:
+                        task = self.tasks.get(task_id)
+                        if task is None:
+                            self.queues.pop(task_id, None)
+                            return
+
+                        inactive_seconds = (
+                            datetime.utcnow() - task.updated_at
+                        ).total_seconds()
+                        if task.status in TERMINAL_TASK_STATUSES:
+                            removed_reason = "terminal"
+                        elif inactive_seconds >= MAX_TASK_INACTIVITY_SECONDS:
+                            removed_reason = "stale"
+
+                        if removed_reason:
+                            self.tasks.pop(task_id, None)
+                            self.queues.pop(task_id, None)
+                        else:
+                            remaining = MAX_TASK_INACTIVITY_SECONDS - inactive_seconds
+                            next_delay = min(
+                                ACTIVE_CLEANUP_RETRY_SECONDS,
+                                max(remaining, 1),
+                            )
+
+                    if removed_reason:
+                        if removed_reason == "stale":
+                            logger.warning(f"清理失联任务: {task_id}")
+                        else:
+                            logger.info(f"清理任务: {task_id}")
+                        return
+            finally:
+                with self.task_lock:
+                    self._cleanup_tasks.discard(task_id)
         
         Thread(target=_cleanup, daemon=True).start()
 
