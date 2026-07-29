@@ -538,11 +538,13 @@ describe('ProgressDrawer.vue', () => {
       expect(wrapper.text()).toContain('LangGraph 入门')
     })
 
-    it('should render favicon images with correct src', () => {
+    it('should render local source icons without remote favicon images', () => {
       const wrapper = mount(ProgressDrawer, {
         props: { ...defaultProps, expanded: true, progressItems: [searchItem] },
       })
-      expect(wrapper.exists()).toBe(true)
+      expect(wrapper.findAll('[data-testid="source-site-icon"]')).toHaveLength(3)
+      expect(wrapper.findAll('img')).toHaveLength(0)
+      expect(wrapper.html()).not.toContain('google.com/s2/favicons')
     })
 
     it('should render search card links with correct href', () => {
@@ -611,6 +613,15 @@ describe('ProgressDrawer.vue', () => {
         props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
       })
       expect(wrapper.exists()).toBe(true)
+    })
+
+    it('should render a local source icon without a remote favicon image', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: { ...defaultProps, expanded: true, progressItems: [crawlItem] },
+      })
+      expect(wrapper.findAll('[data-testid="source-site-icon"]')).toHaveLength(1)
+      expect(wrapper.findAll('img')).toHaveLength(0)
+      expect(wrapper.html()).not.toContain('google.com/s2/favicons')
     })
 
     it('should render content size in KB', () => {
