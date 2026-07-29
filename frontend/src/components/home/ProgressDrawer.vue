@@ -193,7 +193,12 @@
                   :style="{ animationDelay: `${Math.min(ri * 50, 500)}ms` }"
                 >
                   <a class="flex gap-2 h-40 w-40 p-3 bg-accent rounded-xl text-xs text-muted-foreground no-underline overflow-hidden transition-colors hover:bg-muted hover:text-foreground" :href="r.url" target="_blank" rel="noopener">
-                    <img class="shrink-0 mt-0.5 rounded-sm size-4 object-contain" :src="`https://www.google.com/s2/favicons?domain=${r.domain}&sz=16`" :alt="r.domain" />
+                    <Globe2
+                      data-testid="source-site-icon"
+                      :size="16"
+                      class="shrink-0 mt-0.5 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                     <span class="overflow-hidden line-clamp-6 leading-relaxed break-words">{{ r.title }}</span>
                   </a>
                 </li>
@@ -209,7 +214,13 @@
               <ul class="flex flex-wrap gap-4 list-none p-0 m-0">
                 <li class="animate-in fade-in slide-in-from-bottom-2 duration-300">
                   <a class="flex gap-2 h-40 w-40 p-3 bg-accent rounded-xl text-xs text-muted-foreground no-underline overflow-hidden transition-colors hover:bg-muted hover:text-foreground" :href="item.data.url || '#'" target="_blank" rel="noopener">
-                    <img v-if="item.data.url && getHostname(item.data.url)" class="shrink-0 mt-0.5 rounded-sm size-4 object-contain" :src="`https://www.google.com/s2/favicons?domain=${getHostname(item.data.url)}&sz=16`" />
+                    <Globe2
+                      v-if="item.data.url"
+                      data-testid="source-site-icon"
+                      :size="16"
+                      class="shrink-0 mt-0.5 text-muted-foreground"
+                      aria-hidden="true"
+                    />
                     <span class="overflow-hidden line-clamp-6 leading-relaxed break-words">{{ item.data.title || item.data.url || '未知页面' }}</span>
                   </a>
                 </li>
@@ -273,7 +284,7 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { Square, ChevronRight, ChevronDown, X, Lightbulb, Search, BookOpenText } from 'lucide-vue-next'
+import { Square, ChevronRight, ChevronDown, X, Lightbulb, Search, BookOpenText, Globe2 } from 'lucide-vue-next'
 import { useSmartAutoScroll } from '@/composables/useSmartAutoScroll'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
@@ -396,17 +407,6 @@ const getLogIcon = (type: string) => {
   return icons[type] || '○'
 }
 
-const getHostname = (url: string): string | null => {
-  try {
-    if (typeof URL !== 'undefined') {
-      return new URL(url).hostname
-    }
-    const match = url.match(/^https?:\/\/([^\/]+)/)
-    return match ? match[1] : null
-  } catch {
-    return null
-  }
-}
 </script>
 
 <style scoped>

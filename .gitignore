@@ -115,8 +115,8 @@ backend/logs/
 *.bak
 *.swp
 
-# 文档目录
-/docs/
+# 本地实施计划
+/docs/plans/
 
 backend/test_*.py
 backend/test_*.md
