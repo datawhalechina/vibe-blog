@@ -6,6 +6,9 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ## 2026-07-30
 
+### Changed
+- 🔧 **双语 README 入口** — 将英文设为根 README 主版本，新增同步的简体中文副版本，并清理已下线功能、运行产物链接和过期启动说明。
+
 ### Added
 - ✨ **结构化输出契约** — 新增统一 Pydantic 解析入口、decode/validation 错误分类、严格/兼容模式及显式单次修复策略。
 
