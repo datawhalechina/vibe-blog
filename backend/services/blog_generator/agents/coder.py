@@ -2,7 +2,6 @@
 Coder Agent - 代码生成
 """
 
-import json
 import logging
 import os
 import re
@@ -10,6 +9,8 @@ from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import CodeGenerationOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 # 从环境变量读取并行配置，默认为 3
 MAX_WORKERS = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
@@ -103,7 +104,12 @@ class CoderAgent:
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response)
+            result = parse_structured_output(
+                CodeGenerationOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             return {
                 "code": result.get("code_block", ""),
                 "output": result.get("output_block", ""),

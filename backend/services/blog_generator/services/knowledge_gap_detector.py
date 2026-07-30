@@ -7,6 +7,9 @@ import json
 import logging
 from typing import Dict, List, Optional
 
+from ..schemas.outputs import DetectedKnowledgeGapsOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
+
 logger = logging.getLogger(__name__)
 
 # 按文章类型的最大搜索轮数
@@ -87,24 +90,14 @@ class KnowledgeGapDetector:
             )
             if not response:
                 return []
-            return self._parse_gaps(response)
+            return parse_structured_output(
+                DetectedKnowledgeGapsOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
         except Exception as e:
             logger.warning(f"知识空白检测失败: {e}")
-            return []
-
-    def _parse_gaps(self, response: str) -> List[Dict]:
-        """解析 LLM 返回的 JSON"""
-        try:
-            # 尝试提取 JSON 数组
-            text = response.strip()
-            if text.startswith("```"):
-                lines = text.split("\n")
-                text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:])
-            gaps = json.loads(text)
-            if isinstance(gaps, list):
-                return [g for g in gaps if "gap" in g and "refined_query" in g]
-            return []
-        except (json.JSONDecodeError, TypeError):
             return []
 
     @staticmethod

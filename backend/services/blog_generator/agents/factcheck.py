@@ -5,39 +5,17 @@ FactCheck Agent - 事实核查
 位于 reviewer/revision 之后、humanizer 之前。
 """
 
-import json
 import logging
 import os
 from typing import Dict, Any, List
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import FactCheckOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
 VERDICT_MAP = {"S": "SUPPORTED", "C": "CONTRADICTED", "U": "UNVERIFIED"}
-
-
-def _extract_json(text: str) -> dict:
-    """从 LLM 响应中提取 JSON"""
-    text = text.strip()
-    if '```json' in text:
-        start = text.find('```json') + 7
-        end = text.find('```', start)
-        if end != -1:
-            text = text[start:end].strip()
-        else:
-            text = text[start:].strip()
-    elif '```' in text:
-        start = text.find('```') + 3
-        end = text.find('```', start)
-        if end != -1:
-            text = text[start:end].strip()
-        else:
-            text = text[start:].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return json.loads(text, strict=False)
 
 
 def _build_content(sections: List[dict]) -> str:
@@ -128,7 +106,12 @@ class FactCheckAgent:
         )
         if not response or not response.strip():
             raise ValueError("LLM 事实核查返回空响应")
-        raw = _extract_json(response)
+        raw = parse_structured_output(
+            FactCheckOutput,
+            response,
+            mode="compat",
+            repair=repair_legacy_json,
+        ).model_dump(mode="json")
         return _normalize_report(raw)
 
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:

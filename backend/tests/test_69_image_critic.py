@@ -104,6 +104,22 @@ class TestEvaluateImage:
 
         assert result["overall_quality"] == 7.0
 
+    def test_evaluate_calculates_missing_overall_quality(self):
+        self.mock_llm.chat.return_value = json.dumps({
+            "scores": {
+                "structural_accuracy": 9,
+                "visual_clarity": 7,
+                "content_fidelity": 8,
+                "syntax_correctness": 8,
+            },
+            "specific_issues": [],
+            "improvement_suggestions": [],
+        })
+
+        result = self.agent.evaluate_image(code="flowchart TB\n    A --> B")
+
+        assert result["overall_quality"] == 8.0
+
 
 class TestImproveImage:
     def setup_method(self):

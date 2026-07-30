@@ -13,10 +13,12 @@
 - DEEP_RESEARCH_MAX_ROUNDS: 最大迭代轮数（默认 3）
 - DEEP_RESEARCH_GAP_THRESHOLD: 缺口数量阈值，低于此值停止（默认 2）
 """
-import json
 import logging
 import os
 from typing import Dict, Any, List
+
+from ..schemas.outputs import DeepResearchAnalysisOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +62,12 @@ class DeepResearchEngine:
                 messages=[{"role": "user", "content": prompt}],
                 response_format={"type": "json_object"},
             )
-            text = response.strip()
-            if '```json' in text:
-                text = text.split('```json')[1].split('```')[0].strip()
-            elif '```' in text:
-                text = text.split('```')[1].split('```')[0].strip()
-            result = json.loads(text)
+            result = parse_structured_output(
+                DeepResearchAnalysisOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             return result.get('gaps', []), result.get('coverage_score', 50)
         except Exception as e:
             logger.warning(f"[DeepResearch] 缺口分析失败: {e}")
