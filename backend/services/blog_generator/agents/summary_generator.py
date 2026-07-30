@@ -8,36 +8,15 @@ SummaryGenerator Agent - 博客导读 + SEO 关键词生成
   - Meta Description（150 字以内）
 """
 
-import json
 import logging
 from typing import Dict, Any
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import SummaryOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
-
-def _extract_json(text: str) -> dict:
-    """从 LLM 响应中提取 JSON"""
-    text = text.strip()
-    if '```json' in text:
-        start = text.find('```json') + 7
-        end = text.find('```', start)
-        if end != -1:
-            text = text[start:end].strip()
-        else:
-            text = text[start:].strip()
-    elif '```' in text:
-        start = text.find('```') + 3
-        end = text.find('```', start)
-        if end != -1:
-            text = text[start:end].strip()
-        else:
-            text = text[start:].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return json.loads(text, strict=False)
 
 class SummaryGeneratorAgent:
     """博客导读 + SEO 关键词生成 Agent"""
@@ -60,7 +39,12 @@ class SummaryGeneratorAgent:
         )
         if not response or not response.strip():
             raise ValueError("LLM 摘要生成返回空响应")
-        return _extract_json(response)
+        return parse_structured_output(
+            SummaryOutput,
+            response,
+            mode="compat",
+            repair=repair_legacy_json,
+        ).model_dump(mode="json")
 
     def run(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """执行摘要生成并写入 state"""

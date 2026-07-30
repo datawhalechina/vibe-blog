@@ -2,13 +2,14 @@
 Questioner Agent - 追问深化
 """
 
-import json
 import logging
 import os
 from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import ContentEvaluationOutput, DepthCheckOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 # 从环境变量读取并行配置，默认为 3
 MAX_WORKERS = int(os.environ.get('BLOG_GENERATOR_MAX_WORKERS', '3'))
@@ -96,20 +97,18 @@ class QuestionerAgent:
                     "vague_points": []
                 }
             
-            result = json.loads(response)
+            result = parse_structured_output(
+                DepthCheckOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             return {
                 "is_detailed_enough": result.get("is_detailed_enough", True),
                 "depth_score": result.get("depth_score", 80),
                 "vague_points": result.get("vague_points", [])
             }
             
-        except json.JSONDecodeError as e:
-            logger.warning(f"深度检查 JSON 解析失败: {e}，响应内容: {response[:200] if response else '空'}，默认通过")
-            return {
-                "is_detailed_enough": True,
-                "depth_score": 80,
-                "vague_points": []
-            }
         except Exception as e:
             logger.error(f"深度检查失败: {e}")
             # 默认通过
@@ -174,14 +173,18 @@ class QuestionerAgent:
                 logger.warning("段落评估返回空响应，使用默认分数")
                 return default_result
 
-            result = json.loads(response)
+            result = parse_structured_output(
+                ContentEvaluationOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             scores = result.get("scores", default_result["scores"])
             # 计算 overall_quality（如果 LLM 没返回）
             score_values = [v for v in scores.values() if isinstance(v, (int, float))]
-            overall = result.get(
-                "overall_quality",
-                round(sum(score_values) / max(len(score_values), 1), 1),
-            )
+            overall = result.get("overall_quality")
+            if overall is None:
+                overall = round(sum(score_values) / max(len(score_values), 1), 1)
 
             eval_result = {
                 "scores": scores,
@@ -192,9 +195,6 @@ class QuestionerAgent:
 
             return eval_result
 
-        except json.JSONDecodeError as e:
-            logger.warning(f"段落评估 JSON 解析失败: {e}")
-            return default_result
         except Exception as e:
             logger.error(f"段落评估失败: {e}")
             return default_result

@@ -8,11 +8,12 @@ Two-stage pipeline:
 Supports progressive degradation retry and fault-tolerant JSON parsing.
 Feature toggle: GOAL_EXTRACTION_ENABLED (default false).
 """
-import json
 import logging
 import os
 from dataclasses import dataclass
-from typing import Optional
+
+from ..schemas.outputs import GoalExtractionOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
@@ -97,14 +98,17 @@ class GoalDirectedExtractor:
                     kwargs["model"] = self._model_name
                 raw = self.llm_service.chat(messages, **kwargs)
 
-                result = self._parse_extraction_json(raw)
-                if result:
-                    return ExtractionResult(
-                        rational=result.get("rational", ""),
-                        evidence=result.get("evidence", ""),
-                        summary=result.get("summary", ""),
-                    )
-                logger.warning(f"Extraction empty, degrading ({i+1}/{len(retry_ratios)})")
+                result = parse_structured_output(
+                    GoalExtractionOutput,
+                    raw,
+                    mode="compat",
+                    repair=repair_legacy_json,
+                )
+                return ExtractionResult(
+                    rational=result.rational,
+                    evidence=result.evidence,
+                    summary=result.summary,
+                )
             except Exception as e:
                 logger.warning(f"LLM extraction failed: {e}, degrading")
 
@@ -123,28 +127,6 @@ class GoalDirectedExtractor:
         except ImportError:
             max_chars = max_tokens * 4
             return text[:max_chars] if len(text) > max_chars else text
-
-    @staticmethod
-    def _parse_extraction_json(raw: str) -> Optional[dict]:
-        """Fault-tolerant JSON parsing."""
-        if not raw or not raw.strip():
-            return None
-        text = raw.strip()
-        if "```json" in text:
-            text = text.split("```json")[1].split("```")[0].strip()
-        elif "```" in text:
-            text = text.split("```")[1].split("```")[0].strip()
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            left = text.find("{")
-            right = text.rfind("}")
-            if left != -1 and right != -1 and left < right:
-                try:
-                    return json.loads(text[left:right + 1])
-                except json.JSONDecodeError:
-                    pass
-        return None
 
     @staticmethod
     def _truncate_chars(text: str, max_chars: int) -> str:

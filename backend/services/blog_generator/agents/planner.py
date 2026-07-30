@@ -2,12 +2,12 @@
 Planner Agent - 大纲规划
 """
 
-import json
 import logging
-import re
 from typing import Dict, Any
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import PlannerOutlineOutput
+from ..structured_output import parse_structured_output, repair_planner_json
 
 logger = logging.getLogger(__name__)
 
@@ -120,53 +120,14 @@ class PlannerAgent:
                     response_format={"type": "json_object"}
                 )
             
-            # 解析 JSON（可能包含 markdown 代码块或思考文本）
             if not response:
                 raise ValueError("LLM 返回空响应")
-            response_text = response.strip()
-            if '```json' in response_text:
-                start = response_text.find('```json') + 7
-                end = response_text.find('```', start)
-                if end != -1:
-                    response_text = response_text[start:end].strip()
-                else:
-                    # 流式模式下可能缺少结尾 ```
-                    response_text = response_text[start:].strip()
-            elif '```' in response_text:
-                start = response_text.find('```') + 3
-                end = response_text.find('```', start)
-                if end != -1:
-                    response_text = response_text[start:end].strip()
-                else:
-                    response_text = response_text[start:].strip()
-
-            # 如果响应包含思考文本（非 JSON），提取第一个 JSON 对象
-            if response_text and not response_text.startswith('{'):
-                json_start = response_text.find('{')
-                if json_start > 0:
-                    logger.info(f"[Planner] 跳过 {json_start} 字符的思考文本，提取 JSON")
-                    response_text = response_text[json_start:]
-
-            # 尝试修复截断的 JSON（流式模式常见问题）
-            try:
-                outline = json.loads(response_text)
-            except json.JSONDecodeError:
-                # 尝试 strict=False
-                try:
-                    outline = json.loads(response_text, strict=False)
-                except json.JSONDecodeError as e:
-                    # 尝试补全截断的 JSON
-                    repaired = self._repair_truncated_json(response_text)
-                    if repaired:
-                        outline = json.loads(repaired)
-                    else:
-                        raise e
-            
-            # 验证必要字段
-            required_fields = ['title', 'sections']
-            for field in required_fields:
-                if field not in outline:
-                    raise ValueError(f"大纲缺少必要字段: {field}")
+            outline = parse_structured_output(
+                PlannerOutlineOutput,
+                response,
+                mode="compat",
+                repair=repair_planner_json,
+            ).model_dump(mode="json")
             
             # 为每个章节添加 ID (如果没有) 和新字段默认值
             for i, section in enumerate(outline.get('sections', [])):
@@ -186,79 +147,9 @@ class PlannerAgent:
 
             return outline
             
-        except json.JSONDecodeError as e:
-            logger.error(f"大纲 JSON 解析失败: {e}")
-            raise ValueError(f"大纲生成失败: JSON 解析错误")
         except Exception as e:
             logger.error(f"大纲生成失败: {e}")
             raise
-    
-    @staticmethod
-    def _repair_truncated_json(text: str) -> str:
-        """尝试修复截断的 JSON（补全缺失的括号和引号）
-
-        策略：逐步从末尾回退，每次删除最后一个不完整的元素，
-        然后补全所有未闭合的括号。最多尝试 20 次。
-        """
-        open_braces = text.count('{') - text.count('}')
-        open_brackets = text.count('[') - text.count(']')
-
-        if open_braces <= 0 and open_brackets <= 0:
-            return ""
-
-        repaired = text.rstrip()
-
-        for attempt in range(20):
-            candidate = repaired.rstrip().rstrip(',')
-
-            # 检查是否在字符串中间（未闭合的引号）
-            in_string = False
-            escaped = False
-            for ch in candidate:
-                if escaped:
-                    escaped = False
-                    continue
-                if ch == '\\':
-                    escaped = True
-                    continue
-                if ch == '"':
-                    in_string = not in_string
-
-            if in_string:
-                candidate += '"'
-
-            # 检查末尾是否是不完整的 key-value（如 "key": 没有值）
-            stripped = candidate.rstrip()
-            if stripped.endswith(':'):
-                candidate = stripped + ' ""'
-            elif re.search(r':\s*$', stripped):
-                candidate = stripped + '""'
-
-            ob = candidate.count('{') - candidate.count('}')
-            ol = candidate.count('[') - candidate.count(']')
-            candidate += ']' * max(0, ol)
-            candidate += '}' * max(0, ob)
-
-            try:
-                json.loads(candidate)
-                logger.warning(f"[Planner] JSON 截断已修复 (attempt {attempt + 1})")
-                return candidate
-            except json.JSONDecodeError:
-                pass
-
-            # 回退策略：删除最后一个不完整的元素
-            last_comma = repaired.rfind(',')
-            last_open_brace = repaired.rfind('{')
-            last_open_bracket = repaired.rfind('[')
-            cutpoint = max(last_comma, last_open_brace, last_open_bracket)
-            if cutpoint <= 0:
-                return ""
-            if cutpoint == last_comma:
-                repaired = repaired[:cutpoint]
-            else:
-                repaired = repaired[:cutpoint + 1]
-
-        return ""
 
     def run(self, state: Dict[str, Any], on_stream: callable = None) -> Dict[str, Any]:
         """

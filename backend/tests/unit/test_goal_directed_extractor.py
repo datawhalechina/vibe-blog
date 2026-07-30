@@ -4,7 +4,6 @@
 Tests for goal-directed web extraction:
 - ExtractionResult dataclass
 - truncate_to_tokens (tiktoken precision)
-- _parse_extraction_json (fault-tolerant JSON parsing)
 - extract() main flow
 - Progressive retry degradation
 - DeepScraper integration (feature toggle)
@@ -96,54 +95,6 @@ class TestTruncateToTokens:
 
 
 # ---------------------------------------------------------------------------
-# _parse_extraction_json
-# ---------------------------------------------------------------------------
-
-class TestParseExtractionJson:
-
-    def test_valid_json(self):
-        raw = '{"rational": "a", "evidence": "b", "summary": "c"}'
-        result = GoalDirectedExtractor._parse_extraction_json(raw)
-        assert result["rational"] == "a"
-        assert result["evidence"] == "b"
-        assert result["summary"] == "c"
-
-    def test_json_with_markdown_code_block(self):
-        raw = '```json\n{"rational": "a", "evidence": "b", "summary": "c"}\n```'
-        result = GoalDirectedExtractor._parse_extraction_json(raw)
-        assert result is not None
-        assert result["summary"] == "c"
-
-    def test_json_with_generic_code_block(self):
-        raw = '```\n{"rational": "x", "evidence": "y", "summary": "z"}\n```'
-        result = GoalDirectedExtractor._parse_extraction_json(raw)
-        assert result is not None
-        assert result["rational"] == "x"
-
-    def test_json_with_surrounding_text(self):
-        raw = 'Here is the result: {"rational": "a", "evidence": "b", "summary": "c"} done.'
-        result = GoalDirectedExtractor._parse_extraction_json(raw)
-        assert result is not None
-        assert result["evidence"] == "b"
-
-    def test_invalid_json_returns_none(self):
-        result = GoalDirectedExtractor._parse_extraction_json("not json at all")
-        assert result is None
-
-    def test_empty_string_returns_none(self):
-        result = GoalDirectedExtractor._parse_extraction_json("")
-        assert result is None
-
-    def test_none_returns_none(self):
-        result = GoalDirectedExtractor._parse_extraction_json(None)
-        assert result is None
-
-    def test_whitespace_only_returns_none(self):
-        result = GoalDirectedExtractor._parse_extraction_json("   \n  ")
-        assert result is None
-
-
-# ---------------------------------------------------------------------------
 # extract() main flow
 # ---------------------------------------------------------------------------
 
@@ -155,6 +106,21 @@ class TestExtract:
         assert result.rational != ""
         assert result.evidence != ""
         assert result.summary != ""
+
+    @pytest.mark.parametrize("language", ["json", ""])
+    def test_accepts_fenced_structured_result(self, mock_llm, sample_content, language):
+        mock_llm.chat.return_value = (
+            f"```{language}\n"
+            '{"rational":"a","evidence":"b","summary":"c"}'
+            "\n```"
+        )
+
+        result = GoalDirectedExtractor(llm_service=mock_llm).extract(
+            sample_content, "RAG"
+        )
+
+        assert result.success is True
+        assert result.summary == "c"
 
     def test_empty_content_returns_failure(self, extractor):
         result = extractor.extract("", "any goal")
@@ -280,4 +246,3 @@ class TestDeepScraperIntegration:
             call_args = mock_llm.chat.call_args
             prompt_content = call_args[0][0][0]["content"]
             assert "specific RAG goal" in prompt_content
-

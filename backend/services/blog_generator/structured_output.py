@@ -32,7 +32,12 @@ _SENSITIVE_MARKER_RE = re.compile(
 _TOKEN_RE = re.compile(r"\b(?:sk|pk|AIza)-?[A-Za-z0-9_-]{8,}\b")
 _PREVIEW_LIMIT = 240
 
-__all__ = ["StructuredOutputError", "parse_structured_output"]
+__all__ = [
+    "StructuredOutputError",
+    "parse_structured_output",
+    "repair_legacy_json",
+    "repair_planner_json",
+]
 
 
 class StructuredOutputError(ValueError):
@@ -152,6 +157,131 @@ def _extract_json_text(raw: str, mode: ParseMode) -> str:
             return fenced_block.group("body").strip()
         raise _DecodeFailure([{"type": "unsupported_fenced_output"}])
     return stripped
+
+
+def repair_legacy_json(raw: str) -> str:
+    """Canonicalize legacy control characters and incomplete JSON fences once."""
+    candidate = _extract_repair_candidate(raw)
+    attempts = (
+        candidate,
+        re.sub(r'(?<!\\)\\(?!["\\/bfnrtu])', r"\\\\", candidate),
+    )
+    for attempt in attempts:
+        try:
+            payload = json.loads(attempt, strict=False)
+        except json.JSONDecodeError:
+            continue
+        return json.dumps(payload, ensure_ascii=False)
+    return raw
+
+
+def repair_planner_json(raw: str) -> str:
+    """Repair Planner-only thought prefixes and bounded truncated JSON output."""
+    candidate = _extract_repair_candidate(raw)
+    json_start = candidate.find("{")
+    if json_start < 0:
+        return raw
+    candidate = candidate[json_start:]
+
+    canonical = repair_legacy_json(candidate)
+    if canonical != candidate:
+        return canonical
+
+    initial_suffix = _json_closure_suffix(candidate)
+    if initial_suffix == "":
+        return raw
+
+    repaired = candidate.rstrip()
+    for _ in range(20):
+        completed = repaired.rstrip().rstrip(",")
+        in_string = False
+        escaped = False
+        for char in completed:
+            if escaped:
+                escaped = False
+                continue
+            if char == "\\":
+                escaped = True
+                continue
+            if char == '"':
+                in_string = not in_string
+        if in_string:
+            completed += '"'
+
+        stripped = completed.rstrip()
+        if re.search(r":\s*$", stripped):
+            completed = stripped + ' ""'
+
+        suffix = _json_closure_suffix(completed)
+        if suffix is not None:
+            completed += suffix
+
+        try:
+            json.loads(completed)
+        except json.JSONDecodeError:
+            pass
+        else:
+            return completed
+
+        cutpoints = (
+            repaired.rfind(","),
+            repaired.rfind("{"),
+            repaired.rfind("["),
+        )
+        cutpoint = max(cutpoints)
+        if cutpoint <= 0:
+            return raw
+        repaired = (
+            repaired[:cutpoint]
+            if cutpoint == cutpoints[0]
+            else repaired[: cutpoint + 1]
+        )
+    return raw
+
+
+def _json_closure_suffix(text: str) -> str | None:
+    stack = []
+    in_string = False
+    escaped = False
+    for char in text:
+        if escaped:
+            escaped = False
+            continue
+        if in_string and char == "\\":
+            escaped = True
+            continue
+        if char == '"':
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if char in "[{":
+            stack.append(char)
+            continue
+        if char in "]}":
+            expected = "[" if char == "]" else "{"
+            if not stack or stack[-1] != expected:
+                return None
+            stack.pop()
+    return "".join("}" if opener == "{" else "]" for opener in reversed(stack))
+
+
+def _extract_repair_candidate(raw: str) -> str:
+    stripped = raw.strip()
+    if not stripped.startswith("```"):
+        return stripped
+
+    first_newline = stripped.find("\n")
+    if first_newline < 0:
+        return stripped
+    label = stripped[3:first_newline].strip().lower()
+    if label not in {"", "json"}:
+        return stripped
+
+    candidate = stripped[first_newline + 1 :]
+    if candidate.rstrip().endswith("```"):
+        candidate = candidate.rstrip()[:-3]
+    return candidate.strip()
 
 
 def _raise_decode_error(

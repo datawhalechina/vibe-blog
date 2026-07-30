@@ -3,13 +3,14 @@ SearchCoordinator Agent - 搜索协调器
 负责管理多轮搜索、检测知识空白、执行细化搜索
 """
 
-import json
 import logging
 import os
 from typing import Dict, Any, List, Optional
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import KnowledgeGapsOutput
 from ..schemas.state import get_max_search_count
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
@@ -88,7 +89,12 @@ class SearchCoordinator:
                 response_format={"type": "json_object"}
             )
             
-            result = json.loads(response)
+            result = parse_structured_output(
+                KnowledgeGapsOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             gaps = result.get('gaps', [])
             
             logger.info(f"检测到 {len(gaps)} 个知识空白")

@@ -5,10 +5,12 @@
 四维评分，筛选高质量结果。失败时降级返回原始结果。
 """
 
-import json
 import logging
 import os
 from typing import Dict, List, Optional
+
+from ..schemas.outputs import CredibilityScoresOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,12 @@ class SourceCredibilityFilter:
                 logger.warning("可信度评估返回空响应，降级返回原始列表")
                 return search_results
 
-            scores = self._parse_response(response)
+            scores = parse_structured_output(
+                CredibilityScoresOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             if not scores:
                 logger.warning("可信度评估解析失败，降级返回原始列表")
                 return search_results
@@ -124,19 +131,3 @@ class SourceCredibilityFilter:
             f"total_score 加权公式：authority*0.30 + freshness*0.25 + relevance*0.30 + depth*0.15\n"
             f"仅返回 JSON 数组，不要包含 markdown 代码块或其他文本。"
         )
-
-    @staticmethod
-    def _parse_response(response: str) -> List[Dict]:
-        """解析 LLM 响应为评分列表"""
-        text = response.strip()
-        if '```json' in text:
-            text = text.split('```json')[1].split('```')[0].strip()
-        elif '```' in text:
-            text = text.split('```')[1].split('```')[0].strip()
-
-        parsed = json.loads(text)
-        if isinstance(parsed, list):
-            return parsed
-        if isinstance(parsed, dict) and 'results' in parsed:
-            return parsed['results']
-        return []

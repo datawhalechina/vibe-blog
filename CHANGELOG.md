@@ -14,9 +14,12 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ### Changed
 - ♻️ **输出 Schema 边界** — 将稳定的 Agent 输出模型迁至独立 `schemas/outputs.py`，并保留原有导入身份兼容。
+- ♻️ **结构化输出消费者迁移** — 将 12 个生成 Agent 与 6 个研究服务统一迁至共享 Pydantic 解析边界，删除重复 JSON 提取器并保留既有重试与降级语义。
+- 🔧 **Planner 截断修复边界** — 将思考前缀与截断 JSON 修复收口为 Planner 专用显式策略，其他消费者仅使用有限的旧格式兼容修复。
 
 ### Tests
 - ✨ **结构化解析契约测试** — 覆盖 JSON/fence、Mapping/BaseModel、类型校验、截断输入、有限修复、多围栏拒绝及错误与日志脱敏。
+- ✨ **结构化消费者回归契约** — 覆盖畸形嵌套输出、原有 fallback、渐进重试与 Planner 截断场景，并用 AST 守卫禁止 18 个目标模块重新引入私有解析器或 `json.loads`。
 
 ## 2026-07-29
 

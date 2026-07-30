@@ -2,7 +2,6 @@
 Artist Agent - 配图生成
 """
 
-import json
 import logging
 import os
 import re
@@ -10,6 +9,12 @@ from typing import Dict, Any, List
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import (
+    ArtistGenerationOutput,
+    ContentEvaluationOutput,
+    MissingDiagramsOutput,
+)
+from ..structured_output import parse_structured_output, repair_legacy_json
 from ...image_service import get_image_service, AspectRatio, ImageSize
 from ..image_enhancement import ImageEnhancementPipeline
 
@@ -33,28 +38,6 @@ IMAGE_BUDGET = {
     'custom': 8,
 }
 
-
-def _extract_json(text: str) -> dict:
-    """从 LLM 响应中提取 JSON（处理 markdown 包裹）"""
-    text = text.strip()
-    if '```json' in text:
-        start = text.find('```json') + 7
-        end = text.find('```', start)
-        if end != -1:
-            text = text[start:end].strip()
-        else:
-            text = text[start:].strip()
-    elif '```' in text:
-        start = text.find('```') + 3
-        end = text.find('```', start)
-        if end != -1:
-            text = text[start:end].strip()
-        else:
-            text = text[start:].strip()
-    try:
-        return json.loads(text)
-    except json.JSONDecodeError:
-        return json.loads(text, strict=False)
 
 def _get_observe_decorator():
     """获取 Langfuse observe 装饰器，未启用时返回空装饰器"""
@@ -356,7 +339,12 @@ class ArtistAgent:
                 response_format={"type": "json_object"}
             )
             
-            result = _extract_json(response)
+            result = parse_structured_output(
+                ArtistGenerationOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             content = result.get("content", "")
             render_method = result.get("render_method", "mermaid")
             caption = result.get("caption", "")
@@ -441,13 +429,17 @@ class ArtistAgent:
             if not response or not response.strip():
                 return default_result
 
-            result = _extract_json(response)
+            result = parse_structured_output(
+                ContentEvaluationOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             scores = result.get("scores", default_result["scores"])
             score_values = [v for v in scores.values() if isinstance(v, (int, float))]
-            overall = result.get(
-                "overall_quality",
-                round(sum(score_values) / max(len(score_values), 1), 1),
-            )
+            overall = result.get("overall_quality")
+            if overall is None:
+                overall = round(sum(score_values) / max(len(score_values), 1), 1)
             return {
                 "scores": scores,
                 "overall_quality": overall,
@@ -646,7 +638,12 @@ class ArtistAgent:
                     response_format={"type": "json_object"}
                 )
                 
-                result = _extract_json(response)
+                result = parse_structured_output(
+                    MissingDiagramsOutput,
+                    response,
+                    mode="compat",
+                    repair=repair_legacy_json,
+                ).model_dump(mode="json")
                 needs_diagrams = result.get('needs_diagrams', [])
                 
                 # 每个章节最多补充 1 个图表

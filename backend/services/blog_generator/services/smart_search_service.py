@@ -2,7 +2,6 @@
 智能知识源搜索服务 - 根据主题智能路由到不同搜索源
 """
 
-import json
 import logging
 import os
 import re
@@ -11,6 +10,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from .search_service import get_search_service
 from .arxiv_service import get_arxiv_service
+from ..schemas.outputs import SearchRouterOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
@@ -334,7 +335,12 @@ class SmartSearchService:
                 response_format={"type": "json_object"}
             )
 
-            result = self._extract_json(response)
+            result = parse_structured_output(
+                SearchRouterOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
 
             # 确保 general 始终包含
             if 'general' not in result.get('sources', []):
@@ -346,29 +352,6 @@ class SmartSearchService:
             logger.warning(f"LLM 路由失败，使用规则匹配: {e}")
             return self._rule_based_routing(topic)
 
-    @staticmethod
-    def _extract_json(text: str) -> dict:
-        """从 LLM 响应中提取 JSON（处理 markdown 包裹）"""
-        text = text.strip()
-        if '```json' in text:
-            start = text.find('```json') + 7
-            end = text.find('```', start)
-            if end != -1:
-                text = text[start:end].strip()
-            else:
-                text = text[start:].strip()
-        elif '```' in text:
-            start = text.find('```') + 3
-            end = text.find('```', start)
-            if end != -1:
-                text = text[start:end].strip()
-            else:
-                text = text[start:].strip()
-        try:
-            return json.loads(text)
-        except json.JSONDecodeError:
-            return json.loads(text, strict=False)
-    
     def _rule_based_routing(self, topic: str) -> Dict[str, Any]:
         """基于规则的简单路由（LLM 不可用时的备选）"""
         topic_lower = topic.lower()

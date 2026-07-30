@@ -6,11 +6,13 @@ LLM 生成 N 个语义互补的子查询 → ThreadPoolExecutor 并行搜索 →
 三级降级：LLM+context → LLM → 硬编码模板。
 """
 
-import json
 import logging
 import os
 from typing import Dict, Any, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
+
+from ..schemas.outputs import QueryListOutput
+from ..structured_output import parse_structured_output, repair_legacy_json
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +88,13 @@ class SubQueryEngine:
             messages=[{"role": "user", "content": prompt}],
             caller="sub_query_engine",
         )
-        return self._parse_queries_response(response)
+        queries = parse_structured_output(
+            QueryListOutput,
+            response,
+            mode="compat",
+            repair=repair_legacy_json,
+        ).root
+        return [query for query in queries if query.strip()]
 
     def _build_sub_query_prompt(self, topic: str, target_audience: str, context: str) -> str:
         if self.prompt_manager and hasattr(self.prompt_manager, 'render_sub_query_generation'):
@@ -117,20 +125,6 @@ class SubQueryEngine:
             f"4. 返回 JSON 数组格式: [{examples}]\n\n"
             f"请直接返回 JSON 数组，不要包含其他内容。"
         )
-
-    @staticmethod
-    def _parse_queries_response(response: str) -> List[str]:
-        text = response.strip()
-        if '```json' in text:
-            text = text.split('```json')[1].split('```')[0].strip()
-        elif '```' in text:
-            text = text.split('```')[1].split('```')[0].strip()
-        result = json.loads(text)
-        if isinstance(result, list):
-            return [q for q in result if isinstance(q, str) and q.strip()]
-        if isinstance(result, dict) and 'queries' in result:
-            return [q for q in result['queries'] if isinstance(q, str) and q.strip()]
-        return []
 
     @staticmethod
     def _hardcoded_queries(topic: str) -> List[str]:

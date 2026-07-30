@@ -11,7 +11,14 @@ from typing import Dict, Any, List, Optional
 from urllib.parse import urlparse
 
 from ..prompts import get_prompt_manager
+from ..schemas.outputs import (
+    GapAnalysisOutput,
+    QueryListOutput,
+    ResearchSummaryOutput,
+    SourceDistillationOutput,
+)
 from ..services.smart_search_service import get_smart_search_service, init_smart_search_service
+from ..structured_output import parse_structured_output, repair_legacy_json
 from ..utils.cache_utils import get_cache_manager
 
 logger = logging.getLogger(__name__)
@@ -181,13 +188,16 @@ class ResearcherAgent:
                 response_format={"type": "json_object"}
             )
             
-            queries = json.loads(response)
-            if isinstance(queries, list):
-                # 确保原始 topic 作为第一个 query（防止 LLM 改写主题）
-                if queries and topic.lower() not in queries[0].lower():
-                    queries.insert(0, topic)
-                return queries
-            return default_queries
+            queries = parse_structured_output(
+                QueryListOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).root
+            # 确保原始 topic 作为第一个 query（防止 LLM 改写主题）
+            if queries and topic.lower() not in queries[0].lower():
+                queries.insert(0, topic)
+            return queries
             
         except Exception as e:
             logger.warning(f"生成搜索查询失败: {e}，使用默认查询")
@@ -410,22 +420,12 @@ class ResearcherAgent:
                 response_format={"type": "json_object"}
             )
 
-            # 提取 JSON（处理 markdown 代码块）
-            json_str = response.strip()
-            if '```json' in json_str:
-                start = json_str.find('```json') + 7
-                end = json_str.find('```', start)
-                json_str = json_str[start:end].strip() if end != -1 else json_str[start:].strip()
-            elif '```' in json_str:
-                start = json_str.find('```') + 3
-                end = json_str.find('```', start)
-                json_str = json_str[start:end].strip() if end != -1 else json_str[start:].strip()
-
-            # 尝试解析 JSON
-            try:
-                result = json.loads(json_str)
-            except json.JSONDecodeError:
-                result = json.loads(json_str, strict=False)
+            result = parse_structured_output(
+                ResearchSummaryOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
             key_concepts = result.get("key_concepts", [])
 
             # 调试：打印实际返回内容
@@ -473,8 +473,6 @@ class ResearcherAgent:
 
             return summary_result
 
-        except json.JSONDecodeError as e:
-            logger.error(f"JSON 解析失败: {e}, 响应内容: {response[:500] if response else 'None'}")
         except Exception as e:
             logger.error(f"整理搜索结果失败: {e}")
 
@@ -533,21 +531,12 @@ class ResearcherAgent:
                 response_format={"type": "json_object"}
             )
 
-            # 提取 JSON
-            json_str = response.strip()
-            if '```json' in json_str:
-                json_str = json_str.split('```json')[1].split('```')[0].strip()
-            elif '```' in json_str:
-                json_str = json_str.split('```')[1].split('```')[0].strip()
-
-            result = json.loads(json_str)
-
-            # 确保必要字段存在
-            result.setdefault('sources', [])
-            result.setdefault('common_themes', [])
-            result.setdefault('contradictions', [])
-            result.setdefault('material_by_type',
-                              {"concepts": [], "cases": [], "data": [], "comparisons": []})
+            result = parse_structured_output(
+                SourceDistillationOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
 
             logger.info(f"🔬 深度提炼完成: {len(result['sources'])} 条素材, "
                         f"{len(result['common_themes'])} 个共同主题, "
@@ -615,19 +604,12 @@ class ResearcherAgent:
                 response_format={"type": "json_object"}
             )
 
-            # 提取 JSON
-            json_str = response.strip()
-            if '```json' in json_str:
-                json_str = json_str.split('```json')[1].split('```')[0].strip()
-            elif '```' in json_str:
-                json_str = json_str.split('```')[1].split('```')[0].strip()
-
-            result = json.loads(json_str)
-
-            # 确保必要字段存在
-            result.setdefault('content_gaps', [])
-            result.setdefault('unique_angles', [])
-            result.setdefault('writing_recommendations', {})
+            result = parse_structured_output(
+                GapAnalysisOutput,
+                response,
+                mode="compat",
+                repair=repair_legacy_json,
+            ).model_dump(mode="json")
 
             logger.info(f"🔍 缺口分析完成: {len(result['content_gaps'])} 个缺口, "
                         f"{len(result['unique_angles'])} 个独特角度")
@@ -804,7 +786,7 @@ class ResearcherAgent:
         ]
         
         # 4. 更新 Instructional Design 相关状态（新增）
-        instructional_analysis = summary.get('instructional_analysis', {})
+        instructional_analysis = summary.get('instructional_analysis') or {}
         state['instructional_analysis'] = instructional_analysis
         state['learning_objectives'] = instructional_analysis.get('learning_objectives', [])
         state['verbatim_data'] = instructional_analysis.get('verbatim_data', [])
