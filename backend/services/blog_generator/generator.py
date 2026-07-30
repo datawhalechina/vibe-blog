@@ -2,6 +2,7 @@
 长文博客生成器 - LangGraph 工作流主入口
 """
 
+import copy
 import logging
 import os
 import threading
@@ -14,6 +15,7 @@ from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
 
 from .schemas.state import SharedState, create_initial_state
+from .schemas.state_contracts import wrap_node_state_contract
 from .style_profile import StyleProfile
 from .agents.researcher import ResearcherAgent
 from .agents.planner import PlannerAgent
@@ -217,30 +219,30 @@ class BlogGenerator:
         """
         workflow = StateGraph(SharedState)
         
-        # 添加节点（102.10 迁移：通过中间件管道包装）
-        workflow.add_node("researcher", self.pipeline.wrap_node("researcher", self._researcher_node))
-        workflow.add_node("planner", self.pipeline.wrap_node("planner", self._planner_node))
-        workflow.add_node("writer", self.pipeline.wrap_node("writer", self._writer_node))
+        # 添加节点（102.10 中间件 + 稳定 SharedState 边界契约）
+        self._add_node(workflow, "researcher", self._researcher_node)
+        self._add_node(workflow, "planner", self._planner_node)
+        self._add_node(workflow, "writer", self._writer_node)
         # 多轮搜索相关节点
-        workflow.add_node("check_knowledge", self.pipeline.wrap_node("check_knowledge", self._check_knowledge_node))
-        workflow.add_node("refine_search", self.pipeline.wrap_node("refine_search", self._refine_search_node))
-        workflow.add_node("enhance_with_knowledge", self.pipeline.wrap_node("enhance_with_knowledge", self._enhance_with_knowledge_node))
+        self._add_node(workflow, "check_knowledge", self._check_knowledge_node)
+        self._add_node(workflow, "refine_search", self._refine_search_node)
+        self._add_node(workflow, "enhance_with_knowledge", self._enhance_with_knowledge_node)
         # 追问和审核节点
-        workflow.add_node("questioner", self.pipeline.wrap_node("questioner", self._questioner_node))
-        workflow.add_node("deepen_content", self.pipeline.wrap_node("deepen_content", self._deepen_content_node))
-        workflow.add_node("coder_and_artist", self.pipeline.wrap_node("coder_and_artist", self._coder_and_artist_node))  # 并行节点
-        workflow.add_node("cross_section_dedup", self.pipeline.wrap_node("cross_section_dedup", self._cross_section_dedup_node))  # 41.09 跨章节去重
-        workflow.add_node("section_evaluate", self.pipeline.wrap_node("section_evaluate", self._section_evaluate_node))  # 段落评估
-        workflow.add_node("section_improve", self.pipeline.wrap_node("section_improve", self._section_improve_node))  # 段落改进
-        workflow.add_node("consistency_check", self.pipeline.wrap_node("consistency_check", self._consistency_check_node))  # 一致性检查
-        workflow.add_node("reviewer", self.pipeline.wrap_node("reviewer", self._reviewer_node))
-        workflow.add_node("revision", self.pipeline.wrap_node("revision", self._revision_node))
-        workflow.add_node("factcheck", self.pipeline.wrap_node("factcheck", self._factcheck_node))
-        workflow.add_node("text_cleanup", self.pipeline.wrap_node("text_cleanup", self._text_cleanup_node))
-        workflow.add_node("humanizer", self.pipeline.wrap_node("humanizer", self._humanizer_node))
-        workflow.add_node("wait_for_images", self.pipeline.wrap_node("wait_for_images", self._wait_for_images_node))
-        workflow.add_node("assembler", self.pipeline.wrap_node("assembler", self._assembler_node))
-        workflow.add_node("summary_generator", self.pipeline.wrap_node("summary_generator", self._summary_generator_node))
+        self._add_node(workflow, "questioner", self._questioner_node)
+        self._add_node(workflow, "deepen_content", self._deepen_content_node)
+        self._add_node(workflow, "coder_and_artist", self._coder_and_artist_node)
+        self._add_node(workflow, "cross_section_dedup", self._cross_section_dedup_node)
+        self._add_node(workflow, "section_evaluate", self._section_evaluate_node)
+        self._add_node(workflow, "section_improve", self._section_improve_node)
+        self._add_node(workflow, "consistency_check", self._consistency_check_node)
+        self._add_node(workflow, "reviewer", self._reviewer_node)
+        self._add_node(workflow, "revision", self._revision_node)
+        self._add_node(workflow, "factcheck", self._factcheck_node)
+        self._add_node(workflow, "text_cleanup", self._text_cleanup_node)
+        self._add_node(workflow, "humanizer", self._humanizer_node)
+        self._add_node(workflow, "wait_for_images", self._wait_for_images_node)
+        self._add_node(workflow, "assembler", self._assembler_node)
+        self._add_node(workflow, "summary_generator", self._summary_generator_node)
         
         # 定义边
         workflow.add_edge(START, "researcher")
@@ -324,6 +326,14 @@ class BlogGenerator:
         workflow.add_edge("summary_generator", END)
         
         return workflow
+
+    def _add_node(self, workflow: StateGraph, node_name: str, handler: Callable) -> None:
+        """Register middleware inside the stable state contract boundary."""
+        middleware_wrapped = self.pipeline.wrap_node(node_name, handler)
+        workflow.add_node(
+            node_name,
+            wrap_node_state_contract(node_name, middleware_wrapped),
+        )
     
     def _researcher_node(self, state: SharedState) -> SharedState:
         """素材收集节点"""
@@ -747,9 +757,13 @@ class BlogGenerator:
         code_count = len(state.get('code_blocks', []))
         logger.info(f"代码生成完成: {code_count} 个代码块")
 
-        # 2. 配图生成（后台异步）
+        # 2. 同步预处理章节，再将独立快照交给后台配图任务
+        state['sections'] = self.artist.preprocess_ascii_flowcharts(
+            state.get('sections', [])
+        )
+        artist_state = copy.deepcopy(state)
         image_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="artist")
-        future = image_executor.submit(self.artist.run, state)
+        future = image_executor.submit(self.artist.run, artist_state)
 
         # 将 Future 存到实例字典，而非 state，避免 LangGraph msgpack 序列化失败
         image_task_id = str(uuid.uuid4())
@@ -780,6 +794,10 @@ class BlogGenerator:
                     logger.info(f"合并 section_images: {len(state['section_images'])} 张")
                 if 'images' in result:
                     state['images'] = result['images']
+                self._merge_artist_image_ids(
+                    state.get('sections', []),
+                    result.get('sections', []),
+                )
 
             image_count = len(state.get('images', []))
             logger.info(f"=== 配图生成完成: {image_count} 张图片 ===")
@@ -798,6 +816,27 @@ class BlogGenerator:
                 executor.shutdown(wait=False)
 
         return state
+
+    @staticmethod
+    def _merge_artist_image_ids(current_sections, artist_sections) -> None:
+        """Merge only image associations, preserving newer section content."""
+        artist_by_id = {
+            section.get('id'): section
+            for section in artist_sections
+            if section.get('id')
+        }
+        for index, current in enumerate(current_sections):
+            artist_section = artist_by_id.get(current.get('id'))
+            if artist_section is None and index < len(artist_sections):
+                artist_section = artist_sections[index]
+            if not artist_section:
+                continue
+
+            image_ids = artist_section.get('image_ids', [])
+            if image_ids:
+                current['image_ids'] = list(dict.fromkeys(
+                    current.get('image_ids', []) + image_ids
+                ))
     
     def _reviewer_node(self, state: SharedState) -> SharedState:
         """质量审核节点"""
