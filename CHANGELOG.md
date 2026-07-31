@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-07-31
+
+### Changed
+- ♻️ **SQLite 持久化分层** — 将连接、迁移及文档、历史、书籍查询拆分至独立 repository，并保留 `DatabaseService` 公开接口作为兼容门面。
+
+### Tests
+- ✨ **数据库分层回归契约** — 覆盖公开与兼容方法签名、连接/迁移覆写钩子、门面委托、共享 runtime、事务回滚、迁移幂等及 repository 依赖方向。
+
 ## 2026-07-30
 
 ### Changed
