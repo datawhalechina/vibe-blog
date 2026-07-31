@@ -6,6 +6,17 @@ import os
 import uuid
 from typing import TypedDict, List, Optional, Literal
 
+from .state_contracts import (
+    CodeBlocksPayload,
+    ImagesPayload,
+    InstructionalAnalysisPayload,
+    KnowledgeGapsPayload,
+    OutlinePayload,
+    QuestionResultsPayload,
+    ReviewIssuesPayload,
+    SectionsPayload,
+)
+
 from .outputs import (
     AudienceAnalysis,
     BlogOutline,
@@ -53,7 +64,7 @@ class SharedState(TypedDict):
     knowledge_source_stats: dict  # 知识来源统计
     
     # Instructional Design 分析 (Researcher 输出)
-    instructional_analysis: Optional[dict]  # 教学设计分析
+    instructional_analysis: Optional[InstructionalAnalysisPayload]  # 教学设计分析
     learning_objectives: List[dict]  # 学习目标列表
     verbatim_data: List[dict]  # 需要原样保留的数据
 
@@ -73,23 +84,23 @@ class SharedState(TypedDict):
     search_count: int  # 当前搜索次数
     max_search_count: int  # 最大搜索次数
     search_history: List[dict]  # 搜索历史记录
-    knowledge_gaps: List[dict]  # 检测到的知识空白
+    knowledge_gaps: KnowledgeGapsPayload  # 检测到的知识空白
     accumulated_knowledge: str  # 累积的背景知识
     
     # 大纲 (Planner 输出)
-    outline: Optional[dict]
+    outline: Optional[OutlinePayload]
     
     # 章节内容 (Writer 输出)
-    sections: List[dict]
+    sections: SectionsPayload
     
     # 代码块 (Coder 输出)
-    code_blocks: List[dict]
+    code_blocks: CodeBlocksPayload
     
     # 图片资源 (Artist 输出)
-    images: List[dict]
+    images: ImagesPayload
     
     # 追问结果 (Questioner 输出)
-    question_results: List[dict]
+    question_results: QuestionResultsPayload
     all_sections_detailed: bool
     questioning_count: int  # 追问次数，防止无限循环
 
@@ -101,7 +112,7 @@ class SharedState(TypedDict):
     
     # 审核结果 (Reviewer 输出)
     review_score: int
-    review_issues: List[dict]
+    review_issues: ReviewIssuesPayload
     review_approved: bool
     revision_count: int  # 修订次数，防止无限循环
 
