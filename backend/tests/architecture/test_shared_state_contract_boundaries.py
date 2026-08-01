@@ -45,23 +45,34 @@ def test_shared_state_uses_named_aliases_for_stable_payloads():
 
 
 def test_contract_nodes_use_the_single_registration_boundary():
-    tree = ast.parse(
+    generator_tree = ast.parse(
         (BACKEND_ROOT / "services/blog_generator/generator.py").read_text()
     )
-    build_workflow = _function(tree, "_build_workflow")
+    builder_tree = ast.parse(
+        (
+            BACKEND_ROOT
+            / "services/blog_generator/orchestrator/graph_builder.py"
+        ).read_text()
+    )
+    build_workflow = _function(builder_tree, "build")
     registered = {
-        call.args[1].value
-        for call in ast.walk(build_workflow)
-        if isinstance(call, ast.Call)
-        and isinstance(call.func, ast.Attribute)
-        and call.func.attr == "_add_node"
-        and len(call.args) >= 2
-        and isinstance(call.args[1], ast.Constant)
+        item.elts[0].value
+        for node in build_workflow.body
+        if isinstance(node, ast.Assign)
+        and any(
+            isinstance(target, ast.Name) and target.id == "nodes"
+            for target in node.targets
+        )
+        and isinstance(node.value, (ast.Tuple, ast.List))
+        for item in node.value.elts
+        if isinstance(item, (ast.Tuple, ast.List))
+        and item.elts
+        and isinstance(item.elts[0], ast.Constant)
     }
 
     assert set(NODE_STATE_CONTRACTS) <= registered
 
-    add_node = _function(tree, "_add_node")
+    add_node = _function(generator_tree, "_add_node")
     called_functions = {
         call.func.id
         for call in ast.walk(add_node)

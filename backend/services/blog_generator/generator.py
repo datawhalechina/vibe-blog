@@ -10,7 +10,7 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Dict, Any, Optional, Literal, Callable
 
-from langgraph.graph import StateGraph, START, END
+from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
 
@@ -42,6 +42,8 @@ from .context_management_middleware import ContextManagementMiddleware
 from .parallel import ParallelTaskExecutor, TaskConfig
 from .llm_proxy import TieredLLMProxy
 from .llm_tier_config import get_agent_tier
+from .orchestrator.execution_runner import GraphExecutionRunner
+from .orchestrator.graph_builder import GraphBuilder
 import uuid
 
 logger = logging.getLogger(__name__)
@@ -198,6 +200,7 @@ class BlogGenerator:
         # 构建工作流
         self.workflow = self._build_workflow()
         self.app = None
+        self._execution_runner = GraphExecutionRunner(self)
 
     def _validate_layer(self, layer_name: str, state: Dict[str, Any]):
         """37.12 层间数据契约校验（仅日志警告，不阻断流程）"""
@@ -217,115 +220,7 @@ class BlogGenerator:
         Returns:
             StateGraph 实例
         """
-        workflow = StateGraph(SharedState)
-        
-        # 添加节点（102.10 中间件 + 稳定 SharedState 边界契约）
-        self._add_node(workflow, "researcher", self._researcher_node)
-        self._add_node(workflow, "planner", self._planner_node)
-        self._add_node(workflow, "writer", self._writer_node)
-        # 多轮搜索相关节点
-        self._add_node(workflow, "check_knowledge", self._check_knowledge_node)
-        self._add_node(workflow, "refine_search", self._refine_search_node)
-        self._add_node(workflow, "enhance_with_knowledge", self._enhance_with_knowledge_node)
-        # 追问和审核节点
-        self._add_node(workflow, "questioner", self._questioner_node)
-        self._add_node(workflow, "deepen_content", self._deepen_content_node)
-        self._add_node(workflow, "coder_and_artist", self._coder_and_artist_node)
-        self._add_node(workflow, "cross_section_dedup", self._cross_section_dedup_node)
-        self._add_node(workflow, "section_evaluate", self._section_evaluate_node)
-        self._add_node(workflow, "section_improve", self._section_improve_node)
-        self._add_node(workflow, "consistency_check", self._consistency_check_node)
-        self._add_node(workflow, "reviewer", self._reviewer_node)
-        self._add_node(workflow, "revision", self._revision_node)
-        self._add_node(workflow, "factcheck", self._factcheck_node)
-        self._add_node(workflow, "text_cleanup", self._text_cleanup_node)
-        self._add_node(workflow, "humanizer", self._humanizer_node)
-        self._add_node(workflow, "wait_for_images", self._wait_for_images_node)
-        self._add_node(workflow, "assembler", self._assembler_node)
-        self._add_node(workflow, "summary_generator", self._summary_generator_node)
-        
-        # 定义边
-        workflow.add_edge(START, "researcher")
-        workflow.add_edge("researcher", "planner")
-        workflow.add_edge("planner", "writer")
-        
-        # Writer 后：mini 模式跳过知识空白检查，直接进入 questioner
-        workflow.add_conditional_edges(
-            "writer",
-            self._should_check_knowledge,
-            {
-                "check": "check_knowledge",
-                "skip": "questioner"
-            }
-        )
-        
-        # 条件边：检查后决定是搜索还是继续到 Questioner
-        workflow.add_conditional_edges(
-            "check_knowledge",
-            self._should_refine_search,
-            {
-                "search": "refine_search",
-                "continue": "questioner"
-            }
-        )
-        
-        # 搜索后增强内容，然后回到知识检查
-        workflow.add_edge("refine_search", "enhance_with_knowledge")
-        workflow.add_edge("enhance_with_knowledge", "check_knowledge")
-        
-        # 条件边：追问后决定是深化还是继续
-        workflow.add_conditional_edges(
-            "questioner",
-            self._should_deepen,
-            {
-                "deepen": "deepen_content",
-                "continue": "section_evaluate"  # 进入段落评估
-            }
-        )
-        # 深化后判断是否需要继续追问（避免已达轮数上限仍执行 questioner）
-        workflow.add_conditional_edges(
-            "deepen_content",
-            self._should_continue_questioning,
-            {
-                "questioner": "questioner",
-                "section_evaluate": "section_evaluate"
-            }
-        )
-
-        # 段落评估 → 条件边：需要改进则进入改进节点，否则跳过
-        workflow.add_conditional_edges(
-            "section_evaluate",
-            self._should_improve_sections,
-            {
-                "improve": "section_improve",
-                "continue": "coder_and_artist",
-            }
-        )
-        workflow.add_edge("section_improve", "section_evaluate")  # 改进后重新评估
-        
-        # Coder 和 Artist 并行执行（通过单个节点内部并行实现）
-        workflow.add_edge("coder_and_artist", "cross_section_dedup")
-        workflow.add_edge("cross_section_dedup", "consistency_check")
-        workflow.add_edge("consistency_check", "reviewer")
-        
-        # 条件边：审核后决定是修订还是进入去 AI 味
-        workflow.add_conditional_edges(
-            "reviewer",
-            self._should_revise,
-            {
-                "revision": "revision",
-                "assemble": "factcheck"
-            }
-        )
-        workflow.add_edge("revision", "reviewer")  # 修订后重新审核
-        workflow.add_edge("factcheck", "text_cleanup")  # 事实核查后文本清理
-        workflow.add_edge("text_cleanup", "humanizer")  # 文本清理后去 AI 味
-        workflow.add_edge("humanizer", "wait_for_images")  # 去 AI 味后等待配图
-        workflow.add_edge("wait_for_images", "assembler")  # 配图就绪后组装
-        workflow.add_edge("assembler", "summary_generator")
-        workflow.add_edge("summary_generator", END)
-        
-        return workflow
+        return GraphBuilder(self).build()
 
     def _add_node(self, workflow: StateGraph, node_name: str, handler: Callable) -> None:
         """Register middleware inside the stable state contract boundary."""
@@ -1286,146 +1181,14 @@ class BlogGenerator:
         Returns:
             生成结果
         """
-        if self.app is None:
-            self.compile()
-
-        # 根据 StyleProfile 配置并行执行引擎
-        style = StyleProfile.from_target_length(target_length)
-        self.executor = ParallelTaskExecutor(enable_parallel=style.enable_parallel)
-
-        # 创建 Token 追踪器并注入 LLMService
-        token_tracker = None
-        cost_tracker = None
-        try:
-            import os
-            if os.environ.get('TOKEN_TRACKING_ENABLED', 'true').lower() == 'true':
-                from utils.token_tracker import TokenTracker
-                token_tracker = TokenTracker()
-                self.llm.token_tracker = token_tracker
-            # 41.08 成本追踪增强
-            if os.environ.get('COST_TRACKING_ENABLED', 'false').lower() == 'true':
-                from utils.cost_tracker import CostTracker
-                cost_tracker = CostTracker()
-                self.llm._cost_tracker = cost_tracker
-        except Exception:
-            pass
-
-        # 创建结构化任务日志
-        task_log = None
-        try:
-            import os as _os
-            if _os.environ.get('BLOG_TASK_LOG_ENABLED', 'true').lower() == 'true':
-                from .utils.task_log import BlogTaskLog
-                task_log = BlogTaskLog(
-                    topic=topic,
-                    article_type=article_type,
-                    target_length=target_length,
-                )
-                self.task_log = task_log
-                # 注入到中间件，自动记录每个节点耗时
-                self._task_log_middleware.set_task_log(task_log)
-        except Exception:
-            pass
-
-        # 创建 ToolManager 并注册现有工具（37.09）
-        try:
-            from utils.tool_manager import BlogToolManager
-            tool_manager = BlogToolManager(task_log=task_log)
-            if self.search_service:
-                tool_manager.register(
-                    "web_search", self.search_service.search,
-                    description="搜索互联网获取背景知识", timeout=30,
-                )
-            self.tool_manager = tool_manager
-        except Exception:
-            pass
-
-        # 创建初始状态
-        initial_state = create_initial_state(
+        return self._execution_runner.generate(
             topic=topic,
             article_type=article_type,
             target_audience=target_audience,
             target_length=target_length,
-            source_material=source_material
+            source_material=source_material,
+            on_progress=on_progress,
         )
-
-        logger.info(f"开始生成博客: {topic}")
-        logger.info(f"  类型: {article_type}, 受众: {target_audience}, 长度: {target_length}")
-        
-        # 执行工作流
-        config = self._build_config(initial_state)
-        logger.info(f"[RecursionBudget] limit={config['recursion_limit']}")
-
-        try:
-            final_state = self.app.invoke(initial_state, config)
-            
-            logger.info("博客生成完成!")
-
-            # 输出 Token 用量摘要
-            token_summary = None
-            if token_tracker:
-                logger.info(token_tracker.format_summary())
-                token_summary = token_tracker.get_summary()
-
-            # 41.08 成本摘要
-            cost_summary = None
-            if cost_tracker:
-                logger.info(cost_tracker.format_summary())
-                cost_summary = cost_tracker.get_summary()
-
-            # 完成任务日志
-            if task_log:
-                task_log.complete(
-                    score=final_state.get('review_score', 0),
-                    word_count=len(final_state.get('final_markdown', '')),
-                    revision_rounds=final_state.get('revision_count', 0),
-                )
-                if token_summary:
-                    task_log.token_summary = token_summary
-                try:
-                    task_log.save()
-                except Exception as save_err:
-                    logger.warning(f"任务日志保存失败: {save_err}")
-                logger.info(task_log.get_summary())
-
-            result = {
-                "success": True,
-                "markdown": final_state.get('final_markdown', ''),
-                "outline": final_state.get('outline', {}),
-                "sections_count": len(final_state.get('sections', [])),
-                "images_count": len(final_state.get('images', [])),
-                "code_blocks_count": len(final_state.get('code_blocks', [])),
-                "review_score": final_state.get('review_score', 0),
-                "seo_keywords": final_state.get('seo_keywords', []),
-                "social_summary": final_state.get('social_summary', ''),
-                "meta_description": final_state.get('meta_description', ''),
-                "error": None
-            }
-            if token_summary:
-                result["token_summary"] = token_summary
-            if cost_summary:
-                result["cost_summary"] = cost_summary
-
-            # 37.14/37.16 博客衍生物生成（Skill 后处理）
-            derivatives = self._run_derivative_skills(final_state)
-            if derivatives:
-                result["derivatives"] = derivatives
-
-            return result
-            
-        except Exception as e:
-            logger.error(f"博客生成失败: {e}", exc_info=True)
-            if task_log:
-                task_log.fail(str(e))
-                try:
-                    task_log.save()
-                except Exception:
-                    pass
-            return {
-                "success": False,
-                "markdown": "",
-                "error": str(e)
-            }
     
     async def generate_stream(
         self,
@@ -1448,22 +1211,11 @@ class BlogGenerator:
         Yields:
             生成进度和中间结果
         """
-        if self.app is None:
-            self.compile()
-        
-        initial_state = create_initial_state(
+        async for event in self._execution_runner.generate_stream(
             topic=topic,
             article_type=article_type,
             target_audience=target_audience,
             target_length=target_length,
-            source_material=source_material
-        )
-
-        config = self._build_config(initial_state)
-        logger.info(f"[RecursionBudget] limit={config['recursion_limit']}")
-        for event in self.app.stream(initial_state, config):
-            for node_name, state in event.items():
-                yield {
-                    "stage": node_name,
-                    "state": state
-                }
+            source_material=source_material,
+        ):
+            yield event

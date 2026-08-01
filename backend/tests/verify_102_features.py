@@ -444,9 +444,11 @@ def benefit_full_integration():
     """验证所有 102 特性已集成到 BlogGenerator 主流程"""
     import inspect
     from services.blog_generator.generator import BlogGenerator
+    from services.blog_generator.orchestrator.graph_builder import GraphBuilder
 
     init_src = inspect.getsource(BlogGenerator.__init__)
-    workflow_src = inspect.getsource(BlogGenerator._build_workflow)
+    workflow_src = inspect.getsource(GraphBuilder.build)
+    add_node_src = inspect.getsource(BlogGenerator._add_node)
     planner_src = inspect.getsource(BlogGenerator._planner_node)
     writer_src = inspect.getsource(BlogGenerator._writer_node)
 
@@ -485,18 +487,22 @@ def benefit_full_integration():
     )
     call_chain["researcher → ToolRegistry (102.08)"] = "_tool_registry" in researcher_src
 
-    wrap_count = workflow_src.count("pipeline.wrap_node")
-    node_count = workflow_src.count("add_node")
+    wraps_contract = (
+        "generator._add_node" in workflow_src
+        and "for node_name, handler in nodes" in workflow_src
+        and "pipeline.wrap_node" in add_node_src
+        and "wrap_node_state_contract" in add_node_src
+    )
 
     lines = []
     for name, ok in components.items():
         lines.append(f"  {'✓' if ok else '✗'} {name}")
-    lines.append(f"节点包装: {wrap_count}/{node_count} 个节点通过 wrap_node 统一管理")
+    lines.append(f"统一节点注册边界: {'✓' if wraps_contract else '✗'}")
     lines.append("")
     lines.append("主流程调用链:")
     for name, ok in call_chain.items():
         lines.append(f"  {'✓' if ok else '✗'} {name}")
-    all_ok = all(components.values()) and all(call_chain.values())
+    all_ok = all(components.values()) and all(call_chain.values()) and wraps_contract
     assert all_ok, f"部分组件未集成: {[k for k, v in {**components, **call_chain}.items() if not v]}"
     lines.append("收益: 所有 102 特性已接入主流程，不再是孤岛代码")
     return "\n".join(lines)

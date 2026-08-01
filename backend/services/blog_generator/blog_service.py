@@ -16,6 +16,11 @@ from infrastructure.paths import RuntimePaths
 
 from .queue_bridge import update_queue_status, update_queue_progress
 from .generator import BlogGenerator
+from .lifecycle.result_pipeline import (
+    GenerationResultPipeline,
+    GenerationResultRequest,
+)
+from .lifecycle.task_events import TaskEventBridge
 from .schemas.state import create_initial_state
 from .services.search_service import SearchService, init_search_service, get_search_service
 from .post_processors.markdown_formatter import MarkdownFormatter
@@ -66,6 +71,7 @@ class BlogService:
             knowledge_service=knowledge_service
         )
         self.generator.compile()
+        self._result_pipeline = GenerationResultPipeline(self)
 
         # 101.113: 记录正在等待大纲确认的任务（用于 resume 时查找 config）
         self._interrupted_tasks: Dict[str, Dict] = {}  # task_id -> {config, task_manager, ...}
@@ -565,131 +571,13 @@ class BlogService:
         执行生成流程，发送 SSE 事件
         """
         import time
-        import logging
-        
-        # 创建一个自定义日志处理器，将日志推送到前端
-        class SSELogHandler(logging.Handler):
-            def __init__(self, task_manager, task_id):
-                super().__init__()
-                self.task_manager = task_manager
-                self.task_id = task_id
-                
-            def emit(self, record):
-                if self.task_manager and record.name.startswith('services.blog_generator'):
-                    # 队列已销毁则自动移除自身，防止 handler 泄漏
-                    if not self.task_manager.get_queue(self.task_id):
-                        logging.getLogger(record.name).removeHandler(self)
-                        return
-                    msg = self.format(record)
-                    self.task_manager.send_event(self.task_id, 'log', {
-                        'level': record.levelname,
-                        'logger': record.name.split('.')[-1],
-                        'message': msg
-                    })
-                    # 识别搜索日志，额外推送结构化 result 事件
-                    self._emit_structured_search_event(msg, record)
+        event_bridge = TaskEventBridge(self.generator, task_manager, task_id)
+        sse_handler = event_bridge.attach()
+        sse_logger_names = event_bridge.logger_names
 
-            def _emit_structured_search_event(self, msg, record):
-                """从日志中识别搜索/爬取模式，推送结构化 result 事件"""
-                import re
-                import json as _json
-                try:
-                    # 搜索开始: "使用智谱 Web Search 搜索: xxx" 或 "启动智能知识源搜索"
-                    m = re.search(r'(?:Web Search 搜索|智能.*搜索)[：:]\s*(.+)', msg)
-                    if m:
-                        self.task_manager.send_event(self.task_id, 'result', {
-                            'type': 'search_started',
-                            'data': {'query': m.group(1).strip()}
-                        })
-                        return
-                    # 搜索请求参数: 包含 search_query 的 JSON
-                    if '请求参数' in msg and 'search_query' in msg:
-                        m2 = re.search(r'\{.*\}', msg)
-                        if m2:
-                            try:
-                                payload = _json.loads(m2.group(0))
-                                self.task_manager.send_event(self.task_id, 'result', {
-                                    'type': 'search_started',
-                                    'data': {'query': payload.get('search_query', '')}
-                                })
-                            except _json.JSONDecodeError:
-                                pass
-                        return
-                    # 深度抓取完成: "深度抓取完成: N 篇高质量素材"
-                    m3 = re.search(r'深度抓取完成[：:]\s*(\d+)', msg)
-                    if m3:
-                        self.task_manager.send_event(self.task_id, 'result', {
-                            'type': 'crawl_completed',
-                            'data': {'count': int(m3.group(1))}
-                        })
-                        return
-                    # 智能搜索完成: "智能搜索完成，使用搜索源: [...]"
-                    if '智能搜索完成' in msg:
-                        self.task_manager.send_event(self.task_id, 'result', {
-                            'type': 'search_completed',
-                            'data': {'message': msg}
-                        })
-                        return
-                except Exception:
-                    pass
-        
-        # 添加日志处理器
-        sse_handler = None
-        sse_logger_names = [
-            "services.blog_generator.generator",
-            "services.blog_generator.agents.researcher",
-            "services.blog_generator.agents.planner",
-            "services.blog_generator.agents.writer",
-            "services.blog_generator.agents.questioner",
-            "services.blog_generator.agents.coder",
-            "services.blog_generator.agents.artist",
-            "services.blog_generator.agents.reviewer",
-            "services.blog_generator.agents.assembler",
-            "services.blog_generator.agents.search_coordinator",
-            "services.blog_generator.services.search_service",
-            "services.media.image_service",
-        ]
-        if task_manager:
-            sse_handler = SSELogHandler(task_manager, task_id)
-            sse_handler.setLevel(logging.INFO)
-            sse_handler.setFormatter(logging.Formatter('%(message)s'))
-            
-            # 给所有 blog_generator 相关的 logger 添加处理器
-            for logger_name in sse_logger_names:
-                logging.getLogger(logger_name).addHandler(sse_handler)
-        
         # 等待 SSE 连接建立
         time.sleep(0.5)
-
-        # 注入 SSE 事件推送到 LLMService（37.34）
-        if task_manager:
-            try:
-                llm = self.generator.llm
-                llm.task_manager = task_manager
-                llm.task_id = task_id
-                # v2 方案 10: LLM 调用完整日志
-                from utils.llm_logger import LLMCallLogger
-                llm.llm_logger = LLMCallLogger(task_id)
-            except Exception:
-                pass
-
-        # 注入 task_manager 到 researcher、search_service、writer（101.03 SSE 事件推送）
-        if task_manager:
-            try:
-                researcher = self.generator.researcher
-                researcher.task_manager = task_manager
-                researcher.task_id = task_id
-                if researcher.search_service:
-                    researcher.search_service.task_manager = task_manager
-                    researcher.search_service.task_id = task_id
-            except Exception:
-                pass
-            try:
-                writer = self.generator.writer
-                writer.task_manager = task_manager
-                writer.task_id = task_id
-            except Exception:
-                pass
+        event_bridge.inject_dependencies()
 
         # 创建 Token 追踪器（37.31）
         token_tracker = None
@@ -1174,6 +1062,7 @@ class BlogService:
                     'article_config': article_config,
                     'token_tracker': token_tracker,
                     'task_log': task_log,
+                    'event_bridge': event_bridge,
                     'sse_handler': sse_handler,
                     'sse_logger_names': sse_logger_names,
                 }
@@ -1181,204 +1070,28 @@ class BlogService:
                 _interrupted = True
                 return
 
-            # 获取最终状态
             final_state = snapshot.values
-            markdown_content = self._validate_final_state(final_state)
-            
-            # 生成封面架构图（基于全文内容）
-            outline = final_state.get('outline') or {}
-            # 从 final_state 获取图片风格参数
-            image_style = final_state.get('image_style', '')
-            cover_image_result = None
-            if generate_images:
-                cover_image_result = self._generate_cover_image(
-                    title=outline.get('title', topic),
-                    topic=topic,
-                    full_content=markdown_content,
-                    task_manager=task_manager,
+            result_pipeline = getattr(self, "_result_pipeline", None)
+            if result_pipeline is None:
+                result_pipeline = GenerationResultPipeline(self)
+            result = result_pipeline.finalize(
+                GenerationResultRequest(
                     task_id=task_id,
-                    image_style=image_style,
-                    video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
-                )
-            else:
-                logger.info("图片生成已禁用，跳过封面图")
-            # 解构返回值：(外网URL, 本地路径, 文章摘要)
-            cover_image_url = cover_image_result[0] if cover_image_result else None
-            cover_image_path = cover_image_result[1] if cover_image_result else None
-            article_summary = cover_image_result[2] if cover_image_result and len(cover_image_result) > 2 else None
-            
-            # 自动保存 Markdown 到文件（包含封面图）
-            saved_path = None
-            
-            # 如果有封面图，在 Markdown 中插入封面图
-            markdown_with_cover = markdown_content
-            if cover_image_path and markdown_content:
-                title = outline.get('title', topic)
-                # 判断是 OSS URL 还是本地路径
-                if cover_image_path.startswith('http'):
-                    # OSS URL，直接使用
-                    cover_image_ref = cover_image_path
-                else:
-                    # 本地路径，使用相对路径
-                    cover_filename = os.path.basename(cover_image_path)
-                    cover_image_ref = f"./images/{cover_filename}"
-                cover_section = f"\n![{title} - 架构图]({cover_image_ref})\n\n---\n\n"
-                # 在第一个 ## 之前插入封面图
-                lines = markdown_content.split('\n')
-                insert_idx = 0
-                for i, line in enumerate(lines):
-                    if line.startswith('## ') and i > 0:
-                        insert_idx = i
-                        break
-                if insert_idx > 0:
-                    lines.insert(insert_idx, cover_section)
-                    markdown_with_cover = '\n'.join(lines)
-                else:
-                    markdown_with_cover = cover_section + markdown_content
-            
-            if markdown_content:
-                saved_path = self._save_markdown(
-                    task_id=task_id,
-                    markdown=markdown_content,
-                    outline=outline,
-                    cover_image_path=cover_image_path
-                )
-            
-            # 生成封面动画（如果用户选择了该选项且功能已启用）
-            cover_video_path = None
-            cover_video_enabled = os.environ.get('COVER_VIDEO_ENABLED', 'true').lower() == 'true'
-            if generate_cover_video and cover_image_url and cover_video_enabled:
-                # 获取章节配图（用于多图序列模式）
-                section_images = final_state.get('section_images', [])
-                cover_video_path = self._generate_cover_video(
-                    history_id=task_id,
-                    cover_image_url=cover_image_url,
-                    video_aspect_ratio=video_aspect_ratio,
-                    task_manager=task_manager,
-                    task_id=task_id,
-                    section_images=section_images
-                )
-            
-            # 构建 citations 列表（合并 search_results + top_references，URL 去重）
-            citations = []
-            seen_urls = set()
-            for src_list_key in ('search_results', 'top_references'):
-                for r in (final_state.get(src_list_key) or []):
-                    url = r.get('url') or r.get('source', '')
-                    if not url or url in seen_urls:
-                        continue
-                    seen_urls.add(url)
-                    try:
-                        from urllib.parse import urlparse
-                        domain = urlparse(url).hostname or ''
-                    except Exception:
-                        domain = ''
-                    citations.append({
-                        'url': url,
-                        'title': r.get('title', ''),
-                        'domain': domain,
-                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
-                    })
-
-            # 保存历史记录（使用包含封面图的 markdown）
-            try:
-                from services.database_service import get_db_service
-                import json
-                db_service = get_db_service()
-                db_service.save_history(
-                    history_id=task_id,
                     topic=topic,
                     article_type=article_type,
                     target_length=target_length,
-                    markdown_content=markdown_with_cover,
-                    outline=json.dumps(final_state.get('outline') or {}, ensure_ascii=False),
-                    sections_count=len(final_state.get('sections', [])),
-                    code_blocks_count=len(final_state.get('code_blocks', [])),
-                    images_count=len(final_state.get('images', [])),
-                    review_score=final_state.get('review_score', 0),
-                    cover_image=cover_image_path,
-                    cover_video=cover_video_path,
-                    target_sections_count=article_config.get('sections_count'),
-                    target_images_count=article_config.get('images_count'),
-                    target_code_blocks_count=article_config.get('code_blocks_count'),
-                    target_word_count=article_config.get('target_word_count'),
-                    citations=json.dumps(citations, ensure_ascii=False) if citations else None
-                )
-                logger.info(f"历史记录已保存: {task_id}")
-
-                self._send_completion_event(
-                    task_manager=task_manager,
-                    task_id=task_id,
                     final_state=final_state,
-                    markdown=markdown_with_cover,
-                    saved_path=saved_path,
-                    cover_video_path=cover_video_path,
-                    citations=citations,
+                    article_config=article_config,
+                    generate_images=generate_images,
+                    generate_cover_video=generate_cover_video,
+                    video_aspect_ratio=video_aspect_ratio,
+                    task_manager=task_manager,
+                    token_tracker=token_tracker,
+                    task_log=task_log,
+                    record_memory=True,
                 )
-
-                # 102.03: 记录用户行为到记忆存储
-                if self.generator._memory_storage:
-                    try:
-                        user_id = 'default'
-                        self.generator._memory_storage.add_fact(
-                            user_id,
-                            f"生成了关于 {topic} 的 {article_type} 文章",
-                            category="behavior",
-                            confidence=0.8,
-                            source=f"task:{task_id}",
-                        )
-                    except Exception as e:
-                        logger.debug(f"记忆记录跳过: {e}")
-
-                # 保存博客摘要（复用封面图生成时的摘要，避免重复调用 LLM）
-                try:
-                    summary_to_save = article_summary
-                    # 如果没有摘要（封面图生成失败或跳过），则单独生成
-                    if not summary_to_save:
-                        summary_to_save = extract_article_summary(
-                            llm_client=self.generator.llm,
-                            title=topic,
-                            content=markdown_with_cover,
-                            max_length=500
-                        )
-                    
-                    if summary_to_save:
-                        # 截取前 500 字作为摘要
-                        summary_to_save = summary_to_save[:500]
-                        db_service.update_history_summary(task_id, summary_to_save)
-                        logger.info(f"博客摘要已保存: {task_id}")
-                except Exception as e:
-                    logger.warning(f"保存博客摘要失败: {e}")
-                    
-            except Exception as e:
-                logger.warning(f"保存历史记录失败: {e}")
-                raise RuntimeError(f"保存历史记录失败: {e}") from e
-            
-            # 完成 Token 追踪（37.31）
-            token_summary = None
-            if token_tracker:
-                try:
-                    logger.info(token_tracker.format_summary())
-                    token_summary = token_tracker.get_summary()
-                except Exception as e:
-                    logger.warning(f"Token 摘要生成失败: {e}")
-
-            # 完成结构化任务日志（37.08）
-            if task_log:
-                try:
-                    task_log.complete(
-                        score=final_state.get('review_score', 0),
-                        word_count=len(final_state.get('final_markdown', '')),
-                        revision_rounds=final_state.get('revision_count', 0),
-                    )
-                    if token_summary:
-                        task_log.token_summary = token_summary
-                    task_log.save()
-                    logger.info(task_log.get_summary())
-                except Exception as e:
-                    logger.warning(f"任务日志保存失败: {e}")
-
-            logger.info(f"博客生成完成: {task_id}, 保存到: {saved_path}")
+            )
+            logger.info(f"博客生成完成: {task_id}, 保存到: {result.saved_path}")
 
         except Exception as e:
             logger.error(f"博客生成失败 [{task_id}]: {e}", exc_info=True)
@@ -1396,9 +1109,8 @@ class BlogService:
             update_queue_status(task_id, "failed", error_msg=str(e))
         finally:
             # 清理日志处理器（interrupt 暂停时不清理，留给 _run_resume）
-            if sse_handler and not locals().get('_interrupted'):
-                for logger_name in sse_logger_names:
-                    logging.getLogger(logger_name).removeHandler(sse_handler)
+            if not locals().get('_interrupted'):
+                event_bridge.close()
             # 清理按任务分离的文本日志 handler
             if task_log_handler and not locals().get('_interrupted'):
                 from logging_config import remove_task_logger
@@ -1440,6 +1152,7 @@ class BlogService:
         article_config = task_info.get('article_config', {})
         token_tracker = task_info.get('token_tracker')
         task_log = task_info.get('task_log')
+        event_bridge = task_info.get('event_bridge')
         sse_handler = task_info.get('sse_handler')
         sse_logger_names = task_info.get('sse_logger_names', [])
 
@@ -1630,197 +1343,29 @@ class BlogService:
                                 }
                             })
 
-            # 获取最终状态
             final_state = self.generator.app.get_state(config).values
-            markdown_content = self._validate_final_state(final_state)
-
-            # 封面图 + 保存历史 + 完成事件（复用 _run_generation 逻辑）
-            outline = final_state.get('outline') or {}
-            image_style = final_state.get('image_style', '')
-            cover_image_result = None
-            if generate_images:
-                cover_image_result = self._generate_cover_image(
-                    title=outline.get('title', topic),
-                    topic=topic,
-                    full_content=markdown_content,
-                    task_manager=task_manager,
+            result_pipeline = getattr(self, "_result_pipeline", None)
+            if result_pipeline is None:
+                result_pipeline = GenerationResultPipeline(self)
+            result = result_pipeline.finalize(
+                GenerationResultRequest(
                     task_id=task_id,
-                    image_style=image_style,
-                    video_aspect_ratio=video_aspect_ratio if generate_cover_video else "16:9"
-                )
-            else:
-                logger.info("图片生成已禁用，跳过封面图")
-            cover_image_url = cover_image_result[0] if cover_image_result else None
-            cover_image_path = cover_image_result[1] if cover_image_result else None
-            article_summary = cover_image_result[2] if cover_image_result and len(cover_image_result) > 2 else None
-
-            markdown_with_cover = markdown_content
-            if cover_image_path and markdown_content:
-                title_str = outline.get('title', topic)
-                if cover_image_path.startswith('http'):
-                    cover_image_ref = cover_image_path
-                else:
-                    cover_filename = os.path.basename(cover_image_path)
-                    cover_image_ref = f"./images/{cover_filename}"
-                cover_section = f"\n![{title_str} - 架构图]({cover_image_ref})\n\n---\n\n"
-                lines = markdown_content.split('\n')
-                insert_idx = 0
-                for i, line in enumerate(lines):
-                    if line.startswith('## ') and i > 0:
-                        insert_idx = i
-                        break
-                if insert_idx > 0:
-                    lines.insert(insert_idx, cover_section)
-                    markdown_with_cover = '\n'.join(lines)
-                else:
-                    markdown_with_cover = cover_section + markdown_content
-
-            saved_path = None
-            if markdown_content:
-                saved_path = self._save_markdown(
-                    task_id=task_id,
-                    markdown=markdown_content,
-                    outline=outline,
-                    cover_image_path=cover_image_path
-                )
-
-            # 封面动画
-            cover_video_path = None
-            cover_video_enabled = os.environ.get('COVER_VIDEO_ENABLED', 'true').lower() == 'true'
-            if generate_cover_video and cover_image_url and cover_video_enabled:
-                section_images = final_state.get('section_images', [])
-                cover_video_path = self._generate_cover_video(
-                    history_id=task_id,
-                    cover_image_url=cover_image_url,
-                    video_aspect_ratio=video_aspect_ratio,
-                    task_manager=task_manager,
-                    task_id=task_id,
-                    section_images=section_images
-                )
-
-            # 保存历史记录
-            try:
-                from services.database_service import get_db_service
-                import json
-                db_service = get_db_service()
-                
-                # 构建 citations（复用 _run_generation 逻辑）
-                citations = []
-                seen_urls = set()
-                for src_list_key in ('search_results', 'top_references'):
-                    for r in (final_state.get(src_list_key) or []):
-                        url = r.get('url') or r.get('source', '')
-                        if not url or url in seen_urls:
-                            continue
-                        seen_urls.add(url)
-                        try:
-                            from urllib.parse import urlparse
-                            domain = urlparse(url).hostname or ''
-                        except Exception:
-                            domain = ''
-                        citations.append({
-                            'url': url,
-                            'title': r.get('title', ''),
-                            'domain': domain,
-                            'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
-                        })
-                
-                db_service.save_history(
-                    history_id=task_id,
                     topic=topic,
                     article_type=article_type,
                     target_length=target_length,
-                    markdown_content=markdown_with_cover,
-                    outline=json.dumps(final_state.get('outline') or {}, ensure_ascii=False),
-                    sections_count=len(final_state.get('sections', [])),
-                    code_blocks_count=len(final_state.get('code_blocks', [])),
-                    images_count=len(final_state.get('images', [])),
-                    review_score=final_state.get('review_score', 0),
-                    cover_image=cover_image_path,
-                    cover_video=cover_video_path,
-                    target_sections_count=article_config.get('sections_count'),
-                    target_images_count=article_config.get('images_count'),
-                    target_code_blocks_count=article_config.get('code_blocks_count'),
-                    target_word_count=article_config.get('target_word_count'),
-                    citations=json.dumps(citations, ensure_ascii=False) if citations else None
-                )
-                logger.info(f"历史记录已保存: {task_id}")
-
-                self._send_completion_event(
-                    task_manager=task_manager,
-                    task_id=task_id,
                     final_state=final_state,
-                    markdown=markdown_with_cover,
-                    saved_path=saved_path,
-                    cover_video_path=cover_video_path,
-                    citations=citations,
+                    article_config=article_config,
+                    generate_images=generate_images,
+                    generate_cover_video=generate_cover_video,
+                    video_aspect_ratio=video_aspect_ratio,
+                    task_manager=task_manager,
+                    token_tracker=token_tracker,
+                    task_log=task_log,
                 )
-
-                # 保存博客摘要
-                try:
-                    summary_to_save = article_summary
-                    if not summary_to_save:
-                        summary_to_save = extract_article_summary(
-                            llm_client=self.generator.llm,
-                            title=topic,
-                            content=markdown_with_cover,
-                            max_length=500
-                        )
-                    if summary_to_save:
-                        summary_to_save = summary_to_save[:500]
-                        db_service.update_history_summary(task_id, summary_to_save)
-                except Exception as e:
-                    logger.warning(f"保存博客摘要失败: {e}")
-            except Exception as e:
-                logger.warning(f"保存历史记录失败: {e}")
-                raise RuntimeError(f"保存历史记录失败: {e}") from e
-
-            # Token 追踪
-            token_summary = None
-            if token_tracker:
-                try:
-                    logger.info(token_tracker.format_summary())
-                    token_summary = token_tracker.get_summary()
-                except Exception as e:
-                    logger.warning(f"Token 摘要生成失败: {e}")
-
-            # 任务日志
-            if task_log:
-                try:
-                    task_log.complete(
-                        score=final_state.get('review_score', 0),
-                        word_count=len(final_state.get('final_markdown', '')),
-                        revision_rounds=final_state.get('revision_count', 0),
-                    )
-                    if token_summary:
-                        task_log.token_summary = token_summary
-                    task_log.save()
-                    logger.info(task_log.get_summary())
-                except Exception as e:
-                    logger.warning(f"任务日志保存失败: {e}")
-
-            # 构建 citations
-            citations = []
-            seen_urls = set()
-            for src_list_key in ('search_results', 'top_references'):
-                for r in (final_state.get(src_list_key) or []):
-                    url = r.get('url') or r.get('source', '')
-                    if not url or url in seen_urls:
-                        continue
-                    seen_urls.add(url)
-                    try:
-                        from urllib.parse import urlparse
-                        domain = urlparse(url).hostname or ''
-                    except Exception:
-                        domain = ''
-                    citations.append({
-                        'url': url,
-                        'title': r.get('title', ''),
-                        'domain': domain,
-                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:80],
-                    })
-
-            logger.info(f"博客生成完成（resume）: {task_id}, 保存到: {saved_path}")
+            )
+            logger.info(
+                f"博客生成完成（resume）: {task_id}, 保存到: {result.saved_path}"
+            )
         except Exception as e:
             logger.error(f"博客生成失败（resume）[{task_id}]: {e}", exc_info=True)
             if task_log:
@@ -1836,7 +1381,9 @@ class BlogService:
                 })
             update_queue_status(task_id, "failed", error_msg=str(e))
         finally:
-            if sse_handler:
+            if event_bridge:
+                event_bridge.close()
+            elif sse_handler:
                 for logger_name in sse_logger_names:
                     logging.getLogger(logger_name).removeHandler(sse_handler)
             # 清理按任务分离的文本日志 handler
