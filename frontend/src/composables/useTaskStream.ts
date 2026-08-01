@@ -6,6 +6,7 @@ import { ref, onUnmounted } from 'vue'
 import * as api from '@/services/api'
 import type { Citation } from '@/utils/citationMatcher'
 import type { TokenUsageSummary } from '@/types/token'
+import { formatStorybookPreview } from '@/utils/storybookPreview'
 
 export interface ProgressItem {
   time: string
@@ -20,6 +21,10 @@ export interface OutlineData {
   sections_titles: string[]
   sections: any[]
 }
+
+const isRecord = (value: unknown): value is Record<string, any> => (
+  typeof value === 'object' && value !== null && !Array.isArray(value)
+)
 
 export function useTaskStream() {
   // 状态
@@ -306,6 +311,7 @@ export function useTaskStream() {
 
     es.addEventListener('complete', (e: MessageEvent) => {
       const d = JSON.parse(e.data)
+      const result = isRecord(d.outputs) ? d.outputs : d
       updateTokenUsage(d)
       addProgressItem('🎉 生成完成！', 'success')
       statusBadge.value = '已完成'
@@ -313,22 +319,25 @@ export function useTaskStream() {
       isLoading.value = false
 
       // 保存 citations
-      if (d.citations) {
-        citations.value = d.citations
+      if (result.citations) {
+        citations.value = result.citations
       }
 
       // 更新最终预览
-      if (d.markdown) {
-        previewContent.value = d.markdown
+      if (result.markdown) {
+        previewContent.value = result.markdown
+      } else {
+        const storybookPreview = formatStorybookPreview(result)
+        if (storybookPreview) previewContent.value = storybookPreview
       }
-      savedOutputPath.value = d.saved_path || ''
+      savedOutputPath.value = result.saved_path || ''
 
-      completedBlogId.value = d.id || d.book_id || ''
+      completedBlogId.value = result.id || result.book_id || ''
 
       es.close()
       eventSource = null
 
-      onComplete?.(d)
+      onComplete?.(result)
     })
 
     es.addEventListener('error', (e: MessageEvent) => {

@@ -138,7 +138,13 @@ class TestSendEventEnrichment:
 
         mgr.send_complete("t1", {"path": "blog.md"})
 
-        assert mgr.queues["t1"].get_nowait()["event"] == "complete"
+        event = mgr.queues["t1"].get_nowait()
+        assert event["event"] == "complete"
+        assert event["data"] == {
+            "task_id": "t1",
+            "status": "completed",
+            "outputs": {"path": "blog.md"},
+        }
         assert mgr.tasks["t1"].outputs == {"path": "blog.md"}
 
 

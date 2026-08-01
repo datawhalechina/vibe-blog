@@ -274,8 +274,8 @@
       </div>
 
       <!-- 文章预览 Tab -->
-      <div v-show="activeTab === 'preview'" class="progress-preview-container">
-        <div v-if="previewContent" class="progress-preview-content" v-html="previewContent"></div>
+      <div v-if="!embedded" v-show="activeTab === 'preview'" class="progress-preview-container">
+        <div v-if="previewContent" class="progress-preview-content" v-html="renderedPreview"></div>
         <div v-else class="progress-preview-empty">暂无预览内容</div>
       </div>
     </div>
@@ -284,8 +284,10 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
+import DOMPurify from 'dompurify'
 import { Square, ChevronRight, ChevronDown, X, Lightbulb, Search, BookOpenText, Globe2 } from 'lucide-vue-next'
 import { useSmartAutoScroll } from '@/composables/useSmartAutoScroll'
+import { useMarkdownRenderer } from '@/composables/useMarkdownRenderer'
 import { Separator } from '@/components/ui/separator'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -333,6 +335,7 @@ interface Emits {
 
 const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
+const { renderMarkdown } = useMarkdownRenderer()
 
 const activeTab = ref<'logs' | 'preview'>('logs')
 const progressContentRef = ref<HTMLElement | null>(null)
@@ -344,6 +347,10 @@ const visibleItems = computed(() => {
     ? items.slice(items.length - MAX_VISIBLE_LOGS)
     : items
 })
+
+const renderedPreview = computed(() => (
+  props.embedded ? '' : DOMPurify.sanitize(renderMarkdown(props.previewContent))
+))
 
 // 智能自动滚动 — 迁移自 AionUi useAutoScroll.ts
 const { isFollowing, scrollToBottom } = useSmartAutoScroll({

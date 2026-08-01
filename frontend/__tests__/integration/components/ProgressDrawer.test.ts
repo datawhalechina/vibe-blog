@@ -76,6 +76,53 @@ describe('ProgressDrawer.vue', () => {
 
       expect(wrapper.find('.progress-logs').text()).toBe('2 logs')
     })
+
+    it('renders preview Markdown inside the existing preview container', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          expanded: true,
+          previewContent: '# 缓存小镇\n\n## 第 1 页：出发\n\n页面正文',
+        },
+      })
+
+      const preview = wrapper.find('.progress-preview-content')
+      expect(preview.exists()).toBe(true)
+      expect(preview.find('h1').text()).toBe('缓存小镇')
+      expect(preview.find('h2').text()).toBe('第 1 页：出发')
+      expect(preview.text()).toContain('页面正文')
+    })
+
+    it('sanitizes unsafe HTML generated from preview Markdown', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          expanded: true,
+          previewContent: [
+            '[危险链接](javascript:alert(1))',
+            '<img src="x" onerror="alert(1)">',
+          ].join('\n\n'),
+        },
+      })
+
+      const html = wrapper.find('.progress-preview-content').html()
+      expect(html).toContain('危险链接')
+      expect(html).not.toContain('javascript:')
+      expect(html).not.toContain('onerror')
+    })
+
+    it('does not create an unused preview container in embedded mode', () => {
+      const wrapper = mount(ProgressDrawer, {
+        props: {
+          ...defaultProps,
+          embedded: true,
+          expanded: true,
+          previewContent: '# 不应在左栏解析',
+        },
+      })
+
+      expect(wrapper.find('.progress-preview-container').exists()).toBe(false)
+    })
   })
 
   describe('loading indicator', () => {

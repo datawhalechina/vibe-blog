@@ -18,6 +18,7 @@
     "axios": "^1.6.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "dompurify": "^3.3.1",
     "highlight.js": "^11.9.0",
     "html2canvas": "^1.4.1",
     "jspdf": "^4.1.0",
