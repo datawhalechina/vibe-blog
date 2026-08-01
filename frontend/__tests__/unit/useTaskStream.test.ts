@@ -2,7 +2,7 @@
  * 101.03 useTaskStream composable 测试
  * 测试初始化、添加进度项、带数据添加、累积预览、重置
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 
 // Mock vue-router
 vi.mock('vue-router', () => ({
@@ -18,6 +18,25 @@ vi.mock('@/services/api', () => ({
 }))
 
 import { useTaskStream } from '@/composables/useTaskStream'
+import * as api from '@/services/api'
+
+class FakeEventSource {
+  readyState = 1
+  close = vi.fn()
+  onerror: (() => void) | null = null
+  listeners = new Map<string, Array<(event: MessageEvent) => void>>()
+
+  addEventListener(type: string, listener: (event: MessageEvent) => void) {
+    const listeners = this.listeners.get(type) || []
+    listeners.push(listener)
+    this.listeners.set(type, listeners)
+  }
+
+  emit(type: string, data: unknown = {}) {
+    const event = { data: JSON.stringify(data) } as MessageEvent
+    for (const listener of this.listeners.get(type) || []) listener(event)
+  }
+}
 
 describe('useTaskStream', () => {
   it('should initialize with default state', () => {
@@ -94,5 +113,36 @@ describe('useTaskStream', () => {
     expect(stream.outlineData.value).toBeNull()
     expect(stream.waitingForOutline.value).toBe(false)
     expect(stream.completedBlogId.value).toBe('')
+  })
+
+  it('closes the previous connection before reconnecting', () => {
+    const first = new FakeEventSource()
+    const second = new FakeEventSource()
+    vi.mocked(api.createTaskStream)
+      .mockReturnValueOnce(first as unknown as EventSource)
+      .mockReturnValueOnce(second as unknown as EventSource)
+    const stream = useTaskStream()
+
+    stream.connectSSE('task-1')
+    stream.connectSSE('task-2')
+
+    expect(first.close).toHaveBeenCalledOnce()
+    expect(second.close).not.toHaveBeenCalled()
+  })
+
+  it('forwards storybook completion and closes the connection', () => {
+    const source = new FakeEventSource()
+    vi.mocked(api.createTaskStream).mockReturnValue(
+      source as unknown as EventSource,
+    )
+    const onComplete = vi.fn()
+    const stream = useTaskStream()
+
+    stream.connectSSE('storybook-task', onComplete)
+    source.emit('complete', { book_id: 'book-1' })
+
+    expect(stream.completedBlogId.value).toBe('book-1')
+    expect(onComplete).toHaveBeenCalledWith({ book_id: 'book-1' })
+    expect(source.close).toHaveBeenCalledOnce()
   })
 })
