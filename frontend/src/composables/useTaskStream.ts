@@ -101,6 +101,7 @@ export function useTaskStream() {
 
   // 连接 SSE
   const connectSSE = (taskId: string, onComplete?: (data: any) => void) => {
+    eventSource?.close()
     sectionContentMap.clear()
     sectionOrder = []
     previewContent.value = ''
