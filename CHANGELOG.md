@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-08-01
+
+### Changed
+- ♻️ **生成编排职责拆分** — 将任务事件桥接、结果持久化收尾、LangGraph 图构建与执行入口拆分为独立组件，同时保留现有服务门面、节点拓扑和 SSE 行为。
+
+### Tests
+- ✨ **生成编排回归契约** — 覆盖公开签名、图拓扑、执行委托、结果收尾顺序、事件处理器清理及模块依赖边界。
+
 ## 2026-07-31
 
 ### Changed
