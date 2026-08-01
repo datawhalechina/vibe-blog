@@ -248,15 +248,15 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useTaskStream } from '@/composables/useTaskStream'
 import { useExport } from '@/composables/useExport'
 import { useMarkdownRenderer } from '@/composables/useMarkdownRenderer'
 import { useTypingAnimation } from '@/composables/useTypingAnimation'
 import { useResizableSplit } from '@/composables/useResizableSplit'
-import { scanCitationLinks } from '@/utils/citationMatcher'
-import type { Citation } from '@/utils/citationMatcher'
+import { useMarkdownEditing } from '@/composables/useMarkdownEditing'
+import { useCitationInteractions } from '@/composables/useCitationInteractions'
 import {
   Square,
   Pencil,
@@ -319,10 +319,34 @@ const {
 
 const exportComposable = useExport()
 const copied = ref(false)
-const isEditing = ref(false)
-const editableContent = ref('')
-const editAreaRef = ref<HTMLElement | null>(null)
-const editTextareaRef = ref<HTMLTextAreaElement | null>(null)
+const {
+  isEditing,
+  editableContent,
+  editAreaRef,
+  editTextareaRef,
+  showPolishDialog,
+  showSelectionToolbar,
+  polishInstruction,
+  polishLoading,
+  selectionToolbarPosition,
+  selectedTextPreview,
+  polishedTextPreview,
+  canPolish,
+  toggleEdit,
+  closePolishDialog,
+  handleTextSelection,
+  applyMarkdownFormat,
+  openPolishDialog,
+  handleEditScroll,
+  handleEditInput,
+  handlePolish,
+  applyPolishedText,
+} = useMarkdownEditing({
+  previewContent,
+  completedBlogId,
+  savedOutputPath,
+  addProgressItem,
+})
 const { renderMarkdown } = useMarkdownRenderer()
 
 // 打字动画：流式文本逐字显示
@@ -366,337 +390,21 @@ const renderedHtml = computed(() => {
   })
 })
 const outlineTitle = computed(() => outlineData.value?.title || '博客')
+const {
+  tooltipVisible,
+  tooltipCitation,
+  tooltipIndex,
+  tooltipPosition,
+} = useCitationInteractions({
+  previewRef,
+  renderedHtml,
+  citations,
+})
 
 // 质量评估
 const showQualityDialog = ref(false)
 const evaluationData = ref<any>(null)
 const evaluateLoading = ref(false)
-
-// 引用悬浮卡片
-const tooltipVisible = ref(false)
-const tooltipCitation = ref<Citation | null>(null)
-const tooltipIndex = ref(0)
-const tooltipPosition = ref({ top: 0, left: 0 })
-const showPolishDialog = ref(false)
-const showSelectionToolbar = ref(false)
-const polishInstruction = ref('')
-const polishLoading = ref(false)
-const polishedText = ref('')
-const polishRequestId = ref(0)
-const polishAbortController = ref<AbortController | null>(null)
-const selectedText = ref('')
-const selectionRange = ref({ start: 0, end: 0 })
-const selectionToolbarPosition = ref({ top: 0, left: 0 })
-const selectedTextPreview = computed(() => selectedText.value.trim())
-const polishedTextPreview = computed(() => polishedText.value.trim())
-const canPolish = computed(() => selectedTextPreview.value.length > 0)
-
-// 编辑模式切换（对齐 DeerFlow research-block.tsx:633）
-const toggleEdit = () => {
-  if (isEditing.value) {
-    // 撤销：恢复原始内容
-    resetSelectionState()
-    editableContent.value = ''
-    isEditing.value = false
-  } else {
-    // 进入编辑：复制当前预览内容到 textarea
-    editableContent.value = previewContent.value
-    isEditing.value = true
-  }
-}
-
-const invalidatePolishRequest = () => {
-  polishRequestId.value += 1
-  polishAbortController.value?.abort()
-  polishAbortController.value = null
-}
-
-const resetSelectionState = () => {
-  invalidatePolishRequest()
-  showPolishDialog.value = false
-  showSelectionToolbar.value = false
-  polishLoading.value = false
-  polishedText.value = ''
-  polishInstruction.value = ''
-  selectedText.value = ''
-  selectionRange.value = { start: 0, end: 0 }
-}
-
-const isPolishRequestStillValid = (
-  requestId: number,
-  start: number,
-  end: number,
-  expectedSelectedText: string
-) => {
-  return (
-    polishRequestId.value === requestId &&
-    isEditing.value &&
-    showPolishDialog.value &&
-    selectionRange.value.start === start &&
-    selectionRange.value.end === end &&
-    selectedTextPreview.value === expectedSelectedText
-  )
-}
-
-const closePolishDialog = () => {
-  resetSelectionState()
-}
-
-const updateSelectionToolbarPosition = (start: number, end: number) => {
-  const textarea = editTextareaRef.value
-  const editArea = editAreaRef.value
-  if (!textarea || !editArea) return
-
-  const textareaRect = textarea.getBoundingClientRect()
-  const editAreaRect = editArea.getBoundingClientRect()
-  const mirror = document.createElement('div')
-  const mirrorStyle = window.getComputedStyle(textarea)
-
-  const styleKeys = [
-    'boxSizing', 'width', 'height', 'overflowX', 'overflowY',
-    'borderTopWidth', 'borderRightWidth', 'borderBottomWidth', 'borderLeftWidth',
-    'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
-    'fontStyle', 'fontVariant', 'fontWeight', 'fontStretch', 'fontSize',
-    'fontFamily', 'lineHeight', 'letterSpacing', 'textAlign', 'textTransform',
-    'textIndent', 'textDecoration', 'tabSize'
-  ] as const
-
-  mirror.style.position = 'fixed'
-  mirror.style.top = `${textareaRect.top}px`
-  mirror.style.left = `${textareaRect.left}px`
-  mirror.style.whiteSpace = 'pre-wrap'
-  mirror.style.wordBreak = 'break-word'
-  mirror.style.pointerEvents = 'none'
-  mirror.style.visibility = 'hidden'
-
-  styleKeys.forEach((key) => {
-    mirror.style[key] = mirrorStyle[key]
-  })
-
-  mirror.textContent = editableContent.value.slice(0, start)
-
-  const selectedSpan = document.createElement('span')
-  selectedSpan.textContent = editableContent.value.slice(start, end) || ' '
-  mirror.appendChild(selectedSpan)
-
-  document.body.appendChild(mirror)
-  mirror.scrollTop = textarea.scrollTop
-  mirror.scrollLeft = textarea.scrollLeft
-
-  const selectedRect = selectedSpan.getBoundingClientRect()
-  document.body.removeChild(mirror)
-
-  const rawTop = selectedRect.top - editAreaRect.top - 12
-  const rawLeft = selectedRect.left - editAreaRect.left + (selectedRect.width / 2)
-  const clampedLeft = Math.min(Math.max(rawLeft, 72), Math.max(editAreaRect.width - 72, 72))
-
-  selectionToolbarPosition.value = {
-    top: Math.max(rawTop, 8),
-    left: clampedLeft,
-  }
-}
-
-const handleTextSelection = async () => {
-  const textarea = editTextareaRef.value
-  if (!textarea) return
-
-  const start = textarea.selectionStart ?? 0
-  const end = textarea.selectionEnd ?? 0
-  if (end <= start) {
-    resetSelectionState()
-    return
-  }
-
-  const rawSelectedText = editableContent.value.slice(start, end)
-  if (!rawSelectedText.trim()) {
-    resetSelectionState()
-    return
-  }
-
-  selectionRange.value = { start, end }
-  selectedText.value = rawSelectedText
-  polishedText.value = ''
-  showPolishDialog.value = false
-  await nextTick()
-  updateSelectionToolbarPosition(start, end)
-  showSelectionToolbar.value = true
-}
-
-const updateSelectionAfterEdit = async (start: number, end: number) => {
-  await nextTick()
-  const textarea = editTextareaRef.value
-  if (!textarea) return
-  textarea.focus()
-  textarea.setSelectionRange(start, end)
-  selectionRange.value = { start, end }
-  selectedText.value = editableContent.value.slice(start, end)
-  updateSelectionToolbarPosition(start, end)
-  showSelectionToolbar.value = true
-}
-
-const applyWrappedFormat = async (prefix: string, suffix: string = prefix) => {
-  const { start, end } = selectionRange.value
-  if (end <= start) return
-
-  const selection = editableContent.value.slice(start, end)
-  editableContent.value = `${editableContent.value.slice(0, start)}${prefix}${selection}${suffix}${editableContent.value.slice(end)}`
-  previewContent.value = editableContent.value
-  await updateSelectionAfterEdit(start + prefix.length, end + prefix.length)
-}
-
-const persistEditedContent = async (successMessage: string) => {
-  if (!completedBlogId.value) {
-    addProgressItem('无法保存编辑结果：缺少已完成的文章 ID', 'error')
-    return
-  }
-
-  try {
-    const result = await api.updateBlogContent(
-      completedBlogId.value,
-      editableContent.value,
-      savedOutputPath.value || undefined
-    )
-
-    if (!result.success) {
-      throw new Error(result.error || '保存失败')
-    }
-
-    if (!savedOutputPath.value) {
-      addProgressItem(
-        `${successMessage}（已更新数据库，但由于缺少文件路径，未能将内容持久化到文件）`,
-        'warning'
-      )
-    } else {
-      addProgressItem(successMessage, 'success')
-    }
-  } catch (error: any) {
-    addProgressItem(`保存编辑结果失败: ${error.message}`, 'error')
-  }
-}
-
-const applyLinePrefixFormat = async (prefix: string) => {
-  const { start, end } = selectionRange.value
-  if (end <= start) return
-
-  const lineStart = editableContent.value.lastIndexOf('\n', start - 1) + 1
-  const selectedBlock = editableContent.value.slice(lineStart, end)
-  const formattedBlock = selectedBlock
-    .split('\n')
-    .map(line => `${prefix}${line}`)
-    .join('\n')
-
-  editableContent.value = `${editableContent.value.slice(0, lineStart)}${formattedBlock}${editableContent.value.slice(end)}`
-  previewContent.value = editableContent.value
-  await updateSelectionAfterEdit(lineStart, lineStart + formattedBlock.length)
-}
-
-const hasSelection = computed(() => {
-  const { start, end } = selectionRange.value
-  return end > start
-})
-
-const applyMarkdownFormat = async (type: 'bold' | 'italic' | 'code' | 'quote' | 'list') => {
-  if (!hasSelection.value) return
-
-  if (type === 'bold') {
-    await applyWrappedFormat('**')
-    await persistEditedContent('选中文本已加粗并保存')
-    return
-  }
-  if (type === 'italic') {
-    await applyWrappedFormat('*')
-    await persistEditedContent('选中文本已斜体并保存')
-    return
-  }
-  if (type === 'code') {
-    await applyWrappedFormat('`')
-    await persistEditedContent('选中文本已转为行内代码并保存')
-    return
-  }
-  if (type === 'quote') {
-    await applyLinePrefixFormat('> ')
-    await persistEditedContent('选中文本已转为引用并保存')
-    return
-  }
-  await applyLinePrefixFormat('- ')
-  await persistEditedContent('选中文本已转为无序列表并保存')
-}
-
-const openPolishDialog = () => {
-  if (!canPolish.value) return
-  polishedText.value = ''
-  showSelectionToolbar.value = false
-  showPolishDialog.value = true
-}
-
-const handleEditScroll = () => {
-  showSelectionToolbar.value = false
-  if (showPolishDialog.value) {
-    closePolishDialog()
-  }
-}
-
-const handleEditInput = () => {
-  previewContent.value = editableContent.value
-  showSelectionToolbar.value = false
-}
-
-const handlePolish = async () => {
-  if (!canPolish.value || polishLoading.value) return
-
-  const requestId = polishRequestId.value + 1
-  const expectedSelectedText = selectedTextPreview.value
-  const expectedInstruction = polishInstruction.value.trim()
-  const { start, end } = selectionRange.value
-
-  polishRequestId.value = requestId
-  polishAbortController.value?.abort()
-  const controller = new AbortController()
-  polishAbortController.value = controller
-  polishLoading.value = true
-  try {
-    const result = await api.polishSelectedText(expectedSelectedText, expectedInstruction, controller.signal)
-    if (!result.success || !result.polished_text) {
-      throw new Error(result.error || '润色失败')
-    }
-    if (!isPolishRequestStillValid(requestId, start, end, expectedSelectedText)) {
-      return
-    }
-
-    polishedText.value = result.polished_text
-    addProgressItem('润色结果已生成，可确认替换', 'success')
-  } catch (error: any) {
-    if (error?.name === 'AbortError' || !isPolishRequestStillValid(requestId, start, end, expectedSelectedText)) {
-      return
-    }
-    addProgressItem(`润色失败: ${error.message}`, 'error')
-  } finally {
-    if (polishRequestId.value === requestId) {
-      polishLoading.value = false
-      polishAbortController.value = null
-    }
-  }
-}
-
-const applyPolishedText = async () => {
-  if (!polishedTextPreview.value) return
-
-  const { start, end } = selectionRange.value
-  const nextText = polishedTextPreview.value
-  editableContent.value = `${editableContent.value.slice(0, start)}${nextText}${editableContent.value.slice(end)}`
-  previewContent.value = editableContent.value
-
-  resetSelectionState()
-
-  await nextTick()
-  const textarea = editTextareaRef.value
-  if (textarea) {
-    const cursor = start + nextText.length
-    textarea.focus()
-    textarea.setSelectionRange(cursor, cursor)
-  }
-  await persistEditedContent('选中文本已润色替换并保存')
-}
 
 // 复制到剪贴板
 const handleCopy = async () => {
@@ -738,56 +446,6 @@ const handleEvaluate = async () => {
   }
 }
 
-// 引用悬浮卡片：hover 延迟 200ms 显示，离开 100ms 消失
-let hoverShowTimer: ReturnType<typeof setTimeout> | null = null
-let hoverHideTimer: ReturnType<typeof setTimeout> | null = null
-
-const showTooltip = (citation: Citation, index: number, rect: DOMRect) => {
-  if (hoverHideTimer) { clearTimeout(hoverHideTimer); hoverHideTimer = null }
-  hoverShowTimer = setTimeout(() => {
-    tooltipVisible.value = true
-    tooltipCitation.value = citation
-    tooltipIndex.value = index
-    tooltipPosition.value = { top: rect.bottom + 8, left: rect.left }
-  }, 200)
-}
-
-const hideTooltip = () => {
-  if (hoverShowTimer) { clearTimeout(hoverShowTimer); hoverShowTimer = null }
-  hoverHideTimer = setTimeout(() => {
-    tooltipVisible.value = false
-  }, 100)
-}
-
-const setupCitationHover = () => {
-  if (!previewRef.value || !citations.value.length) return
-
-  const matches = scanCitationLinks(previewRef.value, citations.value)
-  matches.forEach(({ element, citation, index }) => {
-    element.addEventListener('mouseenter', () => {
-      const rect = element.getBoundingClientRect()
-      showTooltip(citation, index, rect)
-    })
-    element.addEventListener('mouseleave', () => {
-      hideTooltip()
-    })
-    // 对齐 DeerFlow citation.tsx:80-93 — 点击引用滚动到底部引用列表
-    element.addEventListener('click', (e) => {
-      const targetId = `ref-${index}`
-      const refEl = document.getElementById(targetId)
-      if (refEl) {
-        e.preventDefault()
-        refEl.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    })
-  })
-}
-
-// 监听预览内容变化，重新绑定引用悬浮
-watch([renderedHtml, citations], () => {
-  nextTick(() => setupCitationHover())
-})
-
 // 对齐 DeerFlow: 预览内容首次出现时自动切换到移动端预览 Tab
 watch(previewContent, (val, oldVal) => {
   if (val && !oldVal) {
@@ -820,10 +478,6 @@ onMounted(() => {
 
 onUnmounted(() => {
   window.removeEventListener('resize', onResize)
-  resetSelectionState()
-  tooltipVisible.value = false
-  if (hoverShowTimer) clearTimeout(hoverShowTimer)
-  if (hoverHideTimer) clearTimeout(hoverHideTimer)
 })
 </script>
 
