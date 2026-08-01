@@ -544,6 +544,9 @@ class WriterAgent:
                     style=task.get('style'),  # 37.13
                     _writing_skill_prompt=task.get('_writing_skill_prompt', ''),  # 102.06
                 )
+                content = section.get('content') if isinstance(section, dict) else None
+                if not isinstance(content, str) or not content.strip():
+                    raise ValueError("章节内容为空")
                 return {
                     'success': True,
                     'order_idx': task['order_idx'],
@@ -570,6 +573,24 @@ class WriterAgent:
                     
                     if result['success']:
                         logger.info(f"章节撰写完成: {result['section'].get('title', '')}")
+
+            failed_indices = [
+                index
+                for index, result in enumerate(results)
+                if result and not result['success']
+            ]
+            if failed_indices:
+                logger.warning(
+                    f"并行撰写失败 {len(failed_indices)} 个章节，开始串行恢复"
+                )
+                for index in failed_indices:
+                    recovered = write_single_task(tasks[index])
+                    results[index] = recovered
+                    title = tasks[index]['section_outline'].get('title', '')
+                    if recovered['success']:
+                        logger.info(f"章节串行恢复完成: {title}")
+                    else:
+                        logger.error(f"章节串行恢复失败: {title}")
         else:
             # 串行执行（追踪模式）- 直接调用方法以保持 Langfuse 上下文
             for task in tasks:
