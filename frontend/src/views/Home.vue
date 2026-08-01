@@ -320,16 +320,7 @@ const handleGenerate = async () => {
       currentTaskId.value = data.task_id
       if (task.kind === 'storybook') {
         addProgressItem(`✓ 任务创建成功 (ID: ${data.task_id})`, 'success')
-        connectSSE(data.task_id, (result) => {
-          loadHistory(1)
-          setTimeout(() => {
-            if (result.id) {
-              router.push(`/blog/${result.id}`)
-            } else if (result.book_id) {
-              router.push(`/book/${result.book_id}`)
-            }
-          }, 1000)
-        })
+        connectSSE(data.task_id)
       } else {
         // 博客/Mini 任务跳转到 Generate 页面
         router.push(`/generate/${data.task_id}`)

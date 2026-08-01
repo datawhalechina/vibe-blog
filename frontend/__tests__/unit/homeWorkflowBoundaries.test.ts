@@ -24,4 +24,10 @@ describe('Home workflow boundaries', () => {
     expect(source).not.toContain('api.getHistory(')
     expect(source).not.toContain('api.getHistoryRecord')
   })
+
+  it('keeps ephemeral Storybook completion on Home', () => {
+    expect(source).toContain('connectSSE(data.task_id)')
+    expect(source).not.toContain('connectSSE(data.task_id,')
+    expect(source).not.toContain('result.book_id')
+  })
 })

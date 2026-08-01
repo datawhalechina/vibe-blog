@@ -130,7 +130,7 @@ describe('useTaskStream', () => {
     expect(second.close).not.toHaveBeenCalled()
   })
 
-  it('forwards storybook completion and closes the connection', () => {
+  it('renders and forwards nested Storybook outputs without fabricating an ID', () => {
     const source = new FakeEventSource()
     vi.mocked(api.createTaskStream).mockReturnValue(
       source as unknown as EventSource,
@@ -139,10 +139,52 @@ describe('useTaskStream', () => {
     const stream = useTaskStream()
 
     stream.connectSSE('storybook-task', onComplete)
-    source.emit('complete', { book_id: 'book-1' })
+    source.emit('complete', {
+      task_id: 'storybook-task',
+      status: 'completed',
+      outputs: {
+        title: '缓存小镇历险记',
+        pages: [
+          { page_number: 1, title: '第一页', content: '页面正文' },
+        ],
+      },
+    })
 
-    expect(stream.completedBlogId.value).toBe('book-1')
-    expect(onComplete).toHaveBeenCalledWith({ book_id: 'book-1' })
+    expect(stream.previewContent.value).toContain('# 缓存小镇历险记')
+    expect(stream.previewContent.value).toContain('## 第 1 页：第一页')
+    expect(stream.completedBlogId.value).toBe('')
+    expect(onComplete).toHaveBeenCalledWith({
+      title: '缓存小镇历险记',
+      pages: [
+        { page_number: 1, title: '第一页', content: '页面正文' },
+      ],
+    })
+    expect(source.close).toHaveBeenCalledOnce()
+  })
+
+  it('preserves top-level blog completion behavior', () => {
+    const source = new FakeEventSource()
+    vi.mocked(api.createTaskStream).mockReturnValue(
+      source as unknown as EventSource,
+    )
+    const onComplete = vi.fn()
+    const stream = useTaskStream()
+
+    stream.connectSSE('blog-task', onComplete)
+    source.emit('complete', {
+      id: 'blog-1',
+      markdown: '# Existing blog',
+      saved_path: '/tmp/blog.md',
+    })
+
+    expect(stream.previewContent.value).toBe('# Existing blog')
+    expect(stream.completedBlogId.value).toBe('blog-1')
+    expect(stream.savedOutputPath.value).toBe('/tmp/blog.md')
+    expect(onComplete).toHaveBeenCalledWith({
+      id: 'blog-1',
+      markdown: '# Existing blog',
+      saved_path: '/tmp/blog.md',
+    })
     expect(source.close).toHaveBeenCalledOnce()
   })
 })
