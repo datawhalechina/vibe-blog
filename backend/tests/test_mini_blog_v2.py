@@ -16,14 +16,14 @@ class TestWordCountHelpers:
     
     def test_get_content_word_count_empty(self):
         """测试空 state"""
-        from services.blog_generator.generator import _get_content_word_count
+        from services.blog_generator.orchestrator.nodes.writing import _content_word_count
         
         state = {'sections': []}
-        assert _get_content_word_count(state) == 0
+        assert _content_word_count(state) == 0
     
     def test_get_content_word_count_with_content(self):
         """测试有内容的 state"""
-        from services.blog_generator.generator import _get_content_word_count
+        from services.blog_generator.orchestrator.nodes.writing import _content_word_count
         
         state = {
             'sections': [
@@ -32,19 +32,19 @@ class TestWordCountHelpers:
                 {'content': ''},  # 0 字
             ]
         }
-        assert _get_content_word_count(state) == 13
+        assert _content_word_count(state) == 13
     
     def test_get_content_word_count_no_sections(self):
         """测试没有 sections 字段"""
-        from services.blog_generator.generator import _get_content_word_count
+        from services.blog_generator.orchestrator.nodes.writing import _content_word_count
         
         state = {}
-        assert _get_content_word_count(state) == 0
+        assert _content_word_count(state) == 0
     
     def test_log_word_count_diff_positive(self, caplog):
         """测试字数增加的日志"""
         import logging
-        from services.blog_generator.generator import _log_word_count_diff
+        from services.blog_generator.orchestrator.nodes.writing import _log_word_count_diff
         
         with caplog.at_level(logging.INFO):
             _log_word_count_diff("Writer", 100, 500)
@@ -54,7 +54,7 @@ class TestWordCountHelpers:
     def test_log_word_count_diff_negative(self, caplog):
         """测试字数减少的日志"""
         import logging
-        from services.blog_generator.generator import _log_word_count_diff
+        from services.blog_generator.orchestrator.nodes.writing import _log_word_count_diff
         
         with caplog.at_level(logging.INFO):
             _log_word_count_diff("修订", 500, 400)
@@ -265,17 +265,18 @@ class TestMiniModeCorrectSection:
         """测试 Mini 模式修订使用 correct_section"""
         # 验证 generator.py 中的修订逻辑
         import inspect
-        from services.blog_generator.generator import BlogGenerator
-
-        generator = BlogGenerator.__new__(BlogGenerator)
+        from services.blog_generator.orchestrator.nodes.review import (
+            revision_correct_only,
+            revision_node,
+        )
 
         # _revision_node 委托给 _revision_correct_only（correct_only 策略）
-        source_node = inspect.getsource(generator._revision_node)
+        source_node = inspect.getsource(revision_node)
         assert "revision_strategy" in source_node
         assert "correct_only" in source_node
 
         # _revision_correct_only 中实际调用 correct_section
-        source_correct = inspect.getsource(generator._revision_correct_only)
+        source_correct = inspect.getsource(revision_correct_only)
         assert "correct_section" in source_correct
 
 

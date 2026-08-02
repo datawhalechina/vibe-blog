@@ -39,6 +39,7 @@ def test_extracted_orchestration_does_not_depend_on_api_or_flask():
         ORCHESTRATOR_ROOT / name
         for name in ("graph_builder.py", "execution_runner.py")
     )
+    paths.extend((ORCHESTRATOR_ROOT / "nodes").glob("*.py"))
 
     for path in paths:
         illegal = _top_level_imports(path) & {"api", "routes", "flask"}
@@ -53,9 +54,47 @@ def test_extracted_orchestration_does_not_depend_on_api_or_flask():
 def test_generator_facade_does_not_build_or_execute_graph_directly():
     path = BACKEND_ROOT / "services" / "blog_generator" / "generator.py"
 
-    assert _method_calls(path, "BlogGenerator", "_build_workflow") == {"build"}
+    assert _method_calls(path, "BlogGenerator", "_build_workflow") == {
+        "_bind_node_handlers",
+        "_bind_routing_handlers",
+        "build",
+    }
     assert "invoke" not in _method_calls(path, "BlogGenerator", "generate")
     assert "stream" not in _method_calls(path, "BlogGenerator", "generate_stream")
+
+
+def test_generator_has_no_node_methods_and_graph_builder_has_no_generator_dependency():
+    generator_path = BACKEND_ROOT / "services/blog_generator/generator.py"
+    generator_tree = ast.parse(generator_path.read_text(encoding="utf-8"))
+    generator_class = next(
+        node for node in generator_tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "BlogGenerator"
+    )
+    assert not [
+        node.name for node in generator_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.endswith("_node")
+    ]
+
+    builder_path = ORCHESTRATOR_ROOT / "graph_builder.py"
+    builder_tree = ast.parse(builder_path.read_text(encoding="utf-8"))
+    init = next(
+        node for node in ast.walk(builder_tree)
+        if isinstance(node, ast.FunctionDef) and node.name == "__init__"
+    )
+    assert "generator" not in [argument.arg for argument in init.args.args]
+
+    violations = []
+    for path in (ORCHESTRATOR_ROOT / "nodes").glob("*.py"):
+        tree = ast.parse(path.read_text(encoding="utf-8"))
+        for node in tree.body:
+            if isinstance(node, ast.FunctionDef):
+                parameters = {
+                    argument.arg for argument in [*node.args.args, *node.args.kwonlyargs]
+                }
+                if parameters & {"generator", "context"}:
+                    violations.append(f"{path.name}:{node.name}")
+    assert not violations
 
 
 def test_blog_service_generation_paths_delegate_result_finalization():

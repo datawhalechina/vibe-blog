@@ -1,72 +1,105 @@
-"""LangGraph workflow construction."""
+"""LangGraph workflow construction from explicit handler mappings."""
 
 from langgraph.graph import END, START, StateGraph
 
 from ..schemas.state import SharedState
+from ..schemas.state_contracts import wrap_node_state_contract
+
+
+NODE_NAMES = (
+    "researcher",
+    "planner",
+    "writer",
+    "check_knowledge",
+    "refine_search",
+    "enhance_with_knowledge",
+    "questioner",
+    "deepen_content",
+    "coder_and_artist",
+    "cross_section_dedup",
+    "section_evaluate",
+    "section_improve",
+    "consistency_check",
+    "reviewer",
+    "revision",
+    "factcheck",
+    "text_cleanup",
+    "humanizer",
+    "wait_for_images",
+    "assembler",
+    "summary_generator",
+)
+
+ROUTING_NAMES = (
+    "should_check_knowledge",
+    "should_refine_search",
+    "should_deepen",
+    "should_continue_questioning",
+    "should_improve_sections",
+    "should_revise",
+)
 
 
 class GraphBuilder:
-    def __init__(self, generator):
-        self.generator = generator
+    def __init__(self, *, node_handlers, routing_handlers, middleware_pipeline):
+        self.node_handlers = dict(node_handlers)
+        self.routing_handlers = dict(routing_handlers)
+        self.middleware_pipeline = middleware_pipeline
+        self._validate_keys("node", self.node_handlers, NODE_NAMES)
+        self._validate_keys("routing", self.routing_handlers, ROUTING_NAMES)
+
+    @staticmethod
+    def _validate_keys(kind, handlers, expected):
+        expected_keys = set(expected)
+        actual_keys = set(handlers)
+        if actual_keys != expected_keys:
+            missing = sorted(expected_keys - actual_keys)
+            extra = sorted(actual_keys - expected_keys)
+            raise ValueError(
+                f"Invalid {kind} handler keys: missing={missing}, extra={extra}"
+            )
+
+    def _add_node(self, workflow, node_name, handler):
+        middleware_wrapped = self.middleware_pipeline.wrap_node(node_name, handler)
+        workflow.add_node(
+            node_name,
+            wrap_node_state_contract(node_name, middleware_wrapped),
+        )
 
     def build(self):
-        generator = self.generator
         workflow = StateGraph(SharedState)
+        for node_name in NODE_NAMES:
+            self._add_node(workflow, node_name, self.node_handlers[node_name])
 
-        nodes = (
-            ("researcher", generator._researcher_node),
-            ("planner", generator._planner_node),
-            ("writer", generator._writer_node),
-            ("check_knowledge", generator._check_knowledge_node),
-            ("refine_search", generator._refine_search_node),
-            ("enhance_with_knowledge", generator._enhance_with_knowledge_node),
-            ("questioner", generator._questioner_node),
-            ("deepen_content", generator._deepen_content_node),
-            ("coder_and_artist", generator._coder_and_artist_node),
-            ("cross_section_dedup", generator._cross_section_dedup_node),
-            ("section_evaluate", generator._section_evaluate_node),
-            ("section_improve", generator._section_improve_node),
-            ("consistency_check", generator._consistency_check_node),
-            ("reviewer", generator._reviewer_node),
-            ("revision", generator._revision_node),
-            ("factcheck", generator._factcheck_node),
-            ("text_cleanup", generator._text_cleanup_node),
-            ("humanizer", generator._humanizer_node),
-            ("wait_for_images", generator._wait_for_images_node),
-            ("assembler", generator._assembler_node),
-            ("summary_generator", generator._summary_generator_node),
-        )
-        for node_name, handler in nodes:
-            generator._add_node(workflow, node_name, handler)
-
+        routes = self.routing_handlers
         workflow.add_edge(START, "researcher")
         workflow.add_edge("researcher", "planner")
         workflow.add_edge("planner", "writer")
         workflow.add_conditional_edges(
             "writer",
-            generator._should_check_knowledge,
+            routes["should_check_knowledge"],
             {"check": "check_knowledge", "skip": "questioner"},
         )
         workflow.add_conditional_edges(
             "check_knowledge",
-            generator._should_refine_search,
+            routes["should_refine_search"],
             {"search": "refine_search", "continue": "questioner"},
         )
         workflow.add_edge("refine_search", "enhance_with_knowledge")
         workflow.add_edge("enhance_with_knowledge", "check_knowledge")
         workflow.add_conditional_edges(
             "questioner",
-            generator._should_deepen,
+            routes["should_deepen"],
             {"deepen": "deepen_content", "continue": "section_evaluate"},
         )
         workflow.add_conditional_edges(
             "deepen_content",
-            generator._should_continue_questioning,
+            routes["should_continue_questioning"],
             {"questioner": "questioner", "section_evaluate": "section_evaluate"},
         )
         workflow.add_conditional_edges(
             "section_evaluate",
-            generator._should_improve_sections,
+            routes["should_improve_sections"],
             {"improve": "section_improve", "continue": "coder_and_artist"},
         )
         workflow.add_edge("section_improve", "section_evaluate")
@@ -75,7 +108,7 @@ class GraphBuilder:
         workflow.add_edge("consistency_check", "reviewer")
         workflow.add_conditional_edges(
             "reviewer",
-            generator._should_revise,
+            routes["should_revise"],
             {"revision": "revision", "assemble": "factcheck"},
         )
         workflow.add_edge("revision", "reviewer")
@@ -85,5 +118,4 @@ class GraphBuilder:
         workflow.add_edge("wait_for_images", "assembler")
         workflow.add_edge("assembler", "summary_generator")
         workflow.add_edge("summary_generator", END)
-
         return workflow

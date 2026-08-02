@@ -1,5 +1,6 @@
 import inspect
 import logging
+from functools import partial
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -14,6 +15,38 @@ from services.blog_generator.lifecycle.result_pipeline import (
 from services.blog_generator.lifecycle.task_events import TaskEventBridge
 from services.blog_generator.orchestrator.execution_runner import GraphExecutionRunner
 from services.blog_generator.orchestrator.graph_builder import GraphBuilder
+
+
+NODE_NAMES = {
+    "researcher", "planner", "writer", "check_knowledge", "refine_search",
+    "enhance_with_knowledge", "questioner", "deepen_content",
+    "coder_and_artist", "cross_section_dedup", "section_evaluate",
+    "section_improve", "consistency_check", "reviewer", "revision",
+    "factcheck", "text_cleanup", "humanizer", "wait_for_images",
+    "assembler", "summary_generator",
+}
+
+
+def _named_handler(name):
+    def handler(state):
+        return state
+    handler.__name__ = name
+    return handler
+
+
+def _graph_dependencies():
+    node_handlers = {name: _named_handler(name) for name in NODE_NAMES}
+    routing_handlers = {
+        "should_check_knowledge": _named_handler("_should_check_knowledge"),
+        "should_refine_search": _named_handler("_should_refine_search"),
+        "should_deepen": _named_handler("_should_deepen"),
+        "should_continue_questioning": _named_handler("_should_continue_questioning"),
+        "should_improve_sections": _named_handler("_should_improve_sections"),
+        "should_revise": _named_handler("_should_revise"),
+    }
+    pipeline = MagicMock()
+    pipeline.wrap_node.side_effect = lambda name, handler: handler
+    return node_handlers, routing_handlers, pipeline
 
 
 def test_blog_service_preserves_generation_facade_signatures():
@@ -49,34 +82,74 @@ def test_blog_generator_preserves_build_and_execution_signatures():
     } == expected
 
 
-def test_graph_builder_preserves_workflow_topology():
+def test_planner_runtime_configuration_updates_bound_values_without_self_dependency():
+    generator = BlogGenerator.__new__(BlogGenerator)
+    generator._node_handlers = {
+        "planner": partial(
+            lambda state, *, on_stream, interactive: state,
+            on_stream=None,
+            interactive=False,
+        )
+    }
+    callback = MagicMock()
+
+    generator._configure_planner_runtime(
+        on_stream=callback,
+        interactive=True,
+    )
+
+    assert generator._node_handlers["planner"].keywords == {
+        "on_stream": callback,
+        "interactive": True,
+    }
+
+
+def test_execution_runtime_configuration_updates_all_parallel_node_dependencies():
+    generator = BlogGenerator.__new__(BlogGenerator)
+    old_executor = MagicMock()
+    generator._node_handlers = {
+        name: partial(lambda state, *, parallel_executor: state, parallel_executor=old_executor)
+        for name in (
+            "enhance_with_knowledge",
+            "deepen_content",
+            "consistency_check",
+            "revision",
+        )
+    }
+    new_executor = MagicMock()
+
+    generator._configure_execution_runtime(new_executor)
+
+    assert generator.executor is new_executor
+    assert all(
+        handler.keywords["parallel_executor"] is new_executor
+        for handler in generator._node_handlers.values()
+    )
+
+
+def test_bound_node_dependencies_do_not_retain_generator_instance():
     generator = BlogGenerator(MagicMock())
 
-    workflow = GraphBuilder(generator).build()
+    retained_by = []
+    for node_name, handler in generator._node_handlers.items():
+        for dependency_name, dependency in handler.keywords.items():
+            if getattr(dependency, "__self__", None) is generator:
+                retained_by.append(f"{node_name}.{dependency_name}")
 
-    assert set(workflow.nodes) == {
-        "researcher",
-        "planner",
-        "writer",
-        "check_knowledge",
-        "refine_search",
-        "enhance_with_knowledge",
-        "questioner",
-        "deepen_content",
-        "coder_and_artist",
-        "cross_section_dedup",
-        "section_evaluate",
-        "section_improve",
-        "consistency_check",
-        "reviewer",
-        "revision",
-        "factcheck",
-        "text_cleanup",
-        "humanizer",
-        "wait_for_images",
-        "assembler",
-        "summary_generator",
-    }
+    assert retained_by == []
+
+
+def test_graph_builder_preserves_workflow_topology():
+    node_handlers, routing_handlers, pipeline = _graph_dependencies()
+
+    workflow = GraphBuilder(
+        node_handlers=node_handlers,
+        routing_handlers=routing_handlers,
+        middleware_pipeline=pipeline,
+    ).build()
+
+    assert set(workflow.nodes) == NODE_NAMES
+    assert pipeline.wrap_node.call_count == len(NODE_NAMES)
     assert set(workflow.edges) == {
         ("__start__", "researcher"),
         ("researcher", "planner"),
@@ -136,6 +209,22 @@ def test_graph_builder_preserves_workflow_topology():
             }
         },
     }
+
+
+@pytest.mark.parametrize("mutation", ["missing", "extra"])
+def test_graph_builder_rejects_invalid_node_handler_keys(mutation):
+    node_handlers, routing_handlers, pipeline = _graph_dependencies()
+    if mutation == "missing":
+        node_handlers.pop("writer")
+    else:
+        node_handlers["unexpected"] = MagicMock()
+
+    with pytest.raises(ValueError, match="node handler keys"):
+        GraphBuilder(
+            node_handlers=node_handlers,
+            routing_handlers=routing_handlers,
+            middleware_pipeline=pipeline,
+        )
 
 
 def test_task_event_bridge_attaches_injects_and_closes_idempotently():

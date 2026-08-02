@@ -2,20 +2,18 @@
 长文博客生成器 - LangGraph 工作流主入口
 """
 
-import copy
 import logging
 import os
-import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Dict, Any, Optional, Literal, Callable
 
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
 from langgraph.types import interrupt
 
-from .schemas.state import SharedState, create_initial_state
-from .schemas.state_contracts import wrap_node_state_contract
+from .schemas.state import SharedState
 from .style_profile import StyleProfile
 from .agents.researcher import ResearcherAgent
 from .agents.planner import PlannerAgent
@@ -44,29 +42,42 @@ from .llm_proxy import TieredLLMProxy
 from .llm_tier_config import get_agent_tier
 from .orchestrator.execution_runner import GraphExecutionRunner
 from .orchestrator.graph_builder import GraphBuilder
-import uuid
+from .orchestrator.image_task_registry import ImageTaskRegistry
+from .orchestrator.nodes.finalization import (
+    assembler_node,
+    coder_and_artist_node,
+    factcheck_node,
+    humanizer_node,
+    summary_generator_node,
+    text_cleanup_node,
+    wait_for_images_node,
+)
+from .orchestrator.nodes.research import (
+    check_knowledge_node,
+    enhance_with_knowledge_node,
+    planner_node,
+    refine_search_node,
+    researcher_node,
+)
+from .orchestrator.nodes.review import (
+    consistency_check_node,
+    cross_section_dedup_node,
+    reviewer_node,
+    revision_node,
+)
+from .orchestrator.nodes.writing import (
+    deepen_content_node,
+    questioner_node,
+    section_evaluate_node,
+    section_improve_node,
+    writer_node,
+)
+from .cross_section_dedup import CrossSectionDeduplicator
+from .image_preplanner import ImagePreplanner
+from .prompts import get_prompt_manager
+from utils.text_cleanup import apply_full_cleanup
 
 logger = logging.getLogger(__name__)
-
-
-def _get_content_word_count(state: Dict[str, Any]) -> int:
-    """计算当前 state 中所有章节内容的总字数"""
-    sections = state.get('sections', [])
-    total = 0
-    for section in sections:
-        content = section.get('content', '')
-        if content:
-            total += len(content)
-    return total
-
-
-def _log_word_count_diff(agent_name: str, before: int, after: int):
-    """记录字数变化的 diff"""
-    diff = after - before
-    if diff >= 0:
-        logger.info(f"📊 [{agent_name}] 字数变化: {before} → {after} (+{diff} 字)")
-    else:
-        logger.info(f"📊 [{agent_name}] 字数变化: {before} → {after} ({diff} 字)")
 
 
 class BlogGenerator:
@@ -137,10 +148,8 @@ class BlogGenerator:
         self.tracker = SessionTracker()
         self.summary_generator = SummaryGeneratorAgent(_proxy('summary_generator')) if self._env_summary else None
 
-        # 配图异步任务字典：避免把 Future 对象放入 LangGraph state 导致 msgpack 序列化失败
-        # key = 随机字符串（存在 state['_image_task_id']），value = (Future, ThreadPoolExecutor)
-        self._image_tasks: dict = {}
-        self._image_tasks_lock = threading.Lock()
+        # Future stays outside SharedState so checkpoint serialization remains stable.
+        self._image_task_registry = ImageTaskRegistry()
 
         # 37.12 分层架构校验器（可选）
         self._layer_validator = None
@@ -202,17 +211,6 @@ class BlogGenerator:
         self.app = None
         self._execution_runner = GraphExecutionRunner(self)
 
-    def _validate_layer(self, layer_name: str, state: Dict[str, Any]):
-        """37.12 层间数据契约校验（仅日志警告，不阻断流程）"""
-        if not self._layer_validator:
-            return
-        try:
-            ok, missing = self._layer_validator.validate_inputs(layer_name, state)
-            if not ok:
-                logger.warning(f"🏗️ [{layer_name}] 层输入缺失: {missing}")
-        except Exception as e:
-            logger.debug(f"层校验异常: {e}")
-    
     def _build_workflow(self) -> StateGraph:
         """
         构建 LangGraph 工作流
@@ -220,360 +218,168 @@ class BlogGenerator:
         Returns:
             StateGraph 实例
         """
-        return GraphBuilder(self).build()
+        self._node_handlers = self._bind_node_handlers()
+        return GraphBuilder(
+            node_handlers=self._node_handlers,
+            routing_handlers=self._bind_routing_handlers(),
+            middleware_pipeline=self.pipeline,
+        ).build()
 
-    def _add_node(self, workflow: StateGraph, node_name: str, handler: Callable) -> None:
-        """Register middleware inside the stable state contract boundary."""
-        middleware_wrapped = self.pipeline.wrap_node(node_name, handler)
-        workflow.add_node(
-            node_name,
-            wrap_node_state_contract(node_name, middleware_wrapped),
-        )
+    def _bind_node_handlers(self):
+        return {
+            "researcher": partial(
+                researcher_node,
+                researcher=self.researcher,
+                layer_validator=self._layer_validator,
+            ),
+            "planner": partial(
+                planner_node,
+                planner=self.planner,
+                layer_validator=self._layer_validator,
+                on_stream=None,
+                interactive=False,
+                writing_skill_manager=self._writing_skill_manager,
+                llm_client=self.llm,
+                interrupt_fn=interrupt,
+                getenv=os.getenv,
+                image_preplanner_factory=ImagePreplanner,
+            ),
+            "writer": partial(
+                writer_node,
+                writer=self.writer,
+                layer_validator=self._layer_validator,
+                memory_storage=self._memory_storage,
+                configured_style=self.style,
+            ),
+            "check_knowledge": partial(
+                check_knowledge_node,
+                search_coordinator=self.search_coordinator,
+            ),
+            "refine_search": partial(
+                refine_search_node,
+                search_coordinator=self.search_coordinator,
+            ),
+            "enhance_with_knowledge": partial(
+                enhance_with_knowledge_node,
+                writer=self.writer,
+                parallel_executor=self.executor,
+                prompt_manager_factory=get_prompt_manager,
+                task_config_factory=TaskConfig,
+            ),
+            "questioner": partial(questioner_node, questioner=self.questioner),
+            "deepen_content": partial(
+                deepen_content_node,
+                writer=self.writer,
+                parallel_executor=self.executor,
+                tracker=self.tracker,
+                task_config_factory=TaskConfig,
+            ),
+            "section_evaluate": partial(
+                section_evaluate_node,
+                questioner=self.questioner,
+                tracker=self.tracker,
+                configured_style=self.style,
+            ),
+            "section_improve": partial(
+                section_improve_node,
+                writer=self.writer,
+                tracker=self.tracker,
+            ),
+            "coder_and_artist": partial(
+                coder_and_artist_node,
+                coder=self.coder,
+                artist=self.artist,
+                image_task_registry=self._image_task_registry,
+                executor_factory=ThreadPoolExecutor,
+                uuid_factory=lambda: str(uuid.uuid4()),
+            ),
+            "cross_section_dedup": partial(
+                cross_section_dedup_node,
+                getenv=os.getenv,
+                deduplicator_factory=CrossSectionDeduplicator,
+                llm_client=self.llm,
+            ),
+            "consistency_check": partial(
+                consistency_check_node,
+                configured_style=self.style,
+                env_thread_check=self._env_thread_check,
+                env_voice_check=self._env_voice_check,
+                thread_checker=self.thread_checker,
+                voice_checker=self.voice_checker,
+                parallel_executor=self.executor,
+                task_config_factory=TaskConfig,
+            ),
+            "reviewer": partial(
+                reviewer_node,
+                reviewer=self.reviewer,
+                tracker=self.tracker,
+                configured_style=self.style,
+            ),
+            "revision": partial(
+                revision_node,
+                writer=self.writer,
+                parallel_executor=self.executor,
+                configured_style=self.style,
+                task_config_factory=TaskConfig,
+            ),
+            "factcheck": partial(
+                factcheck_node,
+                factcheck=self.factcheck,
+                configured_style=self.style,
+                env_factcheck=self._env_factcheck,
+            ),
+            "text_cleanup": partial(
+                text_cleanup_node,
+                cleanup=apply_full_cleanup,
+                configured_style=self.style,
+                env_text_cleanup=self._env_text_cleanup,
+            ),
+            "humanizer": partial(
+                humanizer_node,
+                humanizer=self.humanizer,
+                configured_style=self.style,
+                env_humanizer=self._env_humanizer,
+            ),
+            "wait_for_images": partial(
+                wait_for_images_node,
+                image_task_registry=self._image_task_registry,
+                tracker=self.tracker,
+                timeout=600,
+            ),
+            "assembler": partial(assembler_node, assembler=self.assembler),
+            "summary_generator": partial(
+                summary_generator_node,
+                summary_generator=self.summary_generator,
+                configured_style=self.style,
+                env_summary=self._env_summary,
+            ),
+        }
+
+    def _bind_routing_handlers(self):
+        return {
+            "should_check_knowledge": self._should_check_knowledge,
+            "should_refine_search": self._should_refine_search,
+            "should_deepen": self._should_deepen,
+            "should_continue_questioning": self._should_continue_questioning,
+            "should_improve_sections": self._should_improve_sections,
+            "should_revise": self._should_revise,
+        }
+
+    def _configure_planner_runtime(self, *, on_stream, interactive):
+        planner_handler = self._node_handlers["planner"]
+        planner_handler.keywords["on_stream"] = on_stream
+        planner_handler.keywords["interactive"] = interactive
+
+    def _configure_execution_runtime(self, executor):
+        self.executor = executor
+        for node_name in (
+            "enhance_with_knowledge",
+            "deepen_content",
+            "consistency_check",
+            "revision",
+        ):
+            self._node_handlers[node_name].keywords["parallel_executor"] = executor
     
-    def _researcher_node(self, state: SharedState) -> SharedState:
-        """素材收集节点"""
-        if state.get('skip_researcher'):
-            logger.info("=== Step 1: 素材收集（已跳过） ===")
-            empty_defaults = {
-                'background_knowledge': '',
-                'key_concepts': [],
-                'search_results': [],
-                'reference_links': [],
-                'knowledge_source_stats': {},
-                'instructional_analysis': {},
-                'learning_objectives': [],
-                'verbatim_data': [],
-                'distilled_sources': [],
-                'material_by_type': {},
-                'common_themes': [],
-                'contradictions': [],
-                'content_gaps': [],
-                'unique_angles': [],
-                'writing_recommendations': {},
-            }
-            for key, default in empty_defaults.items():
-                if state.get(key) is None:
-                    state[key] = default
-            return state
-        logger.info("=== Step 1: 素材收集 ===")
-        self._validate_layer("research", state)
-        return self.researcher.run(state)
-    
-    def _planner_node(self, state: SharedState) -> SharedState:
-        """大纲规划节点"""
-        logger.info("=== Step 2: 大纲规划 ===")
-        self._validate_layer("structure", state)
-        # 使用实例变量中的流式回调
-        on_stream = getattr(self, '_outline_stream_callback', None)
-        result = self.planner.run(state, on_stream=on_stream)
-
-        # 交互式模式：使用 LangGraph 原生 interrupt 暂停图执行
-        outline = result.get('outline') if isinstance(result, dict) else None
-
-        # mini 模式或环境变量指定时自动确认大纲，跳过人工 interrupt
-        auto_confirm = (
-            state.get('target_length') == 'mini'
-            or os.getenv('OUTLINE_AUTO_CONFIRM', 'false').lower() == 'true'
-        )
-
-        if outline and getattr(self, '_interactive', False) and not auto_confirm:
-            sections = outline.get('sections', [])
-            interrupt_data = {
-                "type": "confirm_outline",
-                "title": outline.get("title", ""),
-                "sections": sections,
-                "sections_titles": [s.get("title", "") for s in sections],
-                "narrative_mode": outline.get("narrative_mode", ""),
-                "narrative_flow": outline.get("narrative_flow", {}),
-                "sections_narrative_roles": [s.get("narrative_role", "") for s in sections],
-            }
-            user_decision = interrupt(interrupt_data)
-
-            # 处理用户决策
-            if isinstance(user_decision, dict) and user_decision.get("action") == "edit":
-                edited_outline = user_decision.get("outline", outline)
-                logger.info(f"大纲已被用户修改: {edited_outline.get('title', '')}")
-                result['outline'] = edited_outline
-                result['sections'] = []  # 清空已有章节，重新写作
-            else:
-                logger.info("大纲已被用户确认")
-        elif outline and auto_confirm:
-            logger.info(f"[AutoConfirm] 自动确认大纲 (target_length={state.get('target_length')})")
-
-        # 102.06: 匹配写作技能，注入到 state 供 writer 使用
-        if self._writing_skill_manager:
-            try:
-                topic = state.get('topic', '')
-                article_type = state.get('article_type', '')
-                skill = self._writing_skill_manager.match_skill(topic, article_type)
-                if skill:
-                    result['_writing_skill_prompt'] = self._writing_skill_manager.build_system_prompt_section(skill)
-                    logger.info(f"匹配写作技能: {skill.name}")
-            except Exception as e:
-                logger.debug(f"写作技能匹配跳过: {e}")
-
-        # 41.05 图片预规划：在大纲确认后、写作前生成全局图片计划
-        if os.environ.get('IMAGE_PREPLAN_ENABLED', 'false').lower() == 'true':
-            try:
-                from .image_preplanner import ImagePreplanner
-                preplanner = ImagePreplanner(self.llm)
-                outline = result.get('outline', {})
-                image_plan = preplanner.plan(
-                    outline=outline,
-                    background_knowledge=state.get('background_knowledge', ''),
-                    article_type=state.get('article_type', 'tutorial'),
-                )
-                result['image_preplan'] = image_plan
-                logger.info(f"[41.05] 图片预规划完成: {len(image_plan)} 张")
-            except Exception as e:
-                logger.warning(f"[41.05] 图片预规划失败: {e}")
-
-        return result
-    
-    def _writer_node(self, state: SharedState) -> SharedState:
-        """内容撰写节点"""
-        logger.info("=== Step 3: 内容撰写 ===")
-        self._validate_layer("content", state)
-
-        # 102.03: 注入用户记忆到 background_knowledge
-        if self._memory_storage:
-            try:
-                user_id = state.get('user_id', 'default')
-                memory_injection = self._memory_storage.format_for_injection(user_id)
-                if memory_injection:
-                    bg = state.get('background_knowledge', '')
-                    state['background_knowledge'] = bg + "\n\n" + memory_injection if bg else memory_injection
-                    logger.info(f"注入用户记忆: {len(memory_injection)} 字符")
-            except Exception as e:
-                logger.debug(f"用户记忆注入跳过: {e}")
-
-        # 41.10: 注入人设 Prompt 到 state（供 Writer 使用）
-        style = self._get_style(state)
-        persona_prompt = style.get_persona_prompt()
-        if persona_prompt:
-            state['_persona_prompt'] = persona_prompt
-            logger.info(f"[41.10] 注入人设 Prompt: {persona_prompt[:60]}...")
-
-        before_count = _get_content_word_count(state)
-        result = self.writer.run(state)
-        after_count = _get_content_word_count(result)
-        _log_word_count_diff("Writer", before_count, after_count)
-        # 初始化累积知识（首次写作后）
-        if not result.get('accumulated_knowledge'):
-            result['accumulated_knowledge'] = result.get('background_knowledge', '')
-        return result
-    
-    def _check_knowledge_node(self, state: SharedState) -> SharedState:
-        """知识空白检查节点"""
-        search_count = state.get('search_count', 0)
-        max_count = state.get('max_search_count', 5)
-        logger.info(f"=== Step 3.5: 知识空白检查 (搜索次数: {search_count}/{max_count}) ===")
-        return self.search_coordinator.run(state)
-    
-    def _refine_search_node(self, state: SharedState) -> SharedState:
-        """细化搜索节点"""
-        search_count = state.get('search_count', 0) + 1
-        max_count = state.get('max_search_count', 5)
-        logger.info(f"=== Step 3.6: 细化搜索 (第 {search_count} 轮) ===")
-        
-        gaps = state.get('knowledge_gaps', [])
-        result = self.search_coordinator.refine_search(gaps, state)
-        
-        if result.get('success'):
-            logger.info(f"细化搜索完成: 获取 {len(result.get('results', []))} 条结果")
-        else:
-            logger.warning(f"细化搜索失败: {result.get('reason', '未知原因')}")
-        
-        return state
-    
-    def _enhance_with_knowledge_node(self, state: SharedState) -> SharedState:
-        """基于新知识增强内容节点（102.01 迁移：使用 ParallelTaskExecutor）"""
-        logger.info("=== Step 3.7: 知识增强 ===")
-
-        sections = state.get('sections', [])
-        gaps = state.get('knowledge_gaps', [])
-        new_knowledge = state.get('accumulated_knowledge', '')
-
-        if not gaps or not new_knowledge:
-            logger.info("没有需要增强的内容")
-            return state
-
-        from .prompts import get_prompt_manager
-        pm = get_prompt_manager()
-
-        # 收集需要增强的任务
-        enhance_items = []
-        for section in sections:
-            section_gaps = [g for g in gaps if not g.get('section_id') or g.get('section_id') == section.get('id')]
-            if section_gaps:
-                enhance_items.append((section, section_gaps))
-
-        if not enhance_items:
-            logger.info("没有需要增强的章节")
-            state['knowledge_gaps'] = []
-            return state
-
-        def enhance_single(section, section_gaps):
-            prompt = pm.render_writer_enhance_with_knowledge(
-                original_content=section.get('content', ''),
-                new_knowledge=new_knowledge,
-                knowledge_gaps=section_gaps,
-            )
-            return self.writer.llm.chat(messages=[{"role": "user", "content": prompt}])
-
-        tasks = [
-            {
-                "name": f"增强-{section.get('title', '')}",
-                "fn": enhance_single,
-                "args": (section, section_gaps),
-            }
-            for section, section_gaps in enhance_items
-        ]
-
-        results = self.executor.run_parallel(tasks, config=TaskConfig(
-            name="knowledge_enhance", timeout_seconds=120,
-        ))
-
-        for i, r in enumerate(results):
-            if r.success:
-                enhance_items[i][0]['content'] = r.result
-                logger.info(f"章节增强完成: {enhance_items[i][0].get('title', '')}")
-            else:
-                logger.error(f"章节增强失败: {r.error}")
-
-        enhanced_count = sum(1 for r in results if r.success)
-        logger.info(f"知识增强完成: {enhanced_count} 个章节")
-        state['knowledge_gaps'] = []
-        return state
-    
-    
-    
-    def _questioner_node(self, state: SharedState) -> SharedState:
-        """追问检查节点"""
-        logger.info("=== Step 4: 追问检查 ===")
-        return self.questioner.run(state)
-    
-    def _deepen_content_node(self, state: SharedState) -> SharedState:
-        """内容深化节点（102.01 迁移：使用 ParallelTaskExecutor）"""
-        logger.info("=== Step 4.1: 内容深化 ===")
-        before_count = _get_content_word_count(state)
-        state['questioning_count'] = state.get('questioning_count', 0) + 1
-
-        sections_to_deepen = [
-            r for r in state.get('question_results', [])
-            if not r.get('is_detailed_enough', True)
-        ]
-        total_to_deepen = len(sections_to_deepen)
-
-        if total_to_deepen == 0:
-            logger.info("没有需要深化的章节")
-            return state
-
-        # 构建任务列表
-        tasks = []
-        for idx, result in enumerate(sections_to_deepen, 1):
-            section_id = result.get('section_id', '')
-            vague_points = result.get('vague_points', [])
-
-            for section in state.get('sections', []):
-                if section.get('id') == section_id:
-                    section_title = section.get('title', section_id)
-                    progress_info = f"[{idx}/{total_to_deepen}]"
-                    tasks.append({
-                        "name": f"深化-{section_title}",
-                        "fn": self.writer.enhance_section,
-                        "kwargs": {
-                            "original_content": section.get('content', ''),
-                            "vague_points": vague_points,
-                            "section_title": section_title,
-                            "progress_info": progress_info,
-                        },
-                        "_section_id": section_id,
-                    })
-                    break
-
-        results = self.executor.run_parallel(tasks, config=TaskConfig(
-            name="content_deepen", timeout_seconds=120,
-        ))
-
-        # 回写结果
-        for i, r in enumerate(results):
-            if r.success:
-                target_id = tasks[i]["_section_id"]
-                for section in state.get('sections', []):
-                    if section.get('id') == target_id:
-                        section['content'] = r.result
-                        logger.info(f"章节深化完成: {section.get('title', '')}")
-                        break
-            else:
-                logger.error(f"章节深化失败: {r.error}")
-
-        after_count = _get_content_word_count(state)
-        _log_word_count_diff("内容深化", before_count, after_count)
-
-        # 69.05: 记录深化迭代快照
-        self.tracker.log_deepen_snapshot(
-            round_num=state.get('questioning_count', 0),
-            sections_deepened=total_to_deepen,
-            chars_added=after_count - before_count,
-        )
-
-        return state
-
-    # ========== 段落级 Generator-Critic Loop (#69.04) ==========
-
-    def _section_evaluate_node(self, state: SharedState) -> SharedState:
-        """段落多维度评估节点（Critic 角色）"""
-        # 双开关：环境变量 + StyleProfile
-        style = self._get_style(state)
-        if not self._is_enabled("SECTION_EVAL_ENABLED", getattr(style, "enable_thread_check", True)):
-            logger.info("段落评估已禁用，跳过")
-            state["section_evaluations"] = []
-            state["needs_section_improvement"] = False
-            return state
-
-        logger.info("=== Step 4.2: 段落多维度评估 ===")
-        sections = state.get("sections", [])
-        evaluations = []
-        needs_improvement = False
-
-        for i, section in enumerate(sections):
-            prev_summary = sections[i - 1].get("title", "") if i > 0 else ""
-            next_preview = sections[i + 1].get("title", "") if i < len(sections) - 1 else ""
-
-            evaluation = self.questioner.evaluate_section(
-                section_content=section.get("content", ""),
-                section_title=section.get("title", ""),
-                prev_summary=prev_summary,
-                next_preview=next_preview,
-            )
-            evaluation["section_idx"] = i
-            evaluations.append(evaluation)
-
-            if evaluation["overall_quality"] < 7.0:
-                needs_improvement = True
-                logger.info(
-                    f"  段落 [{section.get('title', '')}] 需改进: "
-                    f"overall={evaluation['overall_quality']}"
-                )
-
-        state["section_evaluations"] = evaluations
-        state["needs_section_improvement"] = needs_improvement
-
-        avg_score = (
-            sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
-        )
-        logger.info(f"段落评估完成: 平均分 {avg_score:.1f}, 需改进={needs_improvement}")
-
-        # 69.05: 记录段落评估分数
-        for evaluation in evaluations:
-            self.tracker.log_section_evaluation(
-                section_title=sections[evaluation.get("section_idx", 0)].get("title", ""),
-                scores=evaluation.get("scores", {}),
-                overall=evaluation["overall_quality"],
-            )
-
-        return state
 
     def _should_improve_sections(self, state: SharedState) -> str:
         """判断是否需要段落级改进"""
@@ -598,341 +404,6 @@ class BlogGenerator:
         state["prev_section_avg_score"] = curr_avg
         return "improve"
 
-    def _section_improve_node(self, state: SharedState) -> SharedState:
-        """段落精准改进节点（Generator 角色）"""
-        logger.info("=== Step 4.3: 段落精准改进 ===")
-        evaluations = state.get("section_evaluations", [])
-        sections = state.get("sections", [])
-        improved_count = 0
-
-        for evaluation in evaluations:
-            idx = evaluation.get("section_idx", -1)
-            if evaluation["overall_quality"] >= 7.0 or idx < 0 or idx >= len(sections):
-                continue
-
-            section = sections[idx]
-            improved_content = self.writer.improve_section(
-                original_content=section.get("content", ""),
-                critique=evaluation,
-                section_title=section.get("title", ""),
-            )
-            section["content"] = improved_content
-            improved_count += 1
-
-        state["section_improve_count"] = state.get("section_improve_count", 0) + 1
-        logger.info(f"段落改进完成: 改进了 {improved_count} 个段落 (第 {state['section_improve_count']} 轮)")
-
-        # 69.05: 记录段落改进快照
-        new_avg = (
-            sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
-        )
-        self.tracker.log_section_improve_snapshot(
-            round_num=state["section_improve_count"],
-            improved_count=improved_count,
-            avg_score_before=state.get("prev_section_avg_score", 0),
-            avg_score_after=new_avg,
-        )
-
-        return state
-    
-    def _coder_and_artist_node(self, state: SharedState) -> SharedState:
-        """代码生成（同步） + 配图生成（异步后台）
-
-        配图生成耗时长（~400s），但后续节点（dedup/reviewer/humanizer）不依赖图片。
-        因此将配图作为后台任务启动，在 assembler 前等待结果。
-        """
-        logger.info("=== Step 5: 代码生成 + 配图异步启动 ===")
-
-        # 1. 代码生成（同步，很快）
-        try:
-            state = self.coder.run(state)
-        except Exception as e:
-            logger.error(f"代码生成失败: {e}")
-
-        code_count = len(state.get('code_blocks', []))
-        logger.info(f"代码生成完成: {code_count} 个代码块")
-
-        # 2. 同步预处理章节，再将独立快照交给后台配图任务
-        state['sections'] = self.artist.preprocess_ascii_flowcharts(
-            state.get('sections', [])
-        )
-        artist_state = copy.deepcopy(state)
-        image_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="artist")
-        future = image_executor.submit(self.artist.run, artist_state)
-
-        # 将 Future 存到实例字典，而非 state，避免 LangGraph msgpack 序列化失败
-        image_task_id = str(uuid.uuid4())
-        with self._image_tasks_lock:
-            self._image_tasks[image_task_id] = (future, image_executor)
-        state['_image_task_id'] = image_task_id
-        logger.info("配图生成已异步启动，不阻塞后续流程")
-
-        return state
-
-    def _wait_for_images_node(self, state: SharedState) -> SharedState:
-        """等待异步配图生成完成，合并结果到 state"""
-        image_task_id = state.pop('_image_task_id', None)
-        with self._image_tasks_lock:
-            future, executor = self._image_tasks.pop(image_task_id, (None, None)) \
-                if image_task_id else (None, None)
-
-        if future is None:
-            logger.warning("无配图异步任务，跳过等待")
-            return state
-
-        logger.info("=== 等待配图生成完成 ===")
-        try:
-            result = future.result(timeout=600)  # 最多等 10 分钟
-            if isinstance(result, dict):
-                if 'section_images' in result:
-                    state['section_images'] = result['section_images']
-                    logger.info(f"合并 section_images: {len(state['section_images'])} 张")
-                if 'images' in result:
-                    state['images'] = result['images']
-                self._merge_artist_image_ids(
-                    state.get('sections', []),
-                    result.get('sections', []),
-                )
-
-            image_count = len(state.get('images', []))
-            logger.info(f"=== 配图生成完成: {image_count} 张图片 ===")
-
-            # 69.05: 记录配图生成结果
-            for img in state.get('images', []):
-                self.tracker.log_image_generation(
-                    image_id=img.get('id', ''),
-                    image_type=img.get('render_method', ''),
-                    success=True,
-                )
-        except Exception as e:
-            logger.error(f"配图生成失败或超时: {e}")
-        finally:
-            if executor:
-                executor.shutdown(wait=False)
-
-        return state
-
-    @staticmethod
-    def _merge_artist_image_ids(current_sections, artist_sections) -> None:
-        """Merge only image associations, preserving newer section content."""
-        artist_by_id = {
-            section.get('id'): section
-            for section in artist_sections
-            if section.get('id')
-        }
-        for index, current in enumerate(current_sections):
-            artist_section = artist_by_id.get(current.get('id'))
-            if artist_section is None and index < len(artist_sections):
-                artist_section = artist_sections[index]
-            if not artist_section:
-                continue
-
-            image_ids = artist_section.get('image_ids', [])
-            if image_ids:
-                current['image_ids'] = list(dict.fromkeys(
-                    current.get('image_ids', []) + image_ids
-                ))
-    
-    def _reviewer_node(self, state: SharedState) -> SharedState:
-        """质量审核节点"""
-        logger.info("=== Step 7: 质量审核 ===")
-
-        # mini 模式：修订后跳过 R2 审核（revision_count 已达上限时，R2 结果不影响路由）
-        style = self._get_style(state)
-        revision_count = state.get('revision_count', 0)
-        if revision_count >= style.max_revision_rounds:
-            logger.info(f"[Reviewer] 已达最大修订轮数 ({style.max_revision_rounds})，跳过 R2 审核")
-            state['review_approved'] = True
-            return state
-
-        state = self.reviewer.run(state)
-
-        # 合并一致性检查发现的问题到 review_issues
-        consistency_issues = state.get('thread_issues', []) + state.get('voice_issues', [])
-        if consistency_issues:
-            existing = state.get('review_issues', [])
-            state['review_issues'] = existing + consistency_issues
-            logger.info(f"[Reviewer] 合并一致性检查问题: {len(consistency_issues)} 条")
-
-        # 69.05: 记录审核分数到 Langfuse
-        self.tracker.log_review_score(
-            score=state.get('review_score', 0),
-            round_num=state.get('revision_count', 0),
-            summary=f"issues={len(state.get('review_issues', []))} approved={state.get('review_approved', False)}",
-        )
-
-        return state
-    
-    def _revision_node(self, state: SharedState) -> SharedState:
-        """修订节点（102.01 迁移：使用 ParallelTaskExecutor）"""
-        logger.info("=== Step 7.1: 修订 ===")
-        before_count = _get_content_word_count(state)
-        state['revision_count'] = state.get('revision_count', 0) + 1
-
-        review_issues = state.get('review_issues', [])
-        total_issues = len(review_issues)
-        style = self._get_style(state)
-
-        if total_issues == 0:
-            logger.info("没有需要修订的问题")
-            return state
-
-        if style.revision_strategy == "correct_only":
-            self._revision_correct_only(state, review_issues)
-        else:
-            self._revision_enhance(state, review_issues)
-
-        after_count = _get_content_word_count(state)
-        _log_word_count_diff("修订", before_count, after_count)
-        return state
-
-    def _revision_correct_only(self, state, review_issues):
-        """correct_only 模式：按章节分组，使用 correct_section"""
-        section_issues = {}
-        for issue in review_issues:
-            section_id = issue.get('section_id', '')
-            if section_id not in section_issues:
-                section_issues[section_id] = []
-            section_issues[section_id].append({
-                'severity': issue.get('severity', 'medium'),
-                'description': issue.get('description', ''),
-                'affected_content': issue.get('affected_content', ''),
-            })
-
-        tasks = []
-        for idx, (section_id, issues) in enumerate(section_issues.items(), 1):
-            for section in state.get('sections', []):
-                if section.get('id') == section_id:
-                    section_title = section.get('title', section_id)
-                    progress_info = f"[{idx}/{len(section_issues)}]"
-                    tasks.append({
-                        "name": f"更正-{section_title}",
-                        "fn": self.writer.correct_section,
-                        "kwargs": {
-                            "original_content": section.get('content', ''),
-                            "issues": issues,
-                            "section_title": section_title,
-                            "progress_info": progress_info,
-                        },
-                        "_section_id": section_id,
-                    })
-                    break
-
-        results = self.executor.run_parallel(tasks, config=TaskConfig(
-            name="revision_correct", timeout_seconds=120,
-        ))
-
-        for i, r in enumerate(results):
-            if r.success:
-                target_id = tasks[i]["_section_id"]
-                for section in state.get('sections', []):
-                    if section.get('id') == target_id:
-                        section['content'] = r.result
-                        break
-            else:
-                logger.error(f"章节更正失败: {r.error}")
-
-    def _revision_enhance(self, state, review_issues):
-        """enhance 模式：按问题逐个修订"""
-        tasks = []
-        for idx, issue in enumerate(review_issues, 1):
-            section_id = issue.get('section_id', '')
-            suggestion = issue.get('suggestion', '')
-
-            for section in state.get('sections', []):
-                if section.get('id') == section_id:
-                    section_title = section.get('title', section_id)
-                    progress_info = f"[{idx}/{len(review_issues)}]"
-                    tasks.append({
-                        "name": f"修订-{section_title}",
-                        "fn": self.writer.enhance_section,
-                        "kwargs": {
-                            "original_content": section.get('content', ''),
-                            "vague_points": [{
-                                'location': section_title,
-                                'issue': issue.get('description', ''),
-                                'question': suggestion,
-                                'suggestion': '根据审核建议修改',
-                            }],
-                            "section_title": section_title,
-                            "progress_info": progress_info,
-                        },
-                        "_section_id": section_id,
-                    })
-                    break
-
-        results = self.executor.run_parallel(tasks, config=TaskConfig(
-            name="revision_enhance", timeout_seconds=240,
-        ))
-
-        for i, r in enumerate(results):
-            if r.success:
-                target_id = tasks[i]["_section_id"]
-                for section in state.get('sections', []):
-                    if section.get('id') == target_id:
-                        section['content'] = r.result
-                        break
-            else:
-                logger.error(f"章节修订失败: {r.error}")
-
-    def _cross_section_dedup_node(self, state: SharedState) -> SharedState:
-        """41.09 跨章节语义去重节点"""
-        if os.environ.get('CROSS_SECTION_DEDUP_ENABLED', 'false').lower() != 'true':
-            return state
-        sections = state.get('sections', [])
-        if len(sections) < 2:
-            return state
-        logger.info("=== Step 5.5: 跨章节语义去重 ===")
-        try:
-            from .cross_section_dedup import CrossSectionDeduplicator
-            dedup = CrossSectionDeduplicator(llm_client=self.llm)
-            state['sections'] = dedup.deduplicate(sections)
-        except Exception as e:
-            logger.warning(f"[Dedup] 异常，跳过去重: {e}")
-        return state
-
-    def _consistency_check_node(self, state: SharedState) -> SharedState:
-        """一致性检查节点（102.01 迁移：使用 ParallelTaskExecutor）"""
-        sections = state.get('sections', [])
-        if len(sections) < 2:
-            state['thread_issues'] = []
-            state['voice_issues'] = []
-            return state
-
-        style = self._get_style(state)
-        thread_enabled = self._is_enabled(self._env_thread_check, style.enable_thread_check)
-        voice_enabled = self._is_enabled(self._env_voice_check, style.enable_voice_check)
-
-        if not thread_enabled and not voice_enabled:
-            state['thread_issues'] = []
-            state['voice_issues'] = []
-            return state
-
-        logger.info("=== Step 6.5: 一致性检查（叙事 + 语气）===")
-
-        tasks = []
-        if thread_enabled:
-            tasks.append({"name": "叙事一致性", "fn": self.thread_checker.run, "args": (state,)})
-        if voice_enabled:
-            tasks.append({"name": "语气一致性", "fn": self.voice_checker.run, "args": (state,)})
-
-        results = self.executor.run_parallel(tasks, config=TaskConfig(
-            name="consistency_check", timeout_seconds=120,
-        ))
-
-        for r in results:
-            if not r.success:
-                logger.error(f"[ConsistencyCheck] {r.task_name} 异常: {r.error}")
-
-        if not thread_enabled:
-            state['thread_issues'] = []
-        if not voice_enabled:
-            state['voice_issues'] = []
-
-        thread_count = len(state.get('thread_issues', []))
-        voice_count = len(state.get('voice_issues', []))
-        logger.info(f"[ConsistencyCheck] 完成: 叙事问题 {thread_count}, 语气问题 {voice_count}")
-        return state
 
     def _get_style(self, state: SharedState) -> StyleProfile:
         """获取当前运行的 StyleProfile（实例级 > state 级 > target_length 推断）"""
@@ -957,81 +428,7 @@ class BlogGenerator:
             "recursion_limit": recursion_limit,
         }
 
-    def _is_enabled(self, env_flag: bool, style_flag: bool) -> bool:
-        """环境变量 AND StyleProfile 双重开关"""
-        return env_flag and style_flag
 
-    def _factcheck_node(self, state: SharedState) -> SharedState:
-        """事实核查节点"""
-        # mini 模式跳过事实核查（节省 ~280s）
-        target_length = state.get('target_length', 'medium')
-        if target_length == 'mini':
-            logger.info("[FactCheck] mini 模式，跳过事实核查")
-            return state
-        style = self._get_style(state)
-        if not self._is_enabled(self._env_factcheck, style.enable_fact_check):
-            logger.info("=== Step 7.3: 事实核查（已禁用，跳过）===")
-            return state
-        logger.info("=== Step 7.3: 事实核查 ===")
-        try:
-            return self.factcheck.run(state)
-        except Exception as e:
-            logger.error(f"[FactCheck] 异常，降级跳过: {e}")
-            return state
-
-    def _text_cleanup_node(self, state: SharedState) -> SharedState:
-        """确定性文本清理节点（纯正则，零 LLM）"""
-        style = self._get_style(state)
-        if not self._is_enabled(self._env_text_cleanup, style.enable_text_cleanup):
-            logger.info("=== Step 7.4: 文本清理（已禁用，跳过）===")
-            return state
-        logger.info("=== Step 7.4: 确定性文本清理 ===")
-        from utils.text_cleanup import apply_full_cleanup
-        total_fixes = 0
-        for section in state.get('sections', []):
-            content = section.get('content', '')
-            if not content:
-                continue
-            result = apply_full_cleanup(content)
-            section['content'] = result['text']
-            fixes = result['total_fixes']
-            if fixes:
-                logger.info(f"  [{section.get('title', '')}] 修复 {fixes} 处: {result['stats']}")
-                total_fixes += fixes
-        logger.info(f"[TextCleanup] 完成: 共修复 {total_fixes} 处")
-        return state
-
-    def _humanizer_node(self, state: SharedState) -> SharedState:
-        """去 AI 味节点"""
-        style = self._get_style(state)
-        if not self._is_enabled(self._env_humanizer, style.enable_humanizer):
-            logger.info("=== Step 7.5: 去 AI 味（已禁用，跳过）===")
-            return state
-        logger.info("=== Step 7.5: 去 AI 味 ===")
-        try:
-            return self.humanizer.run(state)
-        except Exception as e:
-            logger.error(f"[Humanizer] 异常，降级使用原始内容: {e}")
-            return state
-
-    def _summary_generator_node(self, state: SharedState) -> SharedState:
-        """博客导读 + SEO 关键词生成节点"""
-        style = self._get_style(state)
-        if not self._is_enabled(self._env_summary, style.enable_summary_gen):
-            logger.info("=== Step 9: 导读+SEO（已禁用，跳过）===")
-            return state
-        logger.info("=== Step 9: 导读 + SEO 关键词生成 ===")
-        try:
-            return self.summary_generator.run(state)
-        except Exception as e:
-            logger.error(f"[SummaryGenerator] 异常，降级跳过: {e}")
-            return state
-
-    def _assembler_node(self, state: SharedState) -> SharedState:
-        """文档组装节点"""
-        logger.info("=== Step 8: 文档组装 ===")
-        return self.assembler.run(state)
-    
     def _should_deepen(self, state: SharedState) -> Literal["deepen", "continue"]:
         """判断是否需要深化内容 — 统一用 StyleProfile 控制"""
         count = state.get('questioning_count', 0)

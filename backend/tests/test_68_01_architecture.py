@@ -222,13 +222,13 @@ class TestGeneratorStyleIntegration:
         assert style.max_revision_rounds == 1  # mini
 
     def test_is_enabled_both_true(self):
-        gen = self._make_generator()
-        assert gen._is_enabled(True, True) is True
+        from services.blog_generator.orchestrator.nodes import is_enabled
+        assert is_enabled(True, True) is True
 
     def test_is_enabled_env_false(self):
-        gen = self._make_generator()
-        assert gen._is_enabled(False, True) is False
+        from services.blog_generator.orchestrator.nodes import is_enabled
+        assert is_enabled(False, True) is False
 
     def test_is_enabled_style_false(self):
-        gen = self._make_generator()
-        assert gen._is_enabled(True, False) is False
+        from services.blog_generator.orchestrator.nodes import is_enabled
+        assert is_enabled(True, False) is False

@@ -683,10 +683,10 @@ class BlogService:
                         'accumulated': accumulated
                     })
             
-            self.generator._outline_stream_callback = on_outline_stream
-            
-            # 101.113: 设置交互式标志，让 _planner_node 使用 interrupt()
-            self.generator._interactive = interactive
+            self.generator._configure_planner_runtime(
+                on_stream=on_outline_stream,
+                interactive=interactive,
+            )
             
             config = {"configurable": {"thread_id": f"blog_{task_id}"}}
             
@@ -735,8 +735,8 @@ class BlogService:
             from .style_profile import StyleProfile
             from .parallel import ParallelTaskExecutor
             style = StyleProfile.from_target_length(target_length)
-            self.generator.executor = ParallelTaskExecutor(
-                enable_parallel=style.enable_parallel,
+            self.generator._configure_execution_runtime(
+                ParallelTaskExecutor(enable_parallel=style.enable_parallel)
             )
 
             # 使用 stream 获取中间状态

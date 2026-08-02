@@ -2,6 +2,7 @@ import ast
 from pathlib import Path
 
 from services.blog_generator.schemas.state_contracts import NODE_STATE_CONTRACTS
+from services.blog_generator.orchestrator.graph_builder import NODE_NAMES
 
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
@@ -45,34 +46,15 @@ def test_shared_state_uses_named_aliases_for_stable_payloads():
 
 
 def test_contract_nodes_use_the_single_registration_boundary():
-    generator_tree = ast.parse(
-        (BACKEND_ROOT / "services/blog_generator/generator.py").read_text()
-    )
     builder_tree = ast.parse(
         (
             BACKEND_ROOT
             / "services/blog_generator/orchestrator/graph_builder.py"
         ).read_text()
     )
-    build_workflow = _function(builder_tree, "build")
-    registered = {
-        item.elts[0].value
-        for node in build_workflow.body
-        if isinstance(node, ast.Assign)
-        and any(
-            isinstance(target, ast.Name) and target.id == "nodes"
-            for target in node.targets
-        )
-        and isinstance(node.value, (ast.Tuple, ast.List))
-        for item in node.value.elts
-        if isinstance(item, (ast.Tuple, ast.List))
-        and item.elts
-        and isinstance(item.elts[0], ast.Constant)
-    }
+    assert set(NODE_STATE_CONTRACTS) <= set(NODE_NAMES)
 
-    assert set(NODE_STATE_CONTRACTS) <= registered
-
-    add_node = _function(generator_tree, "_add_node")
+    add_node = _function(builder_tree, "_add_node")
     called_functions = {
         call.func.id
         for call in ast.walk(add_node)

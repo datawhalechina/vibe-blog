@@ -167,37 +167,37 @@ class TestGeneratorTrackerIntegration:
     def test_reviewer_node_calls_tracker(self):
         """ST12: _reviewer_node 调用 tracker.log_review_score"""
         import inspect
-        from services.blog_generator.generator import BlogGenerator
-        source = inspect.getsource(BlogGenerator._reviewer_node)
-        assert "self.tracker.log_review_score" in source
+        from services.blog_generator.orchestrator.nodes.review import reviewer_node
+        source = inspect.getsource(reviewer_node)
+        assert "tracker.log_review_score" in source
 
     def test_section_evaluate_node_calls_tracker(self):
         """ST13: _section_evaluate_node 调用 tracker.log_section_evaluation"""
         import inspect
-        from services.blog_generator.generator import BlogGenerator
-        source = inspect.getsource(BlogGenerator._section_evaluate_node)
-        assert "self.tracker.log_section_evaluation" in source
+        from services.blog_generator.orchestrator.nodes.writing import section_evaluate_node
+        source = inspect.getsource(section_evaluate_node)
+        assert "tracker.log_section_evaluation" in source
 
     def test_section_improve_node_calls_tracker(self):
         """ST14: _section_improve_node 调用 tracker.log_section_improve_snapshot"""
         import inspect
-        from services.blog_generator.generator import BlogGenerator
-        source = inspect.getsource(BlogGenerator._section_improve_node)
-        assert "self.tracker.log_section_improve_snapshot" in source
+        from services.blog_generator.orchestrator.nodes.writing import section_improve_node
+        source = inspect.getsource(section_improve_node)
+        assert "tracker.log_section_improve_snapshot" in source
 
     def test_deepen_content_node_calls_tracker(self):
         """ST14b: _deepen_content_node 调用 tracker.log_deepen_snapshot"""
         import inspect
-        from services.blog_generator.generator import BlogGenerator
-        source = inspect.getsource(BlogGenerator._deepen_content_node)
-        assert "self.tracker.log_deepen_snapshot" in source
+        from services.blog_generator.orchestrator.nodes.writing import deepen_content_node
+        source = inspect.getsource(deepen_content_node)
+        assert "tracker.log_deepen_snapshot" in source
 
     def test_coder_and_artist_node_calls_tracker(self):
         """ST14c: _wait_for_images_node 调用 tracker.log_image_generation（配图异步化后 tracker 移至此处）"""
         import inspect
-        from services.blog_generator.generator import BlogGenerator
-        source = inspect.getsource(BlogGenerator._wait_for_images_node)
-        assert "self.tracker.log_image_generation" in source
+        from services.blog_generator.orchestrator.nodes.finalization import wait_for_images_node
+        source = inspect.getsource(wait_for_images_node)
+        assert "tracker.log_image_generation" in source
 
 
 # ========== ST15-ST17: Agent 清理验证 ==========

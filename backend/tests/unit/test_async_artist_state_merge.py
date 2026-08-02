@@ -1,24 +1,18 @@
-import threading
 from concurrent.futures import Future
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
-from services.blog_generator.generator import BlogGenerator
-
-
-def _generator_shell():
-    generator = BlogGenerator.__new__(BlogGenerator)
-    generator._image_tasks = {}
-    generator._image_tasks_lock = threading.Lock()
-    generator.tracker = MagicMock()
-    return generator
+from services.blog_generator.orchestrator.image_task_registry import ImageTaskRegistry
+from services.blog_generator.orchestrator.nodes.finalization import (
+    coder_and_artist_node,
+    wait_for_images_node,
+)
 
 
 def test_coder_and_artist_preprocesses_before_submitting_detached_snapshot():
-    generator = _generator_shell()
-    generator.coder = MagicMock()
-    generator.coder.run.side_effect = lambda state: state
-    generator.artist = MagicMock()
-    generator.artist.preprocess_ascii_flowcharts.return_value = [
+    coder = MagicMock()
+    coder.run.side_effect = lambda state: state
+    artist = MagicMock()
+    artist.preprocess_ascii_flowcharts.return_value = [
         {
             "id": "intro",
             "title": "Intro",
@@ -32,11 +26,14 @@ def test_coder_and_artist_preprocesses_before_submitting_detached_snapshot():
         "code_blocks": [],
     }
 
-    with patch(
-        "services.blog_generator.generator.ThreadPoolExecutor",
-        return_value=executor,
-    ):
-        result = generator._coder_and_artist_node(state)
+    result = coder_and_artist_node(
+        state,
+        coder=coder,
+        artist=artist,
+        image_task_registry=MagicMock(),
+        executor_factory=MagicMock(return_value=executor),
+        uuid_factory=MagicMock(return_value="task_1"),
+    )
 
     submitted_state = executor.submit.call_args.args[1]
     assert result["sections"][0]["content"] == "[IMAGE: converted ASCII]"
@@ -45,7 +42,7 @@ def test_coder_and_artist_preprocesses_before_submitting_detached_snapshot():
 
 
 def test_wait_for_images_merges_image_ids_without_overwriting_newer_content():
-    generator = _generator_shell()
+    registry = ImageTaskRegistry()
     future = Future()
     future.set_result(
         {
@@ -68,7 +65,7 @@ def test_wait_for_images_merges_image_ids_without_overwriting_newer_content():
         }
     )
     executor = MagicMock()
-    generator._image_tasks["task_1"] = (future, executor)
+    registry.register("task_1", future, executor)
     state = {
         "_image_task_id": "task_1",
         "sections": [
@@ -82,7 +79,12 @@ def test_wait_for_images_merges_image_ids_without_overwriting_newer_content():
         "images": [],
     }
 
-    result = generator._wait_for_images_node(state)
+    result = wait_for_images_node(
+        state,
+        image_task_registry=registry,
+        tracker=MagicMock(),
+        timeout=600,
+    )
 
     assert result["sections"][0]["content"] == "newer reviewed content"
     assert result["sections"][0]["image_ids"] == ["existing", "image_1"]

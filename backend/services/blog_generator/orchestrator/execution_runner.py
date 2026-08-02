@@ -30,7 +30,9 @@ class GraphExecutionRunner:
             generator.compile()
 
         style = StyleProfile.from_target_length(target_length)
-        generator.executor = ParallelTaskExecutor(enable_parallel=style.enable_parallel)
+        generator._configure_execution_runtime(
+            ParallelTaskExecutor(enable_parallel=style.enable_parallel)
+        )
 
         token_tracker = None
         cost_tracker = None
