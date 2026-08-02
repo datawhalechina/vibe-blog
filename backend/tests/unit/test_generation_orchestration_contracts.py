@@ -22,14 +22,18 @@ def test_blog_service_preserves_generation_facade_signatures():
         "generate_async": "(self, task_id: str, topic: str, article_type: str = 'tutorial', target_audience: str = 'intermediate', audience_adaptation: str = 'default', target_length: str = 'medium', source_material: str = None, document_ids: list = None, document_knowledge: list = None, image_style: str = '', generate_images: bool = True, generate_cover_video: bool = False, video_aspect_ratio: str = '16:9', custom_config: dict = None, deep_thinking: bool = False, background_investigation: bool = True, interactive: bool = False, task_manager=None, app=None)",
         "_run_generation": "(self, task_id: str, topic: str, article_type: str, target_audience: str, audience_adaptation: str, target_length: str, source_material: str, document_ids: list = None, document_knowledge: list = None, image_style: str = '', generate_images: bool = True, generate_cover_video: bool = False, video_aspect_ratio: str = '16:9', custom_config: dict = None, deep_thinking: bool = False, background_investigation: bool = True, interactive: bool = False, task_manager=None)",
         "_run_resume": "(self, task_id: str, resume_value, config: dict, task_manager=None, task_info: dict = None)",
-        "_generate_cover_image": "(self, title: str, topic: str, full_content: str = '', task_manager=None, task_id: str = None, image_style: str = '', video_aspect_ratio: str = '16:9') -> Optional[tuple]",
-        "_generate_cover_video": "(self, history_id: str, cover_image_url: str, video_aspect_ratio: str = '16:9', task_manager=None, task_id: str = None, section_images: list = None) -> Optional[str]",
         "_save_markdown": "(self, task_id: str, markdown: str, outline: Dict[str, Any], cover_image_path: Optional[str] = None) -> Optional[str]",
     }
 
     assert {
         name: str(inspect.signature(BlogService.__dict__[name])) for name in expected
     } == expected
+    assert not {
+        "_generate_cover_image",
+        "_generate_cover_video",
+        "_generate_sequence_video",
+        "_merge_videos",
+    } & set(BlogService.__dict__)
 
 
 def test_blog_generator_preserves_build_and_execution_signatures():
@@ -228,13 +232,13 @@ async def test_blog_generator_generate_stream_delegates_to_execution_runner():
 def test_result_pipeline_uses_facade_hooks_and_persists_before_completion():
     service = MagicMock()
     service._validate_final_state.return_value = "# Body"
-    service._generate_cover_image.return_value = (
+    generate_cover_image = MagicMock(return_value=(
         "https://example.com/cover.png",
         "/tmp/cover.png",
         "Summary",
-    )
+    ))
     service._save_markdown.return_value = "/tmp/article.md"
-    service._generate_cover_video.return_value = "/tmp/cover.mp4"
+    generate_cover_video = MagicMock(return_value="/tmp/cover.mp4")
     service.generator = SimpleNamespace(llm=MagicMock(), _memory_storage=None)
     task_manager = MagicMock()
     db_service = MagicMock()
@@ -267,7 +271,11 @@ def test_result_pipeline_uses_facade_hooks_and_persists_before_completion():
     with patch(
         "services.database_service.get_db_service", return_value=db_service
     ):
-        result = GenerationResultPipeline(service).finalize(request)
+        result = GenerationResultPipeline(
+            service,
+            generate_cover_image_fn=generate_cover_image,
+            generate_cover_video_fn=generate_cover_video,
+        ).finalize(request)
 
     assert result.saved_path == "/tmp/article.md"
     assert result.cover_video_path == "/tmp/cover.mp4"
@@ -283,9 +291,133 @@ def test_result_pipeline_uses_facade_hooks_and_persists_before_completion():
         "save_history",
         "send_completion",
     ]
-    service._generate_cover_image.assert_called_once()
+    generate_cover_image.assert_called_once()
     service._save_markdown.assert_called_once()
-    service._generate_cover_video.assert_called_once()
+    generate_cover_video.assert_called_once()
+
+
+def test_result_pipeline_completes_when_media_generation_degrades():
+    service = MagicMock()
+    service._validate_final_state.return_value = "# Body"
+    service._save_markdown.return_value = "/tmp/article.md"
+    service.generator = SimpleNamespace(llm=MagicMock(), _memory_storage=None)
+    task_manager = MagicMock()
+    db_service = MagicMock()
+    request = GenerationResultRequest(
+        task_id="task-1",
+        topic="Topic",
+        article_type="tutorial",
+        target_length="short",
+        final_state={
+            "final_markdown": "# Body",
+            "outline": {"title": "Title"},
+            "sections": [{}],
+            "images": [],
+            "code_blocks": [],
+        },
+        article_config={},
+        generate_images=True,
+        generate_cover_video=True,
+        video_aspect_ratio="16:9",
+        task_manager=task_manager,
+    )
+
+    with patch(
+        "services.database_service.get_db_service", return_value=db_service
+    ):
+        result = GenerationResultPipeline(
+            service,
+            generate_cover_image_fn=MagicMock(return_value=None),
+            generate_cover_video_fn=MagicMock(return_value=None),
+        ).finalize(request)
+
+    assert result.markdown == "# Body"
+    assert result.cover_video_path is None
+    db_service.save_history.assert_called_once()
+    service._send_completion_event.assert_called_once()
+
+
+def test_result_pipeline_completes_when_optional_video_service_resolution_fails():
+    service = MagicMock()
+    service._validate_final_state.return_value = "# Body"
+    service._save_markdown.return_value = "/tmp/article.md"
+    service.generator = SimpleNamespace(llm=MagicMock(), _memory_storage=None)
+    db_service = MagicMock()
+    get_oss_service = MagicMock(side_effect=RuntimeError("oss unavailable"))
+    request = GenerationResultRequest(
+        task_id="task-1",
+        topic="Topic",
+        article_type="tutorial",
+        target_length="short",
+        final_state={
+            "final_markdown": "# Body",
+            "outline": {"title": "Title"},
+            "sections": [{}],
+            "images": [],
+            "code_blocks": [],
+        },
+        article_config={},
+        generate_images=True,
+        generate_cover_video=True,
+        video_aspect_ratio="16:9",
+    )
+
+    with patch("services.database_service.get_db_service", return_value=db_service):
+        result = GenerationResultPipeline(
+            service,
+            generate_cover_image_fn=MagicMock(
+                return_value=("https://example.com/cover.png", "/tmp/cover.png", "Summary")
+            ),
+            get_video_service_fn=MagicMock(return_value=None),
+            get_oss_service_fn=get_oss_service,
+        ).finalize(request)
+
+    assert result.cover_video_path is None
+    get_oss_service.assert_not_called()
+    db_service.save_history.assert_called_once()
+    service._send_completion_event.assert_called_once()
+
+
+def test_result_pipeline_completes_when_oss_service_resolution_raises():
+    service = MagicMock()
+    service._validate_final_state.return_value = "# Body"
+    service._save_markdown.return_value = "/tmp/article.md"
+    service.generator = SimpleNamespace(llm=MagicMock(), _memory_storage=None)
+    db_service = MagicMock()
+    video_service = MagicMock()
+    video_service.is_available.return_value = True
+    request = GenerationResultRequest(
+        task_id="task-1",
+        topic="Topic",
+        article_type="tutorial",
+        target_length="short",
+        final_state={
+            "final_markdown": "# Body",
+            "outline": {"title": "Title"},
+            "sections": [{}],
+            "images": [],
+            "code_blocks": [],
+        },
+        article_config={},
+        generate_images=True,
+        generate_cover_video=True,
+        video_aspect_ratio="16:9",
+    )
+
+    with patch("services.database_service.get_db_service", return_value=db_service):
+        result = GenerationResultPipeline(
+            service,
+            generate_cover_image_fn=MagicMock(
+                return_value=("https://example.com/cover.png", "/tmp/cover.png", "Summary")
+            ),
+            get_video_service_fn=MagicMock(return_value=video_service),
+            get_oss_service_fn=MagicMock(side_effect=RuntimeError("oss unavailable")),
+        ).finalize(request)
+
+    assert result.cover_video_path is None
+    video_service.generate_from_image.assert_not_called()
+    db_service.save_history.assert_called_once()
+    service._send_completion_event.assert_called_once()
 
 
 def test_run_generation_uses_task_event_bridge_for_setup_and_cleanup():

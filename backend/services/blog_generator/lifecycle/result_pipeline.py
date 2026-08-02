@@ -7,6 +7,11 @@ from dataclasses import dataclass
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
 
+from services.media import get_image_service, get_video_service
+from services.publishing import get_oss_service
+
+from .media_pipeline import generate_cover_image, generate_cover_video
+
 
 logger = logging.getLogger("services.blog_generator.blog_service")
 
@@ -37,8 +42,20 @@ class GenerationResult:
 
 
 class GenerationResultPipeline:
-    def __init__(self, service):
+    def __init__(
+        self,
+        service,
+        *,
+        generate_cover_image_fn=generate_cover_image,
+        generate_cover_video_fn=generate_cover_video,
+        get_video_service_fn=get_video_service,
+        get_oss_service_fn=get_oss_service,
+    ):
         self.service = service
+        self.generate_cover_image = generate_cover_image_fn
+        self.generate_cover_video = generate_cover_video_fn
+        self.get_video_service = get_video_service_fn
+        self.get_oss_service = get_oss_service_fn
 
     def finalize(self, request: GenerationResultRequest) -> GenerationResult:
         final_state = request.final_state
@@ -86,12 +103,25 @@ class GenerationResultPipeline:
         if not request.generate_images:
             logger.info("图片生成已禁用，跳过封面图")
             return None
-        return self.service._generate_cover_image(
+        from services.media.image_styles import get_style_manager
+
+        from ..blog_service import extract_article_summary
+        from ..prompts import get_prompt_manager
+
+        return self.generate_cover_image(
             title=outline.get("title", request.topic),
             topic=request.topic,
             full_content=markdown_content,
-            task_manager=request.task_manager,
-            task_id=request.task_id,
+            llm_client=self.service.generator.llm,
+            image_service=get_image_service(),
+            summarize=extract_article_summary,
+            render_style_prompt=lambda style, summary: get_style_manager().render_prompt(
+                style, summary
+            ),
+            render_default_prompt=lambda summary: get_prompt_manager().render_cover_image_prompt(
+                article_summary=summary
+            ),
+            emit_event=self._event_emitter(request),
             image_style=request.final_state.get("image_style", ""),
             video_aspect_ratio=(
                 request.video_aspect_ratio if request.generate_cover_video else "16:9"
@@ -123,14 +153,24 @@ class GenerationResultPipeline:
         enabled = os.environ.get("COVER_VIDEO_ENABLED", "true").lower() == "true"
         if not (request.generate_cover_video and cover_image_url and enabled):
             return None
-        return self.service._generate_cover_video(
-            history_id=request.task_id,
+        return self.generate_cover_video(
             cover_image_url=cover_image_url,
-            video_aspect_ratio=request.video_aspect_ratio,
-            task_manager=request.task_manager,
-            task_id=request.task_id,
             section_images=request.final_state.get("section_images", []),
+            get_video_service=self.get_video_service,
+            get_oss_service=self.get_oss_service,
+            emit_event=self._event_emitter(request),
+            video_aspect_ratio=request.video_aspect_ratio,
         )
+
+    @staticmethod
+    def _event_emitter(request):
+        if not request.task_manager:
+            return None
+
+        def emit(event_name, payload):
+            request.task_manager.send_event(request.task_id, event_name, payload)
+
+        return emit
 
     @staticmethod
     def _build_citations(final_state):
