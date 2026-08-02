@@ -139,6 +139,52 @@ def test_bound_node_dependencies_do_not_retain_generator_instance():
     assert retained_by == []
 
 
+def test_bound_routing_dependencies_do_not_retain_generator_instance():
+    generator = BlogGenerator(MagicMock())
+
+    retained_by = []
+    for routing_name, handler in generator._routing_handlers.items():
+        dependencies = getattr(handler, "keywords", {})
+        for dependency_name, dependency in dependencies.items():
+            if getattr(dependency, "__self__", None) is generator:
+                retained_by.append(f"{routing_name}.{dependency_name}")
+
+    assert retained_by == []
+
+
+def test_bound_routing_handlers_preserve_langgraph_branch_names():
+    generator = BlogGenerator(MagicMock())
+
+    assert {
+        source: set(branches)
+        for source, branches in generator.workflow.branches.items()
+    } == {
+        "writer": {"_should_check_knowledge"},
+        "check_knowledge": {"_should_refine_search"},
+        "questioner": {"_should_deepen"},
+        "deepen_content": {"_should_continue_questioning"},
+        "section_evaluate": {"_should_improve_sections"},
+        "reviewer": {"_should_revise"},
+    }
+
+
+def test_bound_routing_handlers_observe_later_style_updates():
+    from services.blog_generator.style_profile import StyleProfile
+
+    generator = BlogGenerator(MagicMock(), style=StyleProfile.long())
+    handler = generator._routing_handlers["should_deepen"]
+    state = {
+        "target_length": "long",
+        "questioning_count": 1,
+        "all_sections_detailed": False,
+    }
+    assert handler(state) == "deepen"
+
+    generator.style = StyleProfile.mini()
+
+    assert handler(state) == "continue"
+
+
 def test_graph_builder_preserves_workflow_topology():
     node_handlers, routing_handlers, pipeline = _graph_dependencies()
 

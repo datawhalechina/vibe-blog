@@ -191,25 +191,28 @@ class TestImproveSection:
 class TestShouldImproveSections:
     def test_no_improvement_needed(self):
         """GC7a: 所有段落达标时跳过"""
-        from services.blog_generator.generator import BlogGenerator
-        gen = BlogGenerator.__new__(BlogGenerator)
+        from services.blog_generator.orchestrator.routing import (
+            _should_improve_sections,
+        )
         state = {"needs_section_improvement": False}
-        assert gen._should_improve_sections(state) == "continue"
+        assert _should_improve_sections(state) == "continue"
 
     def test_max_rounds_reached(self):
         """GC7b: 达到最大轮数时跳过"""
-        from services.blog_generator.generator import BlogGenerator
-        gen = BlogGenerator.__new__(BlogGenerator)
+        from services.blog_generator.orchestrator.routing import (
+            _should_improve_sections,
+        )
         state = {
             "needs_section_improvement": True,
             "section_improve_count": 2,
         }
-        assert gen._should_improve_sections(state) == "continue"
+        assert _should_improve_sections(state) == "continue"
 
     def test_convergence_detected(self):
         """GC7c: 改进幅度太小时跳过"""
-        from services.blog_generator.generator import BlogGenerator
-        gen = BlogGenerator.__new__(BlogGenerator)
+        from services.blog_generator.orchestrator.routing import (
+            _should_improve_sections,
+        )
         state = {
             "needs_section_improvement": True,
             "section_improve_count": 1,
@@ -219,12 +222,13 @@ class TestShouldImproveSections:
                 {"overall_quality": 6.7},
             ],
         }
-        assert gen._should_improve_sections(state) == "continue"
+        assert _should_improve_sections(state) == "continue"
 
     def test_improvement_needed(self):
         """GC7d: 需要改进时返回 improve"""
-        from services.blog_generator.generator import BlogGenerator
-        gen = BlogGenerator.__new__(BlogGenerator)
+        from services.blog_generator.orchestrator.routing import (
+            _should_improve_sections,
+        )
         state = {
             "needs_section_improvement": True,
             "section_improve_count": 0,
@@ -234,7 +238,7 @@ class TestShouldImproveSections:
                 {"overall_quality": 6.0},
             ],
         }
-        result = gen._should_improve_sections(state)
+        result = _should_improve_sections(state)
         assert result == "improve"
 
 

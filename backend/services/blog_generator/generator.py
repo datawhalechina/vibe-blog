@@ -7,7 +7,7 @@ import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from functools import partial
-from typing import Dict, Any, Optional, Literal, Callable
+from typing import Dict, Any, Optional, Callable
 
 from langgraph.graph import StateGraph
 from langgraph.checkpoint.memory import MemorySaver
@@ -43,6 +43,16 @@ from .llm_tier_config import get_agent_tier
 from .orchestrator.execution_runner import GraphExecutionRunner
 from .orchestrator.graph_builder import GraphBuilder
 from .orchestrator.image_task_registry import ImageTaskRegistry
+from .orchestrator.routing import (
+    _should_check_knowledge,
+    _should_continue_questioning,
+    _should_deepen,
+    _should_improve_sections,
+    _should_refine_search,
+    _should_revise,
+    RoutingStyleResolver,
+    bind_style_resolver,
+)
 from .orchestrator.nodes.finalization import (
     assembler_node,
     coder_and_artist_node,
@@ -86,6 +96,17 @@ class BlogGenerator:
     
     基于 LangGraph 实现的 Multi-Agent 协同生成系统
     """
+
+    @property
+    def style(self):
+        return self._style
+
+    @style.setter
+    def style(self, value):
+        self._style = value
+        resolver = getattr(self, "_routing_style_resolver", None)
+        if resolver is not None:
+            resolver.configured_style = value
     
     def __init__(
         self,
@@ -206,6 +227,8 @@ class BlogGenerator:
             except Exception as e:
                 logger.warning(f"MemoryStorage 初始化失败: {e}")
 
+        self._routing_style_resolver = RoutingStyleResolver(self.style)
+
         # 构建工作流
         self.workflow = self._build_workflow()
         self.app = None
@@ -219,9 +242,10 @@ class BlogGenerator:
             StateGraph 实例
         """
         self._node_handlers = self._bind_node_handlers()
+        self._routing_handlers = self._bind_routing_handlers()
         return GraphBuilder(
             node_handlers=self._node_handlers,
-            routing_handlers=self._bind_routing_handlers(),
+            routing_handlers=self._routing_handlers,
             middleware_pipeline=self.pipeline,
         ).build()
 
@@ -357,12 +381,24 @@ class BlogGenerator:
 
     def _bind_routing_handlers(self):
         return {
-            "should_check_knowledge": self._should_check_knowledge,
-            "should_refine_search": self._should_refine_search,
-            "should_deepen": self._should_deepen,
-            "should_continue_questioning": self._should_continue_questioning,
-            "should_improve_sections": self._should_improve_sections,
-            "should_revise": self._should_revise,
+            "should_check_knowledge": _should_check_knowledge,
+            "should_refine_search": bind_style_resolver(
+                _should_refine_search,
+                self._routing_style_resolver,
+            ),
+            "should_deepen": bind_style_resolver(
+                _should_deepen,
+                self._routing_style_resolver,
+            ),
+            "should_continue_questioning": bind_style_resolver(
+                _should_continue_questioning,
+                self._routing_style_resolver,
+            ),
+            "should_improve_sections": _should_improve_sections,
+            "should_revise": bind_style_resolver(
+                _should_revise,
+                self._routing_style_resolver,
+            ),
         }
 
     def _configure_planner_runtime(self, *, on_stream, interactive):
@@ -380,30 +416,6 @@ class BlogGenerator:
         ):
             self._node_handlers[node_name].keywords["parallel_executor"] = executor
     
-
-    def _should_improve_sections(self, state: SharedState) -> str:
-        """判断是否需要段落级改进"""
-        if not state.get("needs_section_improvement", False):
-            return "continue"
-
-        improve_count = state.get("section_improve_count", 0)
-        if improve_count >= 2:
-            logger.info("段落改进达到最大轮数(2)，跳过")
-            return "continue"
-
-        # 收敛检测：改进幅度 < 0.3 则停止
-        evaluations = state.get("section_evaluations", [])
-        curr_avg = (
-            sum(e["overall_quality"] for e in evaluations) / max(len(evaluations), 1)
-        )
-        prev_avg = state.get("prev_section_avg_score", 0)
-        if prev_avg > 0 and (curr_avg - prev_avg) < 0.3:
-            logger.info(f"段落改进收敛 ({prev_avg:.1f} → {curr_avg:.1f})，跳过")
-            return "continue"
-
-        state["prev_section_avg_score"] = curr_avg
-        return "improve"
-
 
     def _get_style(self, state: SharedState) -> StyleProfile:
         """获取当前运行的 StyleProfile（实例级 > state 级 > target_length 推断）"""
@@ -428,89 +440,6 @@ class BlogGenerator:
             "recursion_limit": recursion_limit,
         }
 
-
-    def _should_deepen(self, state: SharedState) -> Literal["deepen", "continue"]:
-        """判断是否需要深化内容 — 统一用 StyleProfile 控制"""
-        count = state.get('questioning_count', 0)
-        style = self._get_style(state)
-        max_rounds = style.max_questioning_rounds
-
-        if count >= max_rounds:
-            logger.info(f"[Deepen] 已达最大轮数 {count}/{max_rounds}，停止深化")
-            return "continue"
-
-        if not state.get('all_sections_detailed', True):
-            logger.info(f"[Deepen] 第 {count+1}/{max_rounds} 轮深化")
-            return "deepen"
-
-        return "continue"
-
-    def _should_continue_questioning(self, state: SharedState) -> Literal["questioner", "section_evaluate"]:
-        """深化后判断是否需要继续追问 — 避免已达轮数上限仍执行 questioner"""
-        count = state.get('questioning_count', 0)
-        style = self._get_style(state)
-        max_rounds = style.max_questioning_rounds
-        if count >= max_rounds:
-            logger.info(f"[Deepen] 深化后已达最大轮数 {count}/{max_rounds}，跳过追问")
-            return "section_evaluate"
-        return "questioner"
-
-    def _should_check_knowledge(self, state: SharedState) -> Literal["check", "skip"]:
-        """mini 模式跳过知识空白检查"""
-        target_length = state.get('target_length', 'medium')
-        if target_length == 'mini':
-            logger.info("[check_knowledge] mini 模式，跳过知识空白检查")
-            return "skip"
-        return "check"
-
-    def _should_revise(self, state: SharedState) -> Literal["revision", "assemble"]:
-        """判断是否需要修订 — 由 StyleProfile 控制"""
-        style = self._get_style(state)
-        revision_count = state.get('revision_count', 0)
-
-        # 达到最大修订轮数
-        if revision_count >= style.max_revision_rounds:
-            logger.info(f"已达到最大修订轮数 ({style.max_revision_rounds})，跳过修订")
-            return "assemble"
-
-        review_issues = state.get('review_issues', [])
-
-        # 修订问题过滤（high_only 模式）
-        if style.revision_severity_filter == "high_only":
-            high_issues = [i for i in review_issues if i.get('severity') == 'high']
-            if high_issues:
-                logger.info(f"[{style.revision_severity_filter}] 只处理 {len(high_issues)} 个 high 级别问题")
-                state['review_issues'] = high_issues
-                return "revision"
-            logger.info(f"[{style.revision_severity_filter}] 无 high 级别问题，跳过修订")
-            return "assemble"
-
-        # 完整修订模式
-        if not state.get('review_approved', True):
-            return "revision"
-
-        logger.info("审核通过或修订完成，进入组装")
-        return "assemble"
-
-    def _should_refine_search(self, state: SharedState) -> Literal["search", "continue"]:
-        """判断是否需要细化搜索 — 由 StyleProfile 控制"""
-        style = self._get_style(state)
-        if not style.enable_knowledge_refinement:
-            logger.info("知识增强已禁用，跳过")
-            return "continue"
-
-        gaps = state.get('knowledge_gaps', [])
-        search_count = state.get('search_count', 0)
-        max_count = state.get('max_search_count', 5)
-
-        if gaps and search_count < max_count:
-            important_gaps = [g for g in gaps if g.get('gap_type') in ['missing_data', 'vague_concept']]
-            if important_gaps:
-                logger.info(f"检测到 {len(important_gaps)} 个重要知识空白，触发细化搜索")
-                return "search"
-
-        logger.info("无需细化搜索，继续到追问阶段")
-        return "continue"
 
     def _run_derivative_skills(self, final_state: Dict[str, Any]) -> Dict[str, Any]:
         """37.14/37.16 运行博客衍生物 Skills（MindMap/Flashcard/StudyNote）"""

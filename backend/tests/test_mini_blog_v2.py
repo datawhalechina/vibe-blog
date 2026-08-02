@@ -66,15 +66,16 @@ class TestMiniModeRevisionLimit:
     """测试 Mini 模式修订轮数限制"""
     
     @pytest.fixture
-    def mock_generator(self):
-        """创建 mock 的 BlogGenerator"""
-        from services.blog_generator.generator import BlogGenerator
-        
-        mock_llm = Mock()
-        generator = BlogGenerator(mock_llm)
-        return generator
+    def should_revise(self):
+        from services.blog_generator.orchestrator.routing import (
+            RoutingStyleResolver,
+            _should_revise,
+        )
+
+        resolver = RoutingStyleResolver()
+        return lambda state: _should_revise(state, style_resolver=resolver)
     
-    def test_mini_mode_first_revision_with_high_issues(self, mock_generator):
+    def test_mini_mode_first_revision_with_high_issues(self, should_revise):
         """Mini 模式：第一次修订，有 high 问题 → 应该修订"""
         state = {
             'target_length': 'mini',
@@ -85,14 +86,14 @@ class TestMiniModeRevisionLimit:
             ]
         }
         
-        result = mock_generator._should_revise(state)
+        result = should_revise(state)
         
         assert result == "revision"
         # 验证只保留 high 级别问题
         assert len(state['review_issues']) == 1
         assert state['review_issues'][0]['severity'] == 'high'
     
-    def test_mini_mode_second_revision_skip(self, mock_generator):
+    def test_mini_mode_second_revision_skip(self, should_revise):
         """Mini 模式：已修订 1 轮 → 跳过修订"""
         state = {
             'target_length': 'mini',
@@ -102,11 +103,11 @@ class TestMiniModeRevisionLimit:
             ]
         }
         
-        result = mock_generator._should_revise(state)
+        result = should_revise(state)
         
         assert result == "assemble"
     
-    def test_mini_mode_no_high_issues(self, mock_generator):
+    def test_mini_mode_no_high_issues(self, should_revise):
         """Mini 模式：没有 high 问题 → 跳过修订"""
         state = {
             'target_length': 'mini',
@@ -117,11 +118,11 @@ class TestMiniModeRevisionLimit:
             ]
         }
         
-        result = mock_generator._should_revise(state)
+        result = should_revise(state)
         
         assert result == "assemble"
     
-    def test_short_mode_same_as_mini(self, mock_generator):
+    def test_short_mode_same_as_mini(self, should_revise):
         """Short 模式：与 Mini 模式行为一致"""
         state = {
             'target_length': 'short',
@@ -131,11 +132,11 @@ class TestMiniModeRevisionLimit:
             ]
         }
         
-        result = mock_generator._should_revise(state)
+        result = should_revise(state)
         
         assert result == "assemble"
     
-    def test_medium_mode_allows_multiple_revisions(self, mock_generator):
+    def test_medium_mode_allows_multiple_revisions(self, should_revise):
         """Medium 模式：允许多轮修订"""
         state = {
             'target_length': 'medium',
@@ -146,12 +147,12 @@ class TestMiniModeRevisionLimit:
             ]
         }
         
-        result = mock_generator._should_revise(state)
+        result = should_revise(state)
         
         # medium 模式使用 max_revision_rounds (默认 3)
         assert result == "revision"
     
-    def test_medium_mode_max_revisions_reached(self, mock_generator):
+    def test_medium_mode_max_revisions_reached(self, should_revise):
         """Medium 模式：达到最大修订轮数"""
         state = {
             'target_length': 'medium',
@@ -162,7 +163,7 @@ class TestMiniModeRevisionLimit:
             ]
         }
         
-        result = mock_generator._should_revise(state)
+        result = should_revise(state)
         
         assert result == "assemble"
 
