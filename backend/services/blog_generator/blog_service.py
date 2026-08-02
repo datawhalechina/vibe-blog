@@ -20,6 +20,10 @@ from .lifecycle.result_pipeline import (
     GenerationResultPipeline,
     GenerationResultRequest,
 )
+from .lifecycle.progress_events import (
+    normalize_research_result as _normalize_research_result,
+    project_generation_event,
+)
 from .lifecycle.task_events import TaskEventBridge
 from .schemas.state import create_initial_state
 from .services.search_service import SearchService, init_search_service, get_search_service
@@ -32,17 +36,6 @@ OUTPUTS_DIR = os.environ.get(
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _normalize_research_result(state: dict):
-    """Normalize optional research fields before building SSE result events."""
-    return (
-        state.get('background_knowledge') or '',
-        state.get('key_concepts') or [],
-        state.get('knowledge_source_stats') or {},
-        state.get('document_knowledge') or [],
-        state.get('search_results') or [],
-    )
 
 
 # 全局博客生成服务实例
@@ -706,28 +699,6 @@ class BlogService:
             except Exception:
                 pass
             
-            # 阶段进度映射
-            stage_progress = {
-                'researcher': (10, '正在搜索资料...'),
-                'planner': (25, '正在生成大纲...'),
-                'writer': (45, '正在撰写内容...'),
-                # 多轮搜索相关节点
-                'check_knowledge': (52, '正在检查知识空白...'),
-                'refine_search': (54, '正在补充搜索...'),
-                'enhance_with_knowledge': (56, '正在增强内容...'),
-                # 追问和后续节点
-                'questioner': (60, '正在检查内容深度...'),
-                'deepen_content': (65, '正在深化内容...'),
-                'coder': (75, '正在生成代码示例...'),
-                'artist': (85, '正在生成配图...'),
-                'reviewer': (90, '正在审核质量...'),
-                'humanizer': (93, '正在优化文风...'),
-                'revision': (95, '正在修订内容...'),
-                'fact_checker': (96, '正在事实核查...'),
-                'consistency_check': (97, '正在一致性检查...'),
-                'assembler': (98, '正在组装文档...'),
-            }
-            
             # 记录已完成的章节数
             completed_sections = 0
 
@@ -752,279 +723,20 @@ class BlogService:
                     return
                 
                 for node_name, state in event.items():
-                    progress_info = stage_progress.get(node_name, (50, f'正在执行 {node_name}...'))
-                    
-                    if task_manager:
-                        # 发送阶段进度（含 token 用量）
-                        progress_data = {
-                            'stage': node_name,
-                            'progress': progress_info[0],
-                            'message': progress_info[1]
-                        }
-                        token_usage = self._get_token_usage()
-                        if token_usage:
-                            progress_data['token_usage'] = token_usage
-                        task_manager.send_event(task_id, 'progress', progress_data)
-                        # 同步进度到排队系统（Dashboard 进度条）
-                        update_queue_progress(
-                            task_id, progress_info[0],
-                            stage=progress_info[1],
-                            detail=node_name,
-                        )
-                        
-                        # 发送详细中间结果
-                        if node_name == 'researcher':
-                            # 素材收集结果
-                            (
-                                background,
-                                key_concepts,
-                                knowledge_stats,
-                                doc_knowledge,
-                                raw_results,
-                            ) = _normalize_research_result(state)
-                            
-                            # 准备文档知识预览（前500字）
-                            doc_previews = []
-                            for doc in doc_knowledge[:3]:  # 最多展示3个文档
-                                content = doc.get('content', '')
-                                preview = content[:500] + '...' if len(content) > 500 else content
-                                doc_previews.append({
-                                    'file_name': doc.get('file_name', '未知文档'),
-                                    'preview': preview,
-                                    'total_length': len(content)
-                                })
-                            
-                            # 推送搜索结果卡片数据
-                            if raw_results:
-                                from urllib.parse import urlparse
-                                card_results = []
-                                for r in raw_results[:10]:
-                                    url = r.get('url', '')
-                                    domain = ''
-                                    try:
-                                        domain = urlparse(url).hostname or ''
-                                    except Exception:
-                                        pass
-                                    card_results.append({
-                                        'url': url,
-                                        'title': r.get('title', ''),
-                                        'snippet': (r.get('content', '') or r.get('snippet', ''))[:120],
-                                        'domain': domain,
-                                    })
-                                task_manager.send_event(task_id, 'result', {
-                                    'type': 'search_results',
-                                    'data': {
-                                        'query': state.get('topic', ''),
-                                        'results': card_results,
-                                    }
-                                })
-
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'researcher_complete',
-                                'data': {
-                                    'background_length': len(background),
-                                    'key_concepts': key_concepts[:5] if key_concepts else [],
-                                    'document_count': knowledge_stats.get('document_count', 0),
-                                    'web_count': knowledge_stats.get('web_count', 0),
-                                    'document_previews': doc_previews,
-                                    'message': f'素材收集完成，获取 {len(background)} 字背景资料'
-                                }
-                            })
-                        
-                        elif node_name == 'planner' and state.get('outline'):
-                            # 大纲生成结果
-                            outline = state.get('outline', {})
-                            sections = outline.get('sections', [])
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'outline_complete',
-                                'data': {
-                                    'title': outline.get('title', ''),
-                                    'sections_count': len(sections),
-                                    'sections': sections,  # 发送完整的 sections 对象数组（包括 target_words）
-                                    'sections_titles': [s.get('title', '') for s in sections],  # 保留标题列表用于兼容性
-                                    'narrative_mode': outline.get('narrative_mode', ''),
-                                    'narrative_flow': outline.get('narrative_flow', {}),
-                                    'sections_narrative_roles': [s.get('narrative_role', '') for s in sections],
-                                    'message': f'大纲生成完成: {outline.get("title", "")} ({len(sections)} 章节)',
-                                    'interactive': interactive,
-                                }
-                            })
-
-                            # 101.113: 交互式模式下，interrupt() 在 _planner_node 中触发
-                            # 图会自动暂停，stream 循环结束后在下方检测 interrupt 状态
-                        
-                        elif node_name == 'writer' and state.get('sections'):
-                            # 章节撰写进度
-                            sections = state.get('sections', [])
-                            new_count = len(sections)
-                            if new_count > completed_sections:
-                                # 有新章节完成
-                                for i in range(completed_sections, new_count):
-                                    section = sections[i]
-                                    task_manager.send_event(task_id, 'result', {
-                                        'type': 'section_complete',
-                                        'data': {
-                                            'section_index': i + 1,
-                                            'title': section.get('title', ''),
-                                            'content': section.get('content', ''),
-                                            'content_length': len(section.get('content', '')),
-                                            'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
-                                        }
-                                    })
-                                    # 发送 writing_chunk 事件：累积所有已完成章节的 markdown
-                                    accumulated_md = ''
-                                    for j in range(i + 1):
-                                        s = sections[j]
-                                        accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                                    task_manager.send_event(task_id, 'writing_chunk', {
-                                        'section_index': i + 1,
-                                        'delta': section.get('content', ''),
-                                        'accumulated': accumulated_md.strip(),
-                                    })
-                                completed_sections = new_count
-                        
-                        elif node_name == 'check_knowledge':
-                            # 知识空白检查结果
-                            gaps = state.get('knowledge_gaps', [])
-                            search_count = state.get('search_count', 0)
-                            max_search_count = state.get('max_search_count', 5)
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'check_knowledge_complete',
-                                'data': {
-                                    'gaps_count': len(gaps),
-                                    'gaps': [g.get('description', '') for g in gaps[:3]],
-                                    'search_count': search_count,
-                                    'max_search_count': max_search_count,
-                                    'message': f'知识检查完成: 发现 {len(gaps)} 个空白点 (搜索 {search_count}/{max_search_count})'
-                                }
-                            })
-                        
-                        elif node_name == 'refine_search':
-                            # 细化搜索结果
-                            search_count = state.get('search_count', 0)
-                            max_search_count = state.get('max_search_count', 5)
-                            search_history = state.get('search_history', [])
-                            latest_search = search_history[-1] if search_history else {}
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'refine_search_complete',
-                                'data': {
-                                    'round': search_count,
-                                    'max_rounds': max_search_count,
-                                    'queries': latest_search.get('queries', []),
-                                    'results_count': latest_search.get('results_count', 0),
-                                    'message': f'第 {search_count} 轮搜索完成: 获取 {latest_search.get("results_count", 0)} 条结果'
-                                }
-                            })
-                        
-                        elif node_name == 'enhance_with_knowledge':
-                            # 知识增强结果
-                            accumulated_knowledge = state.get('accumulated_knowledge', '')
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'enhance_knowledge_complete',
-                                'data': {
-                                    'knowledge_length': len(accumulated_knowledge),
-                                    'message': f'内容增强完成: 累积知识 {len(accumulated_knowledge)} 字'
-                                }
-                            })
-                        
-                        elif node_name == 'questioner':
-                            # 追问检查结果
-                            needs_deepen = state.get('needs_deepen', False)
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'questioner_complete',
-                                'data': {
-                                    'needs_deepen': needs_deepen,
-                                    'message': '内容需要深化' if needs_deepen else '内容深度检查通过'
-                                }
-                            })
-                        
-                        elif node_name == 'deepen_content' and state.get('sections'):
-                            # 内容深化完成后，发送更新后的章节内容
-                            sections = state.get('sections', [])
-                            accumulated_md = ''
-                            for i, s in enumerate(sections):
-                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                            task_manager.send_event(task_id, 'writing_chunk', {
-                                'section_index': len(sections),
-                                'delta': '',  # 深化是整体更新，不是增量
-                                'accumulated': accumulated_md.strip(),
-                                'stage': 'deepen_complete',
-                                'message': f'内容深化完成，当前总字数: {len(accumulated_md)}'
-                            })
-                        
-                        elif node_name == 'coder' and state.get('code_blocks'):
-                            # 代码生成结果
-                            code_blocks = state.get('code_blocks', [])
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'coder_complete',
-                                'data': {
-                                    'code_blocks_count': len(code_blocks),
-                                    'message': f'代码示例生成完成: {len(code_blocks)} 个代码块'
-                                }
-                            })
-                        
-                        elif node_name == 'artist' and state.get('images'):
-                            # 配图生成结果
-                            images = state.get('images', [])
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'artist_complete',
-                                'data': {
-                                    'images_count': len(images),
-                                    'message': f'配图描述生成完成: {len(images)} 张'
-                                }
-                            })
-                        
-                        elif node_name == 'revision' and state.get('sections'):
-                            # 修订完成后，发送更新后的章节内容
-                            sections = state.get('sections', [])
-                            accumulated_md = ''
-                            for i, s in enumerate(sections):
-                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                            task_manager.send_event(task_id, 'writing_chunk', {
-                                'section_index': len(sections),
-                                'delta': '',
-                                'accumulated': accumulated_md.strip(),
-                                'stage': 'revision_complete',
-                                'message': f'内容修订完成，当前总字数: {len(accumulated_md)}'
-                            })
-                        
-                        elif node_name == 'humanizer' and state.get('sections'):
-                            # 去 AI 味完成后，发送更新后的章节内容
-                            sections = state.get('sections', [])
-                            accumulated_md = ''
-                            for i, s in enumerate(sections):
-                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                            task_manager.send_event(task_id, 'writing_chunk', {
-                                'section_index': len(sections),
-                                'delta': '',
-                                'accumulated': accumulated_md.strip(),
-                                'stage': 'humanizer_complete',
-                                'message': f'文风优化完成，当前总字数: {len(accumulated_md)}'
-                            })
-                        
-                        elif node_name == 'reviewer':
-                            # 审核结果
-                            review_score = state.get('review_score', 0)
-                            review_passed = state.get('review_passed', False)
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'reviewer_complete',
-                                'data': {
-                                    'score': review_score,
-                                    'passed': review_passed,
-                                    'message': f'质量审核完成: {review_score} 分 {"✅ 通过" if review_passed else "❌ 需修订"}'
-                                }
-                            })
-                        
-                        elif node_name == 'assembler':
-                            # 组装完成
-                            markdown = state.get('final_markdown', '')
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'assembler_complete',
-                                'data': {
-                                    'markdown_length': len(markdown),
-                                    'message': f'文档组装完成: {len(markdown)} 字'
-                                }
-                            })
+                    token_usage = (
+                        self._get_token_usage() if task_manager else None
+                    )
+                    completed_sections = project_generation_event(
+                        task_manager=task_manager,
+                        task_id=task_id,
+                        node_name=node_name,
+                        state=state,
+                        completed_sections=completed_sections,
+                        interactive=interactive,
+                        token_usage=token_usage,
+                        initial_generation=True,
+                        update_queue_progress_fn=update_queue_progress,
+                    )
             
             # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认）
             snapshot = self.generator.app.get_state(config)
@@ -1168,25 +880,6 @@ class BlogService:
                     'message': '大纲已确认，开始写作'
                 })
 
-        # 阶段进度映射（复用）
-        stage_progress = {
-            'planner': (25, '正在生成大纲...'),
-            'writer': (45, '正在撰写内容...'),
-            'check_knowledge': (52, '正在检查知识空白...'),
-            'refine_search': (54, '正在补充搜索...'),
-            'enhance_with_knowledge': (56, '正在增强内容...'),
-            'questioner': (60, '正在检查内容深度...'),
-            'deepen_content': (65, '正在深化内容...'),
-            'coder': (75, '正在生成代码示例...'),
-            'artist': (85, '正在生成配图...'),
-            'reviewer': (90, '正在审核质量...'),
-            'humanizer': (93, '正在优化文风...'),
-            'revision': (95, '正在修订内容...'),
-            'fact_checker': (96, '正在事实核查...'),
-            'consistency_check': (97, '正在一致性检查...'),
-            'assembler': (98, '正在组装文档...'),
-        }
-
         completed_sections = 0
 
         # 102.07: 修复悬挂工具调用（防御性代码，防止 resume 时消息历史不完整）
@@ -1217,130 +910,20 @@ class BlogService:
                     return
 
                 for node_name, state in event.items():
-                    progress_info = stage_progress.get(node_name, (50, f'正在执行 {node_name}...'))
-
-                    if task_manager:
-                        progress_data = {
-                            'stage': node_name,
-                            'progress': progress_info[0],
-                            'message': progress_info[1]
-                        }
-                        token_usage = self._get_token_usage()
-                        if token_usage:
-                            progress_data['token_usage'] = token_usage
-                        task_manager.send_event(task_id, 'progress', progress_data)
-                        update_queue_progress(
-                            task_id, progress_info[0],
-                            stage=progress_info[1],
-                            detail=node_name,
-                        )
-
-                        # 如果是 edit，planner 会重新执行并输出新大纲
-                        if node_name == 'planner' and state.get('outline'):
-                            outline = state.get('outline', {})
-                            sections = outline.get('sections', [])
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'outline_complete',
-                                'data': {
-                                    'title': outline.get('title', ''),
-                                    'sections_count': len(sections),
-                                    'sections': sections,
-                                    'sections_titles': [s.get('title', '') for s in sections],
-                                    'message': f'大纲已确认: {outline.get("title", "")} ({len(sections)} 章节)',
-                                    'interactive': interactive,
-                                }
-                            })
-
-                        elif node_name == 'writer' and state.get('sections'):
-                            sections = state.get('sections', [])
-                            new_count = len(sections)
-                            if new_count > completed_sections:
-                                for i in range(completed_sections, new_count):
-                                    section = sections[i]
-                                    task_manager.send_event(task_id, 'result', {
-                                        'type': 'section_complete',
-                                        'data': {
-                                            'section_index': i + 1,
-                                            'title': section.get('title', ''),
-                                            'content': section.get('content', ''),
-                                            'content_length': len(section.get('content', '')),
-                                            'message': f'章节 {i + 1} 撰写完成: {section.get("title", "")}'
-                                        }
-                                    })
-                                    accumulated_md = ''
-                                    for j in range(i + 1):
-                                        s = sections[j]
-                                        accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                                    task_manager.send_event(task_id, 'writing_chunk', {
-                                        'section_index': i + 1,
-                                        'delta': section.get('content', ''),
-                                        'accumulated': accumulated_md.strip(),
-                                    })
-                                completed_sections = new_count
-
-                        elif node_name == 'deepen_content' and state.get('sections'):
-                            # 内容深化完成后，发送更新后的章节内容
-                            sections = state.get('sections', [])
-                            accumulated_md = ''
-                            for i, s in enumerate(sections):
-                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                            task_manager.send_event(task_id, 'writing_chunk', {
-                                'section_index': len(sections),
-                                'delta': '',  # 深化是整体更新，不是增量
-                                'accumulated': accumulated_md.strip(),
-                                'stage': 'deepen_complete',
-                                'message': f'内容深化完成，当前总字数: {len(accumulated_md)}'
-                            })
-
-                        elif node_name == 'revision' and state.get('sections'):
-                            # 修订完成后，发送更新后的章节内容
-                            sections = state.get('sections', [])
-                            accumulated_md = ''
-                            for i, s in enumerate(sections):
-                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                            task_manager.send_event(task_id, 'writing_chunk', {
-                                'section_index': len(sections),
-                                'delta': '',
-                                'accumulated': accumulated_md.strip(),
-                                'stage': 'revision_complete',
-                                'message': f'内容修订完成，当前总字数: {len(accumulated_md)}'
-                            })
-                        
-                        elif node_name == 'humanizer' and state.get('sections'):
-                            # 去 AI 味完成后，发送更新后的章节内容
-                            sections = state.get('sections', [])
-                            accumulated_md = ''
-                            for i, s in enumerate(sections):
-                                accumulated_md += f"## {s.get('title', '')}\n\n{s.get('content', '')}\n\n"
-                            task_manager.send_event(task_id, 'writing_chunk', {
-                                'section_index': len(sections),
-                                'delta': '',
-                                'accumulated': accumulated_md.strip(),
-                                'stage': 'humanizer_complete',
-                                'message': f'文风优化完成，当前总字数: {len(accumulated_md)}'
-                            })
-                        
-                        elif node_name == 'reviewer':
-                            review_score = state.get('review_score', 0)
-                            review_passed = state.get('review_passed', False)
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'reviewer_complete',
-                                'data': {
-                                    'score': review_score,
-                                    'passed': review_passed,
-                                    'message': f'质量审核完成: {review_score} 分 {"✅ 通过" if review_passed else "❌ 需修订"}'
-                                }
-                            })
-
-                        elif node_name == 'assembler':
-                            markdown = state.get('final_markdown', '')
-                            task_manager.send_event(task_id, 'result', {
-                                'type': 'assembler_complete',
-                                'data': {
-                                    'markdown_length': len(markdown),
-                                    'message': f'文档组装完成: {len(markdown)} 字'
-                                }
-                            })
+                    token_usage = (
+                        self._get_token_usage() if task_manager else None
+                    )
+                    completed_sections = project_generation_event(
+                        task_manager=task_manager,
+                        task_id=task_id,
+                        node_name=node_name,
+                        state=state,
+                        completed_sections=completed_sections,
+                        interactive=interactive,
+                        token_usage=token_usage,
+                        initial_generation=False,
+                        update_queue_progress_fn=update_queue_progress,
+                    )
 
             final_state = self.generator.app.get_state(config).values
             result_pipeline = getattr(self, "_result_pipeline", None)
