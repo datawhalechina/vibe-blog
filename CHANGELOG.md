@@ -9,10 +9,12 @@ All notable changes to the Vibe Blog project will be documented in this file.
 ### Changed
 - ♻️ **媒体生成边界** — 将封面图、封面视频、序列视频和视频合并逻辑迁移为显式依赖的模块级函数，移除 `BlogService` 的媒体私有方法并保持降级与 SSE 契约。
 - ♻️ **生成节点函数边界** — 将 21 个 LangGraph 节点迁移为按阶段组织、显式依赖绑定的模块级函数，并让 `GraphBuilder` 通过 handler mapping 建图。
+- ♻️ **生成路由策略边界** — 将 6 个 LangGraph 条件路由迁移为显式 style resolver 依赖的模块级函数，移除 `BlogGenerator` 路由方法并保持分支标识、状态副作用与动态 style 语义。
 
 ### Tests
 - ✨ **媒体 Pipeline 契约** — 覆盖依赖边界、摘要回退、横竖屏、单图与序列分支、事件载荷、顺序保持、合并失败及媒体降级完成流程。
 - ✨ **节点编排回归契约** — 覆盖节点依赖边界、图拓扑、运行时绑定、异步配图资源释放、状态合并及 research/writing/review/finalization 行为。
+- ✨ **路由策略回归契约** — 覆盖 6 个路由分支、循环上限、收敛与问题过滤副作用、真实 LangGraph branch 名称、动态 style 更新及 generator 反向依赖守卫。
 
 ## 2026-08-01
 

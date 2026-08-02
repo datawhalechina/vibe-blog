@@ -37,7 +37,7 @@ def test_extracted_orchestration_does_not_depend_on_api_or_flask():
     paths = [*LIFECYCLE_ROOT.glob("*.py")]
     paths.extend(
         ORCHESTRATOR_ROOT / name
-        for name in ("graph_builder.py", "execution_runner.py")
+        for name in ("graph_builder.py", "execution_runner.py", "routing.py")
     )
     paths.extend((ORCHESTRATOR_ROOT / "nodes").glob("*.py"))
 
@@ -63,7 +63,7 @@ def test_generator_facade_does_not_build_or_execute_graph_directly():
     assert "stream" not in _method_calls(path, "BlogGenerator", "generate_stream")
 
 
-def test_generator_has_no_node_methods_and_graph_builder_has_no_generator_dependency():
+def test_generator_has_no_node_or_routing_methods_and_graph_builder_has_no_generator_dependency():
     generator_path = BACKEND_ROOT / "services/blog_generator/generator.py"
     generator_tree = ast.parse(generator_path.read_text(encoding="utf-8"))
     generator_class = next(
@@ -74,6 +74,11 @@ def test_generator_has_no_node_methods_and_graph_builder_has_no_generator_depend
         node.name for node in generator_class.body
         if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
         and node.name.endswith("_node")
+    ]
+    assert not [
+        node.name for node in generator_class.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name.startswith("_should_")
     ]
 
     builder_path = ORCHESTRATOR_ROOT / "graph_builder.py"
@@ -94,6 +99,15 @@ def test_generator_has_no_node_methods_and_graph_builder_has_no_generator_depend
                 }
                 if parameters & {"generator", "context"}:
                     violations.append(f"{path.name}:{node.name}")
+    routing_path = ORCHESTRATOR_ROOT / "routing.py"
+    routing_tree = ast.parse(routing_path.read_text(encoding="utf-8"))
+    for node in routing_tree.body:
+        if isinstance(node, ast.FunctionDef):
+            parameters = {
+                argument.arg for argument in [*node.args.args, *node.args.kwonlyargs]
+            }
+            if parameters & {"generator", "context"}:
+                violations.append(f"{routing_path.name}:{node.name}")
     assert not violations
 
 
