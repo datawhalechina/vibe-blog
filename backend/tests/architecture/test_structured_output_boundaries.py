@@ -6,6 +6,7 @@ import pytest
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 CONSUMER_MODULES = [
+    "services/blog_generator/blog_service.py",
     "services/blog_generator/agents/artist.py",
     "services/blog_generator/agents/coder.py",
     "services/blog_generator/agents/factcheck.py",
