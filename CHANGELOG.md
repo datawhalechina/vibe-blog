@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## 2026-08-02
+
+### Changed
+- ♻️ **媒体生成边界** — 将封面图、封面视频、序列视频和视频合并逻辑迁移为显式依赖的模块级函数，移除 `BlogService` 的媒体私有方法并保持降级与 SSE 契约。
+
+### Tests
+- ✨ **媒体 Pipeline 契约** — 覆盖依赖边界、摘要回退、横竖屏、单图与序列分支、事件载荷、顺序保持、合并失败及媒体降级完成流程。
+
 ## 2026-08-01
 
 ### Changed

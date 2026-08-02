@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from services.blog_generator.blog_service import BlogService
+from services.blog_generator.lifecycle.result_pipeline import GenerationResultPipeline
 
 
 def test_completion_event_contains_persisted_blog_payload():
@@ -95,6 +96,12 @@ def test_run_generation_reports_failed_state_without_saving_history():
         writer=SimpleNamespace(),
     )
     service._interrupted_tasks = {}
+    generate_cover_image = MagicMock()
+    service._result_pipeline = GenerationResultPipeline(
+        service,
+        generate_cover_image_fn=generate_cover_image,
+        generate_cover_video_fn=MagicMock(),
+    )
     task_manager = MagicMock()
     task_manager.get_queue.return_value = MagicMock()
 
@@ -109,7 +116,6 @@ def test_run_generation_reports_failed_state_without_saving_history():
         patch("time.sleep"),
         patch("logging_config.create_task_logger", return_value=None),
         patch("services.database_service.get_db_service") as get_db_service,
-        patch.object(service, "_generate_cover_image") as generate_cover_image,
         patch.object(service, "_save_markdown") as save_markdown,
         patch(
             "services.blog_generator.blog_service.update_queue_status"
