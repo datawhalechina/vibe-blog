@@ -1,6 +1,6 @@
 from services.blog_generator.schemas.state import SharedState
 from services.blog_generator.blog_service import _normalize_research_result
-from services.blog_generator.generator import BlogGenerator
+from services.blog_generator.orchestrator.nodes.research import researcher_node
 
 
 def test_shared_state_preserves_skip_researcher_flag():
@@ -24,7 +24,6 @@ def test_skipped_researcher_normalizes_empty_event_fields():
 
 
 def test_skipped_researcher_provides_writer_safe_defaults():
-    generator = object.__new__(BlogGenerator)
     state = {
         "skip_researcher": True,
         "background_knowledge": None,
@@ -34,7 +33,11 @@ def test_skipped_researcher_provides_writer_safe_defaults():
         "knowledge_source_stats": None,
     }
 
-    result = generator._researcher_node(state)
+    result = researcher_node(
+        state,
+        researcher=None,
+        layer_validator=None,
+    )
 
     assert result["background_knowledge"] == ""
     assert result["key_concepts"] == []

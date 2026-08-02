@@ -445,12 +445,14 @@ def benefit_full_integration():
     import inspect
     from services.blog_generator.generator import BlogGenerator
     from services.blog_generator.orchestrator.graph_builder import GraphBuilder
+    from services.blog_generator.orchestrator.nodes.research import planner_node
+    from services.blog_generator.orchestrator.nodes.writing import writer_node
 
     init_src = inspect.getsource(BlogGenerator.__init__)
     workflow_src = inspect.getsource(GraphBuilder.build)
-    add_node_src = inspect.getsource(BlogGenerator._add_node)
-    planner_src = inspect.getsource(BlogGenerator._planner_node)
-    writer_src = inspect.getsource(BlogGenerator._writer_node)
+    add_node_src = inspect.getsource(GraphBuilder._add_node)
+    planner_src = inspect.getsource(planner_node)
+    writer_src = inspect.getsource(writer_node)
 
     components = {
         "MiddlewarePipeline": "MiddlewarePipeline" in init_src,
@@ -488,9 +490,9 @@ def benefit_full_integration():
     call_chain["researcher → ToolRegistry (102.08)"] = "_tool_registry" in researcher_src
 
     wraps_contract = (
-        "generator._add_node" in workflow_src
-        and "for node_name, handler in nodes" in workflow_src
-        and "pipeline.wrap_node" in add_node_src
+        "self._add_node" in workflow_src
+        and "for node_name in NODE_NAMES" in workflow_src
+        and "middleware_pipeline.wrap_node" in add_node_src
         and "wrap_node_state_contract" in add_node_src
     )
 

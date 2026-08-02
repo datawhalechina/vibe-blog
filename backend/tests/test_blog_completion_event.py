@@ -94,6 +94,8 @@ def test_run_generation_reports_failed_state_without_saving_history():
         llm=MagicMock(),
         researcher=SimpleNamespace(search_service=None),
         writer=SimpleNamespace(),
+        _configure_planner_runtime=MagicMock(),
+        _configure_execution_runtime=MagicMock(),
     )
     service._interrupted_tasks = {}
     generate_cover_image = MagicMock()

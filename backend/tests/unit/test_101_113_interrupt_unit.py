@@ -9,8 +9,27 @@
 5. interrupt 数据结构正确性
 """
 
+import os
+
 import pytest
 from unittest.mock import MagicMock, patch, PropertyMock
+
+from services.blog_generator.orchestrator.nodes.research import planner_node
+
+
+def _run_planner(gen, state, interrupt_fn):
+    return planner_node(
+        state,
+        planner=gen.planner,
+        layer_validator=None,
+        on_stream=getattr(gen, "_outline_stream_callback", None),
+        interactive=getattr(gen, "_interactive", False),
+        writing_skill_manager=getattr(gen, "_writing_skill_manager", None),
+        llm_client=MagicMock(),
+        interrupt_fn=interrupt_fn,
+        getenv=os.getenv,
+        image_preplanner_factory=MagicMock(),
+    )
 
 
 class TestPlannerNodeInterrupt:
@@ -54,7 +73,7 @@ class TestPlannerNodeInterrupt:
             gen._writing_skill_manager = None
 
             state = {'topic': 'test'}
-            result = gen._planner_node(state)
+            result = _run_planner(gen, state, mock_interrupt)
 
             # interrupt 应该被调用
             mock_interrupt.assert_called_once()
@@ -82,7 +101,7 @@ class TestPlannerNodeInterrupt:
             gen._writing_skill_manager = None
 
             state = {'topic': 'test'}
-            result = gen._planner_node(state)
+            result = _run_planner(gen, state, mock_interrupt)
 
             mock_interrupt.assert_not_called()
 
@@ -111,7 +130,7 @@ class TestPlannerNodeInterrupt:
             gen._layer_validator = None
             gen._writing_skill_manager = None
 
-            result = gen._planner_node({'topic': 'test'})
+            result = _run_planner(gen, {'topic': 'test'}, mock_interrupt)
 
             assert result['outline']['title'] == '修改后的大纲'
             assert result['sections'] == []  # 清空
@@ -132,7 +151,7 @@ class TestPlannerNodeInterrupt:
             gen._layer_validator = None
             gen._writing_skill_manager = None
 
-            result = gen._planner_node({'topic': 'test'})
+            result = _run_planner(gen, {'topic': 'test'}, mock_interrupt)
             mock_interrupt.assert_not_called()
 
 
@@ -258,7 +277,7 @@ class TestInterruptDataStructure:
             gen._layer_validator = None
             gen._writing_skill_manager = None
 
-            gen._planner_node({'topic': 'AI'})
+            _run_planner(gen, {'topic': 'AI'}, mock_interrupt)
 
             call_data = mock_interrupt.call_args[0][0]
             assert 'type' in call_data
