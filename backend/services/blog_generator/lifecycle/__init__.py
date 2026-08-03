@@ -1,5 +1,6 @@
 """Task lifecycle and result finalization helpers."""
 
+from .generation_stream import GenerationStreamResult, run_generation_stream
 from .result_pipeline import (
     GenerationResult,
     GenerationResultPipeline,
@@ -16,9 +17,11 @@ __all__ = [
     "GenerationResult",
     "GenerationResultPipeline",
     "GenerationResultRequest",
+    "GenerationStreamResult",
     "STAGE_PROGRESS",
     "SSELogHandler",
     "TaskEventBridge",
     "normalize_research_result",
     "project_generation_event",
+    "run_generation_stream",
 ]
