@@ -32,6 +32,20 @@ def _method_calls(path: Path, class_name: str, method_name: str) -> set[str]:
     raise AssertionError(f"Missing {class_name}.{method_name}")
 
 
+def _method_named_calls(path: Path, class_name: str, method_name: str) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if isinstance(node, ast.ClassDef) and node.name == class_name:
+            for member in node.body:
+                if isinstance(member, (ast.FunctionDef, ast.AsyncFunctionDef)) and member.name == method_name:
+                    return {
+                        call.func.id
+                        for call in ast.walk(member)
+                        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+                    }
+    raise AssertionError(f"Missing {class_name}.{method_name}")
+
+
 def test_extracted_orchestration_does_not_depend_on_api_or_flask():
     violations = []
     paths = [*LIFECYCLE_ROOT.glob("*.py")]
@@ -118,3 +132,35 @@ def test_blog_service_generation_paths_delegate_result_finalization():
         calls = _method_calls(path, "BlogService", method_name)
         assert "finalize" in calls
         assert "save_history" not in calls
+
+
+def test_blog_service_generation_paths_delegate_progress_projection():
+    path = BACKEND_ROOT / "services" / "blog_generator" / "blog_service.py"
+    source = path.read_text(encoding="utf-8")
+    tree = ast.parse(source, filename=str(path))
+    service = next(
+        node for node in tree.body
+        if isinstance(node, ast.ClassDef) and node.name == "BlogService"
+    )
+
+    forbidden_payload_markers = {
+        "researcher_complete",
+        "section_complete",
+        "writing_chunk",
+        "reviewer_complete",
+        "assembler_complete",
+    }
+    for method_name in ("_run_generation", "_run_resume"):
+        assert "project_generation_event" in _method_named_calls(
+            path, "BlogService", method_name
+        )
+        method = next(
+            node for node in service.body
+            if isinstance(node, ast.FunctionDef) and node.name == method_name
+        )
+        literals = {
+            node.value
+            for node in ast.walk(method)
+            if isinstance(node, ast.Constant) and isinstance(node.value, str)
+        }
+        assert not forbidden_payload_markers & literals
