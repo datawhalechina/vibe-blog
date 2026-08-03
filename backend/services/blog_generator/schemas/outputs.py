@@ -156,6 +156,25 @@ class ArtistGenerationOutput(BaseModel):
     style_description: str = ""
 
 
+class ArticleEvaluationScores(BaseModel):
+    factual_accuracy: float = Field(ge=0, le=100)
+    completeness: float = Field(ge=0, le=100)
+    coherence: float = Field(ge=0, le=100)
+    relevance: float = Field(ge=0, le=100)
+    citation_quality: float = Field(ge=0, le=100)
+    writing_quality: float = Field(ge=0, le=100)
+
+
+class ArticleEvaluationOutput(BaseModel):
+    overall_score: int = Field(ge=0, le=100)
+    grade: Literal["A+", "A", "A-", "B+", "B", "B-", "C+", "C", "C-", "D", "F"]
+    scores: ArticleEvaluationScores
+    strengths: List[str] = Field(default_factory=list)
+    weaknesses: List[str] = Field(default_factory=list)
+    suggestions: List[str] = Field(default_factory=list)
+    summary: str = ""
+
+
 class ContentEvaluationOutput(BaseModel):
     scores: Dict[str, float]
     overall_quality: Optional[float] = None
@@ -430,6 +449,8 @@ class KnowledgeGapsOutput(BaseModel):
 
 
 __all__ = [
+    "ArticleEvaluationOutput",
+    "ArticleEvaluationScores",
     "ArtistGenerationOutput",
     "AudienceAnalysis",
     "BlogOutline",

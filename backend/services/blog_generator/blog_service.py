@@ -25,9 +25,11 @@ from .lifecycle.progress_events import (
     project_generation_event,
 )
 from .lifecycle.task_events import TaskEventBridge
+from .schemas.outputs import ArticleEvaluationOutput
 from .schemas.state import create_initial_state
 from .services.search_service import SearchService, init_search_service, get_search_service
 from .post_processors.markdown_formatter import MarkdownFormatter
+from .structured_output import parse_structured_output
 
 # 输出目录
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent.parent
@@ -381,14 +383,17 @@ class BlogService:
   "summary": "一句话总结"
 }}"""},
             ]
-            import json
             result = self.generator.llm.chat(
                 messages,
                 response_format={"type": "json_object"},
                 caller="evaluate_article"
             )
             if result:
-                evaluation = json.loads(result)
+                evaluation = parse_structured_output(
+                    ArticleEvaluationOutput,
+                    result,
+                    mode="strict",
+                ).model_dump(mode="json")
                 evaluation.update(base_result)
                 return evaluation
         except Exception as e:
