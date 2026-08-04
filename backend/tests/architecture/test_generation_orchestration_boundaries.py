@@ -46,6 +46,21 @@ def _method_named_calls(path: Path, class_name: str, method_name: str) -> set[st
     raise AssertionError(f"Missing {class_name}.{method_name}")
 
 
+def _function_named_calls(path: Path, function_name: str) -> set[str]:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    function = next(
+        node
+        for node in tree.body
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        and node.name == function_name
+    )
+    return {
+        call.func.id
+        for call in ast.walk(function)
+        if isinstance(call, ast.Call) and isinstance(call.func, ast.Name)
+    }
+
+
 def test_extracted_orchestration_does_not_depend_on_api_or_flask():
     violations = []
     paths = [*LIFECYCLE_ROOT.glob("*.py")]
@@ -134,8 +149,9 @@ def test_blog_service_generation_paths_delegate_result_finalization():
         assert "save_history" not in calls
 
 
-def test_blog_service_generation_paths_delegate_progress_projection():
+def test_blog_service_generation_paths_delegate_stream_and_progress_projection():
     path = BACKEND_ROOT / "services" / "blog_generator" / "blog_service.py"
+    stream_path = LIFECYCLE_ROOT / "generation_stream.py"
     source = path.read_text(encoding="utf-8")
     tree = ast.parse(source, filename=str(path))
     service = next(
@@ -151,9 +167,10 @@ def test_blog_service_generation_paths_delegate_progress_projection():
         "assembler_complete",
     }
     for method_name in ("_run_generation", "_run_resume"):
-        assert "project_generation_event" in _method_named_calls(
-            path, "BlogService", method_name
-        )
+        named_calls = _method_named_calls(path, "BlogService", method_name)
+        assert "run_generation_stream" in named_calls
+        assert "project_generation_event" not in named_calls
+        assert "stream" not in _method_calls(path, "BlogService", method_name)
         method = next(
             node for node in service.body
             if isinstance(node, ast.FunctionDef) and node.name == method_name
@@ -164,3 +181,7 @@ def test_blog_service_generation_paths_delegate_progress_projection():
             if isinstance(node, ast.Constant) and isinstance(node.value, str)
         }
         assert not forbidden_payload_markers & literals
+
+    assert "project_event_fn" in _function_named_calls(
+        stream_path, "run_generation_stream"
+    )

@@ -24,6 +24,7 @@ from .lifecycle.progress_events import (
     normalize_research_result as _normalize_research_result,
     project_generation_event,
 )
+from .lifecycle.generation_stream import run_generation_stream
 from .lifecycle.task_events import TaskEventBridge
 from .schemas.outputs import ArticleEvaluationOutput
 from .schemas.state import create_initial_state
@@ -704,9 +705,6 @@ class BlogService:
             except Exception:
                 pass
             
-            # 记录已完成的章节数
-            completed_sections = 0
-
             # 根据 StyleProfile 配置并行执行引擎
             from .style_profile import StyleProfile
             from .parallel import ParallelTaskExecutor
@@ -715,33 +713,25 @@ class BlogService:
                 ParallelTaskExecutor(enable_parallel=style.enable_parallel)
             )
 
-            # 使用 stream 获取中间状态
-            for event in self.generator.app.stream(initial_state, config):
-                # 检查任务是否被取消
-                if task_manager and task_manager.is_cancelled(task_id):
-                    logger.info(f"任务已取消，停止生成: {task_id}")
-                    self._interrupted_tasks.pop(task_id, None)
-                    task_manager.send_event(task_id, 'cancelled', {
-                        'task_id': task_id,
-                        'message': '任务已被用户取消'
-                    })
-                    return
-                
-                for node_name, state in event.items():
-                    token_usage = (
-                        self._get_token_usage() if task_manager else None
-                    )
-                    completed_sections = project_generation_event(
-                        task_manager=task_manager,
-                        task_id=task_id,
-                        node_name=node_name,
-                        state=state,
-                        completed_sections=completed_sections,
-                        interactive=interactive,
-                        token_usage=token_usage,
-                        initial_generation=True,
-                        update_queue_progress_fn=update_queue_progress,
-                    )
+            def on_cancel():
+                logger.info(f"任务已取消，停止生成: {task_id}")
+                self._interrupted_tasks.pop(task_id, None)
+
+            stream_result = run_generation_stream(
+                app=self.generator.app,
+                stream_input=initial_state,
+                config=config,
+                task_manager=task_manager,
+                task_id=task_id,
+                interactive=interactive,
+                initial_generation=True,
+                get_token_usage_fn=self._get_token_usage,
+                project_event_fn=project_generation_event,
+                update_queue_progress_fn=update_queue_progress,
+                on_cancel=on_cancel,
+            )
+            if stream_result.cancelled:
+                return
             
             # 101.113: 检查是否因 interrupt 暂停（交互式大纲确认）
             snapshot = self.generator.app.get_state(config)
@@ -885,8 +875,6 @@ class BlogService:
                     'message': '大纲已确认，开始写作'
                 })
 
-        completed_sections = 0
-
         # 102.07: 修复悬挂工具调用（防御性代码，防止 resume 时消息历史不完整）
         try:
             snapshot = self.generator.app.get_state(config)
@@ -904,31 +892,23 @@ class BlogService:
 
         try:
             # 使用 Command(resume=...) 恢复图执行
-            for event in self.generator.app.stream(Command(resume=resume_value), config):
-                # 检查任务是否被取消
-                if task_manager and task_manager.is_cancelled(task_id):
-                    logger.info(f"任务已取消，停止生成: {task_id}")
-                    task_manager.send_event(task_id, 'cancelled', {
-                        'task_id': task_id,
-                        'message': '任务已被用户取消'
-                    })
-                    return
-
-                for node_name, state in event.items():
-                    token_usage = (
-                        self._get_token_usage() if task_manager else None
-                    )
-                    completed_sections = project_generation_event(
-                        task_manager=task_manager,
-                        task_id=task_id,
-                        node_name=node_name,
-                        state=state,
-                        completed_sections=completed_sections,
-                        interactive=interactive,
-                        token_usage=token_usage,
-                        initial_generation=False,
-                        update_queue_progress_fn=update_queue_progress,
-                    )
+            stream_result = run_generation_stream(
+                app=self.generator.app,
+                stream_input=Command(resume=resume_value),
+                config=config,
+                task_manager=task_manager,
+                task_id=task_id,
+                interactive=interactive,
+                initial_generation=False,
+                get_token_usage_fn=self._get_token_usage,
+                project_event_fn=project_generation_event,
+                update_queue_progress_fn=update_queue_progress,
+                on_cancel=lambda: logger.info(
+                    f"任务已取消，停止生成: {task_id}"
+                ),
+            )
+            if stream_result.cancelled:
+                return
 
             final_state = self.generator.app.get_state(config).values
             result_pipeline = getattr(self, "_result_pipeline", None)
