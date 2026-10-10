@@ -4,6 +4,11 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## Unreleased
+
+### Fixed
+- Keep generated task logs and search progress events within their originating task's SSE stream. Logs without a task context are no longer broadcast to active tasks.
+
 ## 2026-08-16
 
 ### Added

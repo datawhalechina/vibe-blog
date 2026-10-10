@@ -4,6 +4,8 @@ import json
 import logging
 import re
 
+from logging_config import task_id_context
+
 
 LOGGER_NAMES = (
     "services.blog_generator.generator",
@@ -33,6 +35,11 @@ class SSELogHandler(logging.Handler):
         if self.task_manager and record.name.startswith("services.blog_generator"):
             if not self.task_manager.get_queue(self.task_id):
                 logging.getLogger(record.name).removeHandler(self)
+                return
+            # TaskIdFilter formats record.task_id later on the root handlers.
+            # Route using the generation context, never a display field or an
+            # unscoped log from another worker.
+            if task_id_context.get() != self.task_id:
                 return
             msg = self.format(record)
             self.task_manager.send_event(
