@@ -49,6 +49,15 @@ export function useTaskStream() {
   let sectionOrder: string[] = []                       // 保持章节出现顺序
   let previewTimer: ReturnType<typeof setTimeout> | null = null
 
+  const disconnectSSE = () => {
+    eventSource?.close()
+    eventSource = null
+    if (previewTimer !== null) {
+      clearTimeout(previewTimer)
+      previewTimer = null
+    }
+  }
+
   // 重建完整预览
   const rebuildPreview = () => {
     const parts: string[] = []
@@ -61,7 +70,7 @@ export function useTaskStream() {
 
   // 节流更新预览
   const throttledUpdatePreview = () => {
-    if (previewTimer) return
+    if (previewTimer !== null) return
     previewTimer = setTimeout(() => {
       previewContent.value = rebuildPreview()
       previewTimer = null
@@ -106,9 +115,11 @@ export function useTaskStream() {
 
   // 连接 SSE
   const connectSSE = (taskId: string, onComplete?: (data: any) => void) => {
-    eventSource?.close()
+    disconnectSSE()
     sectionContentMap.clear()
     sectionOrder = []
+    sectionCount = 0
+    activeSectionIndex.value = -1
     previewContent.value = ''
     savedOutputPath.value = ''
     citations.value = []
@@ -312,6 +323,9 @@ export function useTaskStream() {
     es.addEventListener('complete', (e: MessageEvent) => {
       const d = JSON.parse(e.data)
       const result = isRecord(d.outputs) ? d.outputs : d
+      // 保留最新草稿作为兜底，并取消延迟更新，避免覆盖最终预览。
+      if (previewTimer !== null) previewContent.value = rebuildPreview()
+      disconnectSSE()
       updateTokenUsage(d)
       addProgressItem('🎉 生成完成！', 'success')
       statusBadge.value = '已完成'
@@ -333,9 +347,6 @@ export function useTaskStream() {
       savedOutputPath.value = result.saved_path || ''
 
       completedBlogId.value = result.id || result.book_id || ''
-
-      es.close()
-      eventSource = null
 
       onComplete?.(result)
     })
@@ -386,8 +397,7 @@ export function useTaskStream() {
         addProgressItem('⚠️ 取消请求失败', 'error')
       }
     }
-    eventSource?.close()
-    eventSource = null
+    disconnectSSE()
     statusBadge.value = '已停止'
     isLoading.value = false
   }
@@ -395,12 +405,12 @@ export function useTaskStream() {
   // 关闭进度
   const closeProgress = () => {
     showProgress.value = false
-    eventSource?.close()
-    eventSource = null
+    disconnectSSE()
   }
 
   // 重置状态
   const reset = () => {
+    disconnectSSE()
     isLoading.value = false
     showProgress.value = false
     progressItems.value = []
@@ -420,14 +430,7 @@ export function useTaskStream() {
     sectionCount = 0
   }
 
-  onUnmounted(() => {
-    eventSource?.close()
-    eventSource = null
-    if (previewTimer) {
-      clearTimeout(previewTimer)
-      previewTimer = null
-    }
-  })
+  onUnmounted(disconnectSSE)
 
   return {
     // 状态

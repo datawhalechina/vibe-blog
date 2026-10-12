@@ -4,6 +4,14 @@ All notable changes to the Vibe Blog project will be documented in this file.
 
 ---
 
+## Unreleased
+
+### Fixed
+- Preserve final blog and Storybook previews when a streamed draft update is still pending, and clear pending preview work when a task stream is replaced or closed.
+
+### Tests
+- Cover throttled preview updates, final-result precedence, draft fallback, reconnects, and stream cleanup on stop, close, reset, and unmount.
+
 ## 2026-08-16
 
 ### Added
