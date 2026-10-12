@@ -2,7 +2,8 @@
  * 101.03 useTaskStream composable 测试
  * 测试初始化、添加进度项、带数据添加、累积预览、重置
  */
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
+import { mount } from '@vue/test-utils'
 
 // Mock vue-router
 vi.mock('vue-router', () => ({
@@ -186,5 +187,117 @@ describe('useTaskStream', () => {
       saved_path: '/tmp/blog.md',
     })
     expect(source.close).toHaveBeenCalledOnce()
+  })
+
+  describe('preview timer lifecycle', () => {
+    let unmount: (() => void) | undefined
+
+    const createStream = () => {
+      let stream!: ReturnType<typeof useTaskStream>
+      const wrapper = mount({
+        setup() {
+          stream = useTaskStream()
+          return () => null
+        },
+      })
+      unmount = () => wrapper.unmount()
+      const source = new FakeEventSource()
+      vi.mocked(api.createTaskStream).mockReturnValue(source as unknown as EventSource)
+      stream.connectSSE('task-1')
+      return { stream, source }
+    }
+
+    beforeEach(() => {
+      vi.useFakeTimers()
+    })
+
+    afterEach(() => {
+      unmount?.()
+      unmount = undefined
+      vi.clearAllTimers()
+      vi.useRealTimers()
+      vi.clearAllMocks()
+    })
+
+    it('coalesces section chunks while keeping their order and latest content', () => {
+      const { stream, source } = createStream()
+      source.emit('writing_chunk', { section_title: 'First', accumulated: 'First draft' })
+      source.emit('writing_chunk', { section_title: 'Second', delta: 'Second section' })
+      source.emit('writing_chunk', { section_title: 'First', accumulated: 'Revised first' })
+      source.emit('writing_chunk', { section_title: 'Second', delta: ' continued' })
+
+      vi.advanceTimersByTime(99)
+      expect(stream.previewContent.value).toBe('')
+      vi.advanceTimersByTime(1)
+      expect(stream.previewContent.value).toBe('Revised first\n\nSecond section continued')
+    })
+
+    it.each([
+      ['blog', { id: 'blog-1', markdown: '# Final article\n\nReferences and images' }, '# Final article\n\nReferences and images'],
+      ['nested blog', { outputs: { id: 'blog-1', markdown: '# Final article' } }, '# Final article'],
+      ['storybook', { outputs: { title: 'Final story', pages: [{ page_number: 1, title: 'Page', content: 'Final page' }] } }, '# Final story'],
+    ])('keeps the final %s preview after a pending draft update', (_kind, result, expected) => {
+      const { stream, source } = createStream()
+      source.emit('writing_chunk', { section_title: 'Draft', accumulated: '# Incomplete draft' })
+      source.emit('complete', result)
+
+      const finalPreview = stream.previewContent.value
+      expect(finalPreview).toContain(expected)
+      vi.runAllTimers()
+      expect(stream.previewContent.value).toBe(finalPreview)
+      expect(source.close).toHaveBeenCalledOnce()
+    })
+
+    it('keeps the latest draft when completion has no replacement preview', () => {
+      const { stream, source } = createStream()
+      source.emit('writing_chunk', { accumulated: '# Last streamed content' })
+      source.emit('complete', { id: 'blog-1' })
+
+      expect(stream.previewContent.value).toBe('# Last streamed content')
+      expect(vi.getTimerCount()).toBe(0)
+    })
+
+    it('starts a new preview interval and section index when reconnecting', () => {
+      const { stream, source } = createStream()
+      source.emit('writing_chunk', { section_title: 'Old', accumulated: 'Old draft' })
+      vi.advanceTimersByTime(50)
+      const nextSource = new FakeEventSource()
+      vi.mocked(api.createTaskStream).mockReturnValue(nextSource as unknown as EventSource)
+
+      stream.connectSSE('task-2')
+      expect(stream.activeSectionIndex.value).toBe(-1)
+      nextSource.emit('writing_chunk', { section_title: 'New', accumulated: 'New draft' })
+      expect(stream.activeSectionIndex.value).toBe(0)
+      vi.advanceTimersByTime(50)
+      expect(stream.previewContent.value).toBe('')
+      vi.advanceTimersByTime(50)
+      expect(stream.previewContent.value).toBe('New draft')
+      expect(source.close).toHaveBeenCalledOnce()
+    })
+
+    it.each(['stopGeneration', 'closeProgress', 'reset', 'unmount'] as const)(
+      'cancels pending preview work on %s',
+      async (action) => {
+        const { stream, source } = createStream()
+        source.emit('writing_chunk', { accumulated: 'Rendered draft' })
+        vi.advanceTimersByTime(100)
+        source.emit('writing_chunk', { accumulated: 'Pending draft' })
+        if (action === 'stopGeneration') {
+          stream.currentTaskId.value = 'task-1'
+          vi.mocked(api.cancelTask).mockResolvedValue({ success: true })
+        }
+        if (action === 'unmount') {
+          unmount?.()
+          unmount = undefined
+        } else {
+          await stream[action]()
+        }
+
+        expect(source.close).toHaveBeenCalledOnce()
+        expect(vi.getTimerCount()).toBe(0)
+        vi.runAllTimers()
+        expect(stream.previewContent.value).toBe(action === 'reset' ? '' : 'Rendered draft')
+      },
+    )
   })
 })
